@@ -24,6 +24,7 @@ export class OAuthError extends Error {
   constructor(readonly status:401|403|503,readonly reason:string){super(reason);}
 }
 function checkedUrl(value:string,allowHttp:boolean){
+  if(/[\u0000-\u0020\u007f\\]/.test(value))throw Error('OAUTH_URL_INVALID');
   const parsed=new URL(value);
   if(parsed.username||parsed.password||parsed.hash||parsed.search||
     !(parsed.protocol==='https:'||(allowHttp&&parsed.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(parsed.hostname))))

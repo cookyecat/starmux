@@ -27,7 +27,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build:test": "npm run build",
     "prepare": "node scripts/prepare.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "test:oauth:keycloak": "npm run build && node --test dist/test/keycloak.integration.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",

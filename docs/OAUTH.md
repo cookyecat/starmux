@@ -12,13 +12,14 @@ Gateway is the OAuth **resource server**. A separate authorization server owns u
 
 ## Configure an existing authorization server
 
-Create a dedicated owner account and a public OAuth client with authorization-code flow, PKCE S256, the exact ChatGPT callback URL and explicit consent. Disable password grants, implicit grants and public account registration. The issuer must issue a token for this Gateway resource with `gateway:access`. The scope means access to **Owner default**, not a filesystem sandbox.
+Create a dedicated owner account and an OAuth client with authorization-code flow, PKCE S256, the exact ChatGPT callback URL and explicit consent. Disable password grants, implicit grants and public account registration. The issuer must issue a token for this Gateway resource with `gateway:access`. The scope means access to **Owner default**, not a filesystem sandbox.
 
 ```sh
 mac-mcp-gateway access oauth configure \
   --issuer https://auth.example.com/realms/gateway \
   --resource https://gateway.example.com/mcp \
   --client-id gateway-chatgpt \
+  --token-auth client_secret_basic \
   --subjects OWNER_SUBJECT_ID
 mac-mcp-gateway access oauth doctor
 mac-mcp-gateway access mode oauth
@@ -31,7 +32,7 @@ The default registration method is `provided` and token endpoint method is `none
 
 Configure ChatGPT with OAuth, the corresponding registration mode and client ID. `none` means no **client secret**, not no user authentication. Use `gateway:access` as the base scope. Leave OIDC/domain-claim features off unless your provider is configured for them. Tool names, input schemas and results retain upstream semantics; OAuth security metadata is added to advertised descriptors without replacing other `_meta` entries.
 
-Forward the MCP route and the protected-resource metadata routes through your HTTPS ingress, preserving Authorization and WWW-Authenticate headers. Keep `/access`, `/dashboard`, `/permissions` and other local management endpoints private. Do not derive issuer/resource from an untrusted Host or forwarded header.
+Forward the MCP route and the protected-resource metadata routes through your HTTPS ingress, preserving Authorization and WWW-Authenticate headers. The local upstream Host header must match the loopback endpoint; the Core retains its loopback Host validation. Keep `/access`, `/dashboard`, `/permissions` and other local management endpoints private. Do not derive issuer/resource from an untrusted Host or forwarded header.
 
 For Secure MCP Tunnel, verify metadata discovery through the tunnel separately. The authorization server's browser-facing login and token endpoints are not automatically made reachable by an MCP tunnel.
 
@@ -45,9 +46,9 @@ mac-mcp-gateway access oauth keycloak-realm \
   --callback https://chatgpt.com/connector/oauth/YOUR_CALLBACK_ID > gateway-realm.json
 ```
 
-Import into a dedicated Keycloak instance/realm. The generator contains no users or passwords, enables explicit client consent, requires S256, disables password/implicit grants, uses short-lived access tokens and refresh-token rotation, and registers only the exact callback. Create the owner account using Keycloak's admin interface; take its user ID as `--subjects`. The reference client ID is `gateway-chatgpt`.
+Import into a dedicated Keycloak instance/realm. The generator contains no users or passwords, enables explicit client consent, requires S256, disables password/implicit grants, uses short-lived access tokens and refresh-token rotation, and registers only the exact callback. Create the owner account using Keycloak's admin interface; take its user ID as `--subjects`. The reference client ID is `gateway-chatgpt`, using `client_secret_basic`. Obtain its generated secret from the Keycloak admin interface and enter it only into ChatGPT. Keycloak 26.8.1 does not advertise `none` in token endpoint authentication metadata, so this reference uses a confidential client rather than claiming public-client discovery support.
 
-Start Keycloak with `--features=resource-indicators` so it processes and validates the resource parameter. The import declares a `gateway-resource` client with `resource_url` and a `gateway:access` audience mapper targeting that client. This feature is experimental in 26.8.1. Production deployments require a persistent database, HTTPS/hostname settings, protected administration and backups; do not expose `start-dev` publicly. CIMD is not enabled by this template.
+Start Keycloak with `--features=resource-indicators` so it processes and validates the resource parameter. The import explicitly maps the subject (`sub`) into access tokens and declares a `gateway-resource` client with `resource_url` and a `gateway:access` audience mapper targeting that client. This feature is experimental in 26.8.1. Production deployments require a persistent database, HTTPS/hostname settings, protected administration and backups; do not expose `start-dev` publicly. CIMD is not enabled by this template.
 
 ## View and revoke
 
@@ -70,10 +71,20 @@ JWT verification checks signatures, issuer, audience, expiry/not-before, issued-
 - [x] Metadata, PKCE discovery validation, wrong issuer/audience/scope/client rejection.
 - [x] Tool discovery/read behavior, restricted write denial and unchanged invocation policy.
 - [x] Local revocation rejects refreshed token claims with the same session ID.
-- [ ] Real provider authorization code, PKCE, consent, refresh and replay tests.
+- [x] Real Keycloak 26.8.1 authorization code, PKCE, consent, refresh and replay tests (local macOS).
 - [ ] Real ChatGPT HTTPS: discovery → authorization → coding → refresh → revoke.
 - [ ] Real ChatGPT Tunnel: same flow, including separate authorization endpoint reachability.
 - [ ] Native Linux/Windows validation of the new OAuth feature.
+
+## Reproduce the local provider test
+
+Use a **disposable** unpacked Keycloak 26.8.1 distribution and Java 21. The test starts Keycloak only on loopback with an in-memory database, imports a temporary realm into that distribution, generates temporary credentials, and stops it afterward. Do not point this test at an existing provider installation.
+
+```sh
+GATEWAY_KEYCLOAK_HOME=/absolute/path/to/disposable/keycloak-26.8.1 npm run test:oauth:keycloak
+```
+
+The test exercises exact callback checks, consent rejection, PKCE mismatch, authorization-code replay rejection, real token audience, MCP discovery and reading, token expiry, refresh rotation, and Gateway revocation surviving a provider refresh. It does not connect to ChatGPT or deploy a public authorization server. The normal `npm test` suite does not require Keycloak.
 
 ## Sources
 
