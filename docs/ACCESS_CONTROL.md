@@ -23,7 +23,7 @@ mac-mcp-gateway access create "Temporary client" --expires 2027-01-01T00:00:00.0
 mac-mcp-gateway access mode api-key
 ```
 
-Configure the client to send `Authorization: Bearer <key>` on every MCP request. Use a protected HTTPS or encrypted Tunnel connection remotely, and ensure the ingress preserves the header. Not every MCP client's configuration UI supports arbitrary Bearer credentials. Verify your particular client before switching modes. No OAuth authorization server or client-specific login adapter is included.
+Configure the client to send `Authorization: Bearer <key>` on every MCP request. Use a protected HTTPS or encrypted Tunnel connection remotely, and ensure the ingress preserves the header. Not every MCP client's configuration UI supports arbitrary Bearer credentials. Verify your particular client before switching modes. An optional OAuth resource-server adapter is available separately; see [OAuth setup](OAUTH.md). Gateway does not embed an authorization server.
 
 Changes take effect for subsequent requests without restarting. Missing, invalid, expired and revoked keys receive HTTP 401; an unreadable, unsafe or invalid access store receives 503. Neither failure falls back to ingress mode. Revoking the final credential leaves API key mode enabled and blocks all MCP access until the owner creates another credential or explicitly switches modes. Already executing tool calls are not canceled or replayed.
 
@@ -58,3 +58,7 @@ For isolated instances/tests, set the absolute path `MAC_MCP_ACCESS_FILE` consis
 This is a single-owner workstation, not an isolation boundary against tools running with that owner's OS privileges. Trusted native Shell/file tools may access owner-readable configuration and alter it. API keys control admission to those already approved capabilities; they do not sandbox them. Per-credential workspaces, billing and arbitrary role policies are not implemented.
 
 On macOS, Home-only restrictions apply to the configured sandboxed Desktop Commander process and its subprocesses. They do not cover every optional upstream or external application. Linux/Windows trusted mode uses OS-account permissions and does not provide the macOS Home-only sandbox.
+
+## OAuth mode
+
+`mac-mcp-gateway access mode oauth` enables the configured OAuth resource-server adapter. It accepts OAuth tokens only; API keys are not a fallback. Configure and validate the provider first using [OAuth setup](OAUTH.md).

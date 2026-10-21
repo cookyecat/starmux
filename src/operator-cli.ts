@@ -183,7 +183,7 @@ async function currentStatus(info: ServiceInfo,uid: number,home: string,portOver
       const r=await fetch("http://127.0.0.1:"+port+"/healthz",{
         signal:AbortSignal.timeout(2000)});
       const data=record(await r.json());
-      if(data.accessMode==="ingress"||data.accessMode==="api-key"||data.accessMode==="unavailable")accessMode=data.accessMode;
+      if(data.accessMode==="ingress"||data.accessMode==="api-key"||data.accessMode==="oauth"||data.accessMode==="unavailable")accessMode=data.accessMode;
       if(r.ok&&data.status==="ok"&&typeof data.mode==="string"&&["read-only","read-write"].includes(data.mode))
         workspaceMode=data.mode;
       if(r.ok&&data.status==="ok"&&typeof data.writeScope==="string"&&["home-only","unrestricted"].includes(data.writeScope))

@@ -29,6 +29,11 @@ Usage:
   mac-mcp-gateway access mode api-key Require a key on every MCP request
   mac-mcp-gateway access mode ingress Delegate access control to ingress
   mac-mcp-gateway access revoke ID    Revoke one credential immediately
+  mac-mcp-gateway access oauth configure --issuer URL --resource URL --client-id ID --subjects SUBJECT
+                                      Discover and save OAuth settings; does not enable auth
+  mac-mcp-gateway access oauth doctor  Check OAuth discovery and PKCE support
+  mac-mcp-gateway access mode oauth    Require OAuth on MCP requests
+  mac-mcp-gateway access revoke-oauth ID Revoke an OAuth session locally
   mac-mcp-gateway access owner-token  Show the local Dashboard management token
 
   mac-mcp-gateway setup               Configure local access and connection preference

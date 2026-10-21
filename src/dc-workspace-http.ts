@@ -1,3 +1,4 @@
+import {resourceMetadata,metadataUrl,oauthChallenge,OAuthError} from './oauth-resource.js';
 import {randomUUID} from 'node:crypto';
 import {createAccessControl} from './access-control.js';
 import {accessPage,accessPost,accessHeaders} from './access-dashboard.js';
@@ -137,6 +138,18 @@ http=createServer(async(req,res)=>{
   const hostOk=[`127.0.0.1:${port}`,`localhost:${port}`].includes(req.headers.host??"");
   if(!local||!hostOk){res.writeHead(403).end("Denied");return;}
   const route=new URL(req.url||"/","http://localhost").pathname;
+  if(route.startsWith('/.well-known/oauth-protected-resource')&&(req.method==='GET'||req.method==='OPTIONS')){
+    try{
+      const config=await access.oauthSettings();
+      if(!config||![new URL(metadataUrl(config)).pathname,'/.well-known/oauth-protected-resource'].includes(route)){
+        res.writeHead(404).end('Not found');return;
+      }
+      res.writeHead(req.method==='OPTIONS'?204:200,{'content-type':'application/json','cache-control':'no-store',
+        'access-control-allow-origin':'*','access-control-allow-methods':'GET, OPTIONS'});
+      res.end(req.method==='OPTIONS'?undefined:JSON.stringify(resourceMetadata(config)));
+    }catch{res.writeHead(503).end('Access configuration unavailable');}
+    return;
+  }
   // Only the owner authorization form accepts an Origin; MCP remains no-CORS.
   if(req.headers.origin&&!(
     (route==="/permissions"||route==="/filters"||route==="/access")&&req.method==="POST")){
@@ -248,7 +261,7 @@ http=createServer(async(req,res)=>{
       writeScope,accessMode}));
     return;
   }
-  if(route!=="/mcp"||req.method!=="POST"){
+  if(route!=="/mcp"){
     res.writeHead(404).end("Not found");return;
   }
   if(Number(req.headers["content-length"]||0)>65536){
@@ -257,17 +270,22 @@ http=createServer(async(req,res)=>{
   let identity: import('./contracts.js').RequestContext['identity'];
   try{identity=await access.authenticate(req.headers.authorization);}
   catch(error){
-    const rejected=error instanceof Error&&error.message==='ACCESS_UNAUTHORIZED';
-    res.writeHead(rejected?401:503,{"cache-control":"no-store",...(rejected?{"www-authenticate":'Bearer realm="Gateway"'}:{})}).end(rejected?"Gateway API key required":"Access configuration unavailable");return;
+    const config=await access.oauthSettings().catch(()=>null);
+    const status=error instanceof OAuthError?error.status:error instanceof Error&&error.message==='ACCESS_UNAUTHORIZED'?401:503;
+    const challenge=config?oauthChallenge(config,status===403?403:401):'Bearer realm="Gateway"';
+    res.writeHead(status,{"cache-control":"no-store",...(status!==503?{"www-authenticate":challenge}:{})}).end(status===503?"Access configuration unavailable":"Authentication required or access denied");return;
   }
+  if(req.method!=='POST'){res.writeHead(405,{allow:'POST'}).end('Method not allowed');return;}
+  const oauth=identity.kind==='verified-oauth'?await access.oauthSettings().catch(()=>null):null;
+  if(identity.kind==='verified-oauth'&&!oauth){res.writeHead(503).end('Access configuration unavailable');return;}
   const request={requestId:randomUUID(),identity};
   audit({event:'MCP_REQUEST_ACCEPTED',requestId:request.requestId,identityKind:identity.kind,
-    ...(identity.kind==='verified-api-key'?{credentialId:identity.credentialId}:{})});
+    ...(identity.kind==='verified-api-key'?{credentialId:identity.credentialId}:identity.kind==='verified-oauth'?{connectionId:identity.connectionId}:{})});
   const transport=new StreamableHTTPServerTransport({
     enableJsonResponse:true
   });
   const gateway=createDesktopCommanderBridge(router,audit,{
-    request,workspacePolicy,upstreamRouter:router,
+    request,...(oauth?{oauthScope:oauth.scope}:{}),workspacePolicy,upstreamRouter:router,
     nativePassthrough:nativeAccessMode==="native",denyRules,
     ...(gitWorkflow?{gitWorkflow}:{})
   });

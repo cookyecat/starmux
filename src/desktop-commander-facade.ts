@@ -4,7 +4,7 @@ import { createInvocationPipeline,safeAuditSink } from "./invocation.js";
 import type { LocalDesktopReadProbe } from './local-desktop-read-probe.js';
 import { createToolDispatcher } from "./tool-dispatch.js";
 export type BridgeUpstream = McpUpstream & Partial<ResourceProvider> & Partial<Pick<LocalDesktopReadProbe,'callApprovedRead'|'callApprovedProjectRead'|'callApprovedCanaryWrite'|'callApprovedSystemName'>>;
-export interface BridgeOptions {request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
+export interface BridgeOptions {oauthScope?:string;request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
 // Desktop Commander tool-schema facade. Upstream catalog remains unmodified.
 // Preserve all native upstream tools; owner-approved native mode forwards unchanged.
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -55,7 +55,9 @@ export function createDesktopCommanderBridge(upstream: BridgeUpstream, audit: Au
       description:"Mac MCP Gateway bridge connection and genuine upstream availability check",
       inputSchema:{type:"object",properties:{},additionalProperties:false},
       annotations:{readOnlyHint:true,destructiveHint:false}
-    }].filter(tool=>!state?.deniedTools.includes(tool.name))};
+    }].filter(tool=>!state?.deniedTools.includes(tool.name)).map(tool=>options.oauthScope?{...tool,
+      securitySchemes:[{type:'oauth2',scopes:[options.oauthScope]}],
+      _meta:{...('_meta' in tool?tool._meta:{}),securitySchemes:[{type:'oauth2',scopes:[options.oauthScope]}]}}:tool)};
   });
   const invoke = createInvocationPipeline({
     dispatch: createToolDispatcher(upstream, safeAudit, options),

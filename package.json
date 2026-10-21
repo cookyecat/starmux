@@ -47,6 +47,7 @@
     "test/fixtures/p1-fixture.txt",
     "LICENSE",
     "README.md",
-    "docs/ACCESS_CONTROL.md"
+    "docs/ACCESS_CONTROL.md",
+    "docs/OAUTH.md"
   ]
 }

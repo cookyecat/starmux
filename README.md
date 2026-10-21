@@ -78,6 +78,8 @@ mac-mcp-gateway access revoke CREDENTIAL_ID
 
 Every credential uses your existing owner-approved permissions; authentication does not remove Desktop Commander coding tools. Manage credentials through the CLI or **Dashboard → Access control** (also reachable from the macOS App). See [access control, client compatibility and security boundaries](docs/ACCESS_CONTROL.md) before enabling key mode.
 
+OAuth for ChatGPT is now available as an opt-in resource-server integration with a separate authorization server. See [OAuth setup and acceptance status](docs/OAUTH.md); real remote-client acceptance is still pending.
+
 ## Why run your own Gateway?
 
 **Your AI runs in the cloud. Your code, Git repositories, and terminal live on your Mac. Why should someone else control the bridge?**

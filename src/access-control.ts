@@ -1,3 +1,4 @@
+import {oauthConfigSchema,oauthConnectionSchema,validateOAuthConfig,createOAuthVerifier,OAuthError,type OAuthConfig} from './oauth-resource.js';
 import {randomBytes,createHash,timingSafeEqual} from 'node:crypto';
 import {lstat,readFile,writeFile,rename,rm,mkdir} from 'node:fs/promises';
 import {homedir} from 'node:os';
@@ -9,7 +10,8 @@ import type {RequestContext} from './contracts.js';
 const credential=z.object({id:z.string().regex(/^[a-f0-9]{24}$/),name:z.string().trim().min(1).max(80).regex(/^[^\x00-\x1f\x7f]+$/),
   digest:z.string().regex(/^[a-f0-9]{64}$/),createdAt:z.string().datetime(),expiresAt:z.string().datetime().nullable(),
   revokedAt:z.string().datetime().nullable(),lastUsedAt:z.string().datetime().nullable(),permission:z.literal('owner-default')}).strict();
-const schema=z.object({version:z.literal(1),mode:z.enum(['ingress','api-key']),credentials:z.array(credential).max(256)}).strict();
+const schema=z.object({version:z.literal(1),mode:z.enum(['ingress','api-key','oauth']),credentials:z.array(credential).max(256),
+  oauth:oauthConfigSchema.optional(),oauthConnections:z.array(oauthConnectionSchema).max(512).default([])}).strict();
 type State=z.infer<typeof schema>;
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 const equal=(a:string,b:string)=>a.length===b.length&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
@@ -41,7 +43,10 @@ export async function createAccessControl(file=defaultAccessFile()){
   }
   async function load(){
     if(!ownedByUser(folder,await lstat(folder),true))throw Error('ACCESS_DIRECTORY_UNSAFE');
-    return schema.parse(JSON.parse(await readPrivate(file)) as unknown);
+    const data=schema.parse(JSON.parse(await readPrivate(file)) as unknown);
+    if(data.oauth)validateOAuthConfig(data.oauth);
+    if(data.mode==='oauth'&&!data.oauth)throw Error('OAUTH_CONFIGURATION_REQUIRED');
+    return data;
   }
   await locked(async()=>{
     try{await load();}catch(e){
@@ -53,7 +58,7 @@ export async function createAccessControl(file=defaultAccessFile()){
         if(!(markerError instanceof Error&&'code' in markerError&&markerError.code==='ENOENT'))throw markerError;
       }
       await writeFile(file+'.initialized','1\n',{flag:'wx',mode:0o600});
-      await save({version:1,mode:'ingress',credentials:[]});
+      await save({version:1,mode:'ingress',credentials:[],oauthConnections:[]});
     }
   });
   const ownerFile=file+'.owner-token';
@@ -71,7 +76,7 @@ export async function createAccessControl(file=defaultAccessFile()){
     try{return equal(token,(await readPrivate(ownerFile)).trim());}catch{return false;}
   }
   async function snapshot(){
-    const data=await load();return {mode:data.mode,permission:'owner-default' as const,
+    const data=await load();return {mode:data.mode,permission:'owner-default' as const,oauth:data.oauth??null,oauthConnections:data.oauthConnections,
       credentials:data.credentials.map(({digest:_,...c})=>({...c,status:c.revokedAt?'revoked':active(c)?'active':'expired'}))};
   }
   async function create(name:string,expiresAt:string|null=null){
@@ -82,18 +87,50 @@ export async function createAccessControl(file=defaultAccessFile()){
     await locked(async()=>{const data=await load();data.credentials.push(c);await save(data);});
     return {id:c.id,name:c.name,key:secret,permission:c.permission};
   }
-  async function setMode(mode:'ingress'|'api-key'){
+  async function setMode(mode:'ingress'|'api-key'|'oauth'){
     await locked(async()=>{const data=await load();
       if(mode==='api-key'&&!data.credentials.some(active))throw Error('ACCESS_ACTIVE_KEY_REQUIRED');
+      if(mode==='oauth'&&!data.oauth)throw Error('OAUTH_CONFIGURATION_REQUIRED');
       data.mode=mode;await save(data);});
   }
   async function revoke(id:string){
     await locked(async()=>{const data=await load();const c=data.credentials.find(c=>c.id===id);
       if(!c)throw Error('ACCESS_CREDENTIAL_NOT_FOUND');c.revokedAt??=new Date().toISOString();await save(data);});
   }
+  async function configureOAuth(value:unknown){
+    const config=validateOAuthConfig(value);
+    await locked(async()=>{const data=await load();data.oauth=config;await save(data);});
+  }
+  async function revokeOAuth(id:string){
+    await locked(async()=>{const data=await load();const c=data.oauthConnections.find(c=>c.id===id);
+      if(!c)throw Error('OAUTH_CONNECTION_NOT_FOUND');c.revokedAt??=new Date().toISOString();await save(data);});
+  }
+  async function oauthSettings(){const data=await load();return data.mode==='oauth'?data.oauth!:null;}
+  let verifier:{signature:string;verify:ReturnType<typeof createOAuthVerifier>}|undefined;
+  async function authenticateOAuth(config:OAuthConfig,header:string|undefined):Promise<RequestContext['identity']>{
+    const signature=JSON.stringify(config);
+    if(verifier?.signature!==signature)verifier={signature,verify:createOAuthVerifier(config)};
+    const verified=await verifier.verify(header);
+    await locked(async()=>{
+      const data=await load();
+      if(data.mode!=='oauth'||JSON.stringify(data.oauth)!==signature)throw new OAuthError(401,'OAUTH_CONFIGURATION_CHANGED');
+      const c=data.oauthConnections.find(c=>c.id===verified.id);
+      if(c?.revokedAt)throw new OAuthError(401,'OAUTH_CONNECTION_REVOKED');
+      const now=new Date().toISOString();
+      if(c)c.lastUsedAt=now;
+      else{
+        if(data.oauthConnections.length>=512)throw new OAuthError(503,'OAUTH_CONNECTION_LIMIT');
+        data.oauthConnections.push({id:verified.id,subjectHash:verified.subjectHash,clientId:verified.clientId,
+          createdAt:now,lastUsedAt:now,revokedAt:null,permission:'owner-default'});
+      }
+      await save(data);
+    });
+    return {kind:'verified-oauth',connectionId:verified.id,subjectHash:verified.subjectHash,scopes:verified.scopes,permission:'owner-default'};
+  }
   async function authenticate(header:string|undefined):Promise<RequestContext['identity']>{
     const data=await load();
     if(data.mode==='ingress')return {kind:'unverified-local'};
+    if(data.mode==='oauth')return authenticateOAuth(data.oauth!,header);
     if(!header||!/^Bearer mgw_[A-Za-z0-9_-]{43}$/i.test(header))throw Error('ACCESS_UNAUTHORIZED');
     const hash=digest(header.slice(7));const c=data.credentials.find(c=>equal(c.digest,hash)&&active(c));
     if(!c)throw Error('ACCESS_UNAUTHORIZED');
@@ -103,6 +140,6 @@ export async function createAccessControl(file=defaultAccessFile()){
       found.lastUsedAt=new Date().toISOString();await save(current);});
     return {kind:'verified-api-key',credentialId:c.id,permission:'owner-default'};
   }
-  return {file,snapshot,create,setMode,revoke,authenticate,ownerToken,authorized};
+  return {file,snapshot,create,setMode,revoke,authenticate,ownerToken,authorized,configureOAuth,revokeOAuth,oauthSettings};
 }
 export type AccessControl=Awaited<ReturnType<typeof createAccessControl>>;
