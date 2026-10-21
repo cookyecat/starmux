@@ -49,6 +49,7 @@
     "LICENSE",
     "README.md",
     "docs/ACCESS_CONTROL.md",
-    "docs/OAUTH.md"
+    "docs/OAUTH.md",
+    "docs/VALIDATION_TUNNEL.md"
   ]
 }
