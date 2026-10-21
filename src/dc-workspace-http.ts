@@ -1,3 +1,6 @@
+import {randomUUID} from 'node:crypto';
+import {createAccessControl} from './access-control.js';
+import {accessPage,accessPost,accessHeaders} from './access-dashboard.js';
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 // SDK 1.32.1 transport callback optionality predates exactOptionalPropertyTypes.
 // The transport satisfies the runtime interface; keep the compatibility cast local.
@@ -50,6 +53,7 @@ export function createGatewayRuntime(options: RuntimeOptions={}): GatewayRuntime
   };
 }
 async function initializeGateway({env=process.env,audit:externalAudit}: RuntimeOptions){
+const access=await createAccessControl(env.MAC_MCP_ACCESS_FILE);
 const root=env.MAC_MCP_PROJECT_ROOT;
 if(!root)throw new Error("OWNER_APPROVED_PROJECT_ROOT_REQUIRED");
 const mode=env.MAC_MCP_WORKSPACE_MODE||"read-only";
@@ -135,8 +139,19 @@ http=createServer(async(req,res)=>{
   const route=new URL(req.url||"/","http://localhost").pathname;
   // Only the owner authorization form accepts an Origin; MCP remains no-CORS.
   if(req.headers.origin&&!(
-    (route==="/permissions"||route==="/filters")&&req.method==="POST")){
+    (route==="/permissions"||route==="/filters"||route==="/access")&&req.method==="POST")){
     res.writeHead(403).end("Denied");return;
+  }
+  if(route==="/access"){
+    try{
+      if(req.method==="GET"){
+        res.writeHead(200,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(accessPage(await access.snapshot()));
+      }else if(req.method==="POST"){
+        const result=await accessPost(req,access);
+        res.writeHead(result.status,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(result.html||"Access update rejected");
+      }else res.writeHead(405).end();
+    }catch{res.writeHead(503,{...accessHeaders}).end("Access configuration unavailable");}
+    return;
   }
   if(route==="/filters"&&denyRules&&grants){
     if(req.method==="GET"){
@@ -193,6 +208,7 @@ http=createServer(async(req,res)=>{
   if((route==="/dashboard"||route==="/dashboard.json")&&req.method==="GET"){
     try{
       const snapshot={...await collectOperationsSnapshot(),configuredUpstreams:configured!.status(),
+        accessControl:await access.snapshot(),
         permissionManagementEnabled:Boolean(grants),
         nativeAccessEnabled:nativeAccessMode==="native",
         denyRuleManagementEnabled:Boolean(denyRules)};
@@ -227,8 +243,9 @@ http=createServer(async(req,res)=>{
   }
   if(route==="/healthz"&&req.method==="GET"){
     res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});
+    const accessMode=await access.snapshot().then(s=>s.mode).catch(()=>"unavailable");
     res.end(JSON.stringify({status:"ok",service:"dc-project-workspace",mode,
-      writeScope}));
+      writeScope,accessMode}));
     return;
   }
   if(route!=="/mcp"||req.method!=="POST"){
@@ -237,11 +254,20 @@ http=createServer(async(req,res)=>{
   if(Number(req.headers["content-length"]||0)>65536){
     res.writeHead(413).end("Too large");return;
   }
+  let identity: import('./contracts.js').RequestContext['identity'];
+  try{identity=await access.authenticate(req.headers.authorization);}
+  catch(error){
+    const rejected=error instanceof Error&&error.message==='ACCESS_UNAUTHORIZED';
+    res.writeHead(rejected?401:503,{"cache-control":"no-store",...(rejected?{"www-authenticate":'Bearer realm="Gateway"'}:{})}).end(rejected?"Gateway API key required":"Access configuration unavailable");return;
+  }
+  const request={requestId:randomUUID(),identity};
+  audit({event:'MCP_REQUEST_ACCEPTED',requestId:request.requestId,identityKind:identity.kind,
+    ...(identity.kind==='verified-api-key'?{credentialId:identity.credentialId}:{})});
   const transport=new StreamableHTTPServerTransport({
     enableJsonResponse:true
   });
   const gateway=createDesktopCommanderBridge(router,audit,{
-    workspacePolicy,upstreamRouter:router,
+    request,workspacePolicy,upstreamRouter:router,
     nativePassthrough:nativeAccessMode==="native",denyRules,
     ...(gitWorkflow?{gitWorkflow}:{})
   });
@@ -269,8 +295,12 @@ export async function runGateway(options: RuntimeOptions={}) {
   const stop=()=>{
     void runtime.close().catch(()=>{process.exitCode=1;}).finally(()=>{
       process.off('SIGINT',stop);process.off('SIGTERM',stop);
+      process.off('message',message);process.off('disconnect',stop);
+      if(process.connected)process.disconnect();
     });
   };
+  const message=(value:unknown)=>{if(value&&typeof value==='object'&&'type' in value&&value.type==='gateway-stop')stop();};
+  if(process.send){process.on('message',message);process.on('disconnect',stop);}
   process.on('SIGINT',stop);process.on('SIGTERM',stop);
   return runtime;
 }

@@ -11,10 +11,11 @@ async function main(){
   async function request(method: string,params: Record<string,unknown>={}){
     const response=await fetch(endpoint+"/mcp",{
       method:"POST",
-      headers:{"content-type":"application/json",accept:"application/json, text/event-stream"},
+      headers:{"content-type":"application/json",accept:"application/json, text/event-stream",...(process.env.MAC_MCP_API_KEY?{authorization:"Bearer "+process.env.MAC_MCP_API_KEY}:{})},
       body:JSON.stringify({jsonrpc:"2.0",id:19,method,params}),
       signal:AbortSignal.timeout(10000)
     });
+    if(response.status===401)throw Error("GATEWAY_KEY_REQUIRED_SET_MAC_MCP_API_KEY");
     if(!response.ok)throw Error("LOCAL_MCP_HTTP_FAILURE");
     const json=record(await response.json());
     if(json.error)throw Error("LOCAL_MCP_RPC_FAILURE");

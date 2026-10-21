@@ -1,5 +1,5 @@
+import {ownedByUser,gitBinary,within} from "./platform.js";
 import type { WorkspacePolicy } from "./contracts.js";
-import { currentUid } from "./validation.js";
 // Generic Gateway workspace authorization selector.
 // Routing to an allowed directory is a Gateway policy decision, NOT a new
 // Desktop Commander tool. Actual file operations stay upstream MCP calls.
@@ -14,7 +14,7 @@ const filePathKey=new Map([
   ["read_file","path"],["write_file","path"],["edit_block","file_path"],
   ["get_file_info","path"],["list_directory","path"]
 ]);
-const inside=(candidate: string,root: string)=>candidate===root||candidate.startsWith(root+path.sep);
+const inside=(candidate: string,root: string)=>within(candidate,root);
 
 export function createAuthorizedWorkspacePolicy({basePolicy,linkedGitWorktrees="off"}: {basePolicy: WorkspacePolicy; linkedGitWorktrees?: string}): WorkspacePolicy{
   if(!basePolicy?.root||!["off","linked"].includes(linkedGitWorktrees))
@@ -23,10 +23,10 @@ export function createAuthorizedWorkspacePolicy({basePolicy,linkedGitWorktrees="
   const base=basePolicy.root;
   const policies=new Map([[base,basePolicy]]);
   async function linkedRoots(){
-    const {stdout}=await exec("/usr/bin/git",
+    const {stdout}=await exec(gitBinary,
       ["-C",base,"worktree","list","--porcelain"],{
         timeout:3000,maxBuffer:65536,
-        env:{PATH:"/usr/bin:/bin",HOME:process.env.HOME||"/"}
+        env:process.env
       });
     const candidates=stdout.split(/\n\s*\n/)
       .map(part=>part.split("\n").find(line=>line.startsWith("worktree "))?.slice(9))
@@ -38,7 +38,7 @@ export function createAuthorizedWorkspacePolicy({basePolicy,linkedGitWorktrees="
       const canonical=await realpath(given).catch(()=>null);
       if(canonical!==given)continue;
       const st=await lstat(canonical).catch(()=>null);
-      if(!st?.isDirectory()||st.isSymbolicLink()||st.uid!==currentUid())continue;
+      if(!st?.isDirectory()||st.isSymbolicLink()||!ownedByUser(canonical,st))continue;
       roots.push(canonical);
     }
     if(!roots.includes(base))throw Error("WORKSPACE_ROOT_NOT_IN_GIT");

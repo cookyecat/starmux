@@ -47,12 +47,12 @@ export type WorkspaceGrants = Awaited<ReturnType<typeof import('./workspace-gran
 export type DenyRules = Awaited<ReturnType<typeof import('./explicit-deny-rules.js').createDenyRules>>;
 export type GitWorkflow = ReturnType<typeof import('./project-git-workflow.js').createGitWorkflow>;
 export interface VerifiedPrincipal {readonly kind: 'verified-remote'; readonly subjectHash: string; readonly scopes: readonly string[]}
-export type RequestContext = {readonly requestId: string; readonly identity: VerifiedPrincipal | {readonly kind: 'unverified-local'}};
+export type RequestContext = {readonly requestId: string; readonly identity: VerifiedPrincipal | {readonly kind:'verified-api-key';readonly credentialId:string;readonly permission:'owner-default'} | {readonly kind: 'unverified-local'}};
 export type AuthenticationResult = {status: 200; principal: VerifiedPrincipal} | {status: 401|403|503; revoked?: boolean};
 export type GatewayStatus = {
   event: 'GATEWAY_STATUS'; profile: 'live'|'setup'; installed: boolean; registered: boolean;
   label: string; port: number|null; health: string|null; workspaceMode: string|null;
-  writeScope?: string|null; executionMode: string; listenerPid: number|null;
+  accessMode?: 'ingress'|'api-key'|'unavailable'|null; writeScope?: string|null; executionMode: string; listenerPid: number|null;
   loginAutostart: string; tcc?: string; coreControl: string; coreLauncher: string; coreOwnerPid: number|null;
 };
 export interface PostResult {status: number; message?: string; location?: string}

@@ -1,5 +1,6 @@
+import {ownedByUser,windows} from "./platform.js";
 import { revocationsSchema } from "./config-schemas.js";
-import { GatewayError,currentUid,errorCode,parseJSON,record } from "./validation.js";
+import { GatewayError,errorCode,parseJSON,record } from "./validation.js";
 // P0-C owner-local revocations: read afresh per request. This is NOT an IdP
 // revocation service, token introspection, or a cross-UID security boundary.
 import { randomBytes } from "node:crypto";
@@ -17,8 +18,7 @@ function validateFilename(file: unknown) {
 async function validateDirectory(file: string) {
   let s;
   try{s=await lstat(path.dirname(file));}catch{fail("REVOCATION_PARENT_UNAVAILABLE");}
-  if(!s.isDirectory()||s.isSymbolicLink()||s.uid!==currentUid()||
-     (s.mode&0o077)!==0)fail("REVOCATION_PARENT_UNSAFE");
+  if(!s.isDirectory()||s.isSymbolicLink()||!ownedByUser(path.dirname(file),s,true))fail("REVOCATION_PARENT_UNSAFE");
 }
 function normalized(value: unknown) {
   const state=record(value,"REVOCATION_STATE_INVALID");
@@ -39,10 +39,11 @@ export async function readRemoteRevocations(value: unknown) {
   await validateDirectory(file);
   let handle;
   try{
+    if((await lstat(file)).isSymbolicLink())fail("REVOCATION_FILE_UNSAFE");
     handle=await open(file,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
     const stat=await handle.stat();
-    if(!stat.isFile()||stat.uid!==currentUid()||stat.nlink!==1||
-       (stat.mode&0o777)!==0o600||stat.size>MAX_BYTES)
+    if(!stat.isFile()||!ownedByUser(file,stat,true)||stat.nlink!==1||
+       (!windows&&(stat.mode&0o777)!==0o600)||stat.size>MAX_BYTES)
       fail("REVOCATION_FILE_UNSAFE");
     const text=await handle.readFile("utf8");
     return normalized(parseJSON(text));

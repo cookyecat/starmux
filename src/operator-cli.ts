@@ -1,8 +1,9 @@
+import {ownedByUser,supportedHost,windows,childEnvKeys} from "./platform.js";
 import { privateAgentSchema,type PrivateAgent } from "./config-schemas.js";
 import type { GatewayStatus } from "./contracts.js";
 import { cliEntry,packageRoot } from "./runtime-paths.js";
 import { runtimeIdentity,formatStartup } from "./runtime-identity.js";
-import { GatewayError,currentUid,errorCode,errorMessage,errorStderr,isInteger,isSafeInteger,parseJSON,record } from "./validation.js";
+import { GatewayError,errorCode,errorMessage,errorStderr,isInteger,isSafeInteger,parseJSON,record } from "./validation.js";
 export interface CliOptions {home?:string;profile?:string;entry?:string;port?:number;controlRoot?:string;appParentPid?:number;json?:boolean;all?:boolean;target?:string;lines?:number}
 type ServiceInfo={label:string;plist:string;installed:boolean;files:string[]} & ({kind:"live";agent:PrivateAgent}|{kind:"setup"});
 interface LifecycleOperations {registered:boolean;portBusy:boolean;disable:()=>Promise<unknown>;enable:()=>Promise<unknown>;bootout:()=>Promise<unknown>;bootstrap:()=>Promise<unknown>;waitPortFree:()=>Promise<boolean>;waitHealthy:()=>Promise<boolean>;port:number}
@@ -10,7 +11,7 @@ export type CliResult = GatewayStatus | {event:"GATEWAY_LOGS";output:string} | {
 // Operator-facing foreground CLI and explicit, per-user launchd lifecycle.
 // Adopt existing private service without overwriting its checked plist.
 import { execFile as execFileCallback,spawn } from "node:child_process";
-import { access,lstat } from "node:fs/promises";
+import { access,lstat,readFile } from "node:fs/promises";
 import net from "node:net";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -47,8 +48,7 @@ async function owned(p: string,uid: number,required=false){
     if(errorCode(e)==="ENOENT"&&!required)return false;
     throw e;
   }
-  if(st.isSymbolicLink()||!st.isFile()||st.nlink!==1||st.uid!==uid||
-    (st.mode&0o022))failure("UNTRUSTED_OWNER_FILE");
+  if(st.isSymbolicLink()||!st.isFile()||st.nlink!==1||!ownedByUser(p,st)||(process.platform!=="win32"&&(st.mode&0o022)))failure("UNTRUSTED_OWNER_FILE");
   return true;
 }
 async function parsePlist(p: string){
@@ -75,6 +75,10 @@ function validatePrivate(value: unknown,home: string){
 }
 async function locate(home: string,uid: number,profile="auto"): Promise<ServiceInfo>{
   if(!["live","setup","auto"].includes(profile))failure("INVALID_PROFILE");
+  if(process.platform!=="darwin"){
+    if(profile==="live")failure("LEGACY_PROFILE_MACOS_ONLY");
+    return {kind:"setup",label:SERVICE_LABEL,plist:"",installed:false,files:[]};
+  }
   const privateFile=privatePlist(home);
   const hasSetup=profile==="auto"&&await owned(defaultSetupPath(home),uid);
   if(profile==="live"||(profile==="auto"&&!hasSetup&&await owned(privateFile,uid))){
@@ -89,6 +93,7 @@ async function locate(home: string,uid: number,profile="auto"): Promise<ServiceI
     files:[path.join(pl.logs,"out.log"),path.join(pl.logs,"err.log")]};
 }
 async function registered(label: string,uid: number){
+  if(process.platform!=="darwin")return false;
   try{await execFile("/bin/launchctl",["print","gui/"+uid+"/"+label],
     {timeout:5000,maxBuffer:10000});return true;}catch{return false;}
 }
@@ -106,6 +111,7 @@ async function available(port: number): Promise<boolean>{
   });
 }
 async function disabledFlag(label: string,uid: number){
+  if(process.platform!=="darwin")return true;
   try{
     const {stdout}=await execFile("/bin/launchctl",["print-disabled","gui/"+uid],
       {timeout:5000,maxBuffer:120000});
@@ -122,6 +128,7 @@ async function setAutostart(label: string,uid: number,enabled: boolean){
     String(errorStderr(e)||errorMessage(e)).slice(0,90));}
 }
 async function listenerOwner(port: number,expectedEntry: string){
+  if(process.platform!=="darwin")return null;
   try{
     const {stdout}=await execFile("/usr/sbin/lsof",[
       "-nP","-t","-iTCP:"+port,"-sTCP:LISTEN"],{timeout:4000});
@@ -170,11 +177,13 @@ async function currentStatus(info: ServiceInfo,uid: number,home: string,portOver
   let health=portBusy?"unreachable":"not-running";
   let workspaceMode=null;
   let writeScope=null;
+  let accessMode: GatewayStatus["accessMode"]=null;
   if(portBusy&&port!==null){
     try{
       const r=await fetch("http://127.0.0.1:"+port+"/healthz",{
         signal:AbortSignal.timeout(2000)});
       const data=record(await r.json());
+      if(data.accessMode==="ingress"||data.accessMode==="api-key"||data.accessMode==="unavailable")accessMode=data.accessMode;
       if(r.ok&&data.status==="ok"&&typeof data.mode==="string"&&["read-only","read-write"].includes(data.mode))
         workspaceMode=data.mode;
       if(r.ok&&data.status==="ok"&&typeof data.writeScope==="string"&&["home-only","unrestricted"].includes(data.writeScope))
@@ -198,9 +207,9 @@ async function currentStatus(info: ServiceInfo,uid: number,home: string,portOver
   });
   const autostart=await disabledFlag(info.label,uid);
   return {profile:info.kind,installed:info.installed,registered:active,
-    label:info.label,port,health,workspaceMode,writeScope,executionMode,listenerPid:owner?.pid??null,
+    label:info.label,port,health,workspaceMode,writeScope,accessMode,executionMode,listenerPid:owner?.pid??null,
     loginAutostart:autostart===null?((info.kind==="live"?info.agent.RunAtLoad:undefined)===true?"default-enabled":"unknown"):autostart?"disabled":"enabled",
-    tcc:"Foreground Termius vs background launchd may have different macOS privacy access"};
+    tcc:process.platform==="darwin"?"Foreground Termius vs background launchd may have different macOS privacy access":"Access follows the current OS account permissions"};
 }
 export async function executeServiceLifecycle(action: string,{
   registered:running,portBusy:busy,disable,enable,bootout,bootstrap,
@@ -239,6 +248,7 @@ export async function executeServiceLifecycle(action: string,{
     loginAutostart:"enabled",health:"ok"};
 }
 async function manage(info: ServiceInfo,action: string,uid: number,home: string,entry: string){
+  if(process.platform!=="darwin")failure("BACKGROUND_SERVICE_UNSUPPORTED_USE_RUN");
   if(action==="install"){
     if(info.kind==="live")failure("ALREADY_INSTALLED_NO_OVERWRITE");
     const created=await serviceCommand("install",{
@@ -273,8 +283,7 @@ async function logs(info: ServiceInfo,lines: number,uid: number){
   for(const p of info.files){
     if(typeof p!=="string"||!path.isAbsolute(p))continue;
     if(!await owned(p,uid))continue;
-    const {stdout}=await execFile("/usr/bin/tail",["-n",String(lines),p],
-      {timeout:5000,maxBuffer:100000});
+    const stdout=(await readFile(p,"utf8")).split("\n").slice(-lines-1).join("\n");
     // Only print to the owner's own terminal; no remote log upload.
     output+="== "+p+" ==\n"+stdout;
   }
@@ -322,27 +331,30 @@ async function runForeground(info: ServiceInfo,options: CliOptions,home: string,
     ...details,mode:info.kind,stop:"Ctrl+C",existingService:"untouched"})+"\n":formatStartup(details));
   // Do not pass unrelated credentials from the operator's shell.
   const inherited: NodeJS.ProcessEnv={};
-  for(const key of ["HOME","USER","LOGNAME","PATH","TMPDIR","LANG",
-                    "LC_ALL","LC_CTYPE","TERM","COLORTERM"]){
+  for(const key of childEnvKeys){
     if(typeof process.env[key]==="string")inherited[key]=process.env[key]!;
   }
+  if(process.env.MAC_MCP_ACCESS_FILE)env.MAC_MCP_ACCESS_FILE=process.env.MAC_MCP_ACCESS_FILE;
   const child=spawn(args[0]!,args.slice(1),{
-    cwd,env:{...inherited,...env},stdio:"inherit"});
-  let stopRequested=false;
+    cwd,env:{...inherited,...env},stdio:windows?["inherit","inherit","inherit","ipc"]:"inherit"});
+  const stopChild=(signal:NodeJS.Signals)=>{
+    if(child.exitCode!==null)return;
+    if(windows&&child.connected)child.send({type:"gateway-stop"},()=>{});
+    else child.kill(signal);
+  };
   const exited=new Promise(resolve=>child.once("exit",()=>resolve(true)));
   control.onStop(async()=>{
-    stopRequested=true;
-    if(child.exitCode===null)child.kill("SIGTERM");
+    stopChild("SIGTERM");
     const ended=await Promise.race([
-      exited,new Promise(resolve=>setTimeout(()=>resolve(false),8000))
+      exited,new Promise(resolve=>{setTimeout(()=>resolve(false),8000).unref();})
     ]);
     if(!ended)return "STOP_FAILED";
     return await waitUntilFree(port,14)?"STOPPED":"STOP_FAILED";
   });
   control.markRunning();
   return await new Promise<number>((resolve,reject)=>{
-    const interrupt=()=>{if(child.exitCode===null)child.kill("SIGINT");};
-    const terminate=()=>{if(child.exitCode===null)child.kill("SIGTERM");};
+    const interrupt=()=>{stopChild("SIGINT");};
+    const terminate=()=>{stopChild("SIGTERM");};
     process.on("SIGINT",interrupt);process.on("SIGTERM",terminate);
     // A force-quit/crash of the menu-bar App must not orphan the owned Core.
     // Never monitor, signal or adopt any external listener. This check is
@@ -400,9 +412,9 @@ export function parseArgs(argv: string[]){
   return {action,options};
 }
 export async function operatorCommand(action: string,options: CliOptions={}): Promise<CliResult>{
-  if(process.platform!=="darwin")failure("MACOS_ONLY");
+  supportedHost();
   if(process.getuid?.()===0)failure("DO_NOT_RUN_AS_ROOT");
-  const home=options.home||homedir(),uid=currentUid();
+  const home=options.home||homedir(),uid=process.getuid?.()??0;
   const info=await locate(home,uid,options.profile||"auto");
   const entry=options.entry??cliEntry();
   if(action==="status"){
@@ -419,6 +431,7 @@ export async function operatorCommand(action: string,options: CliOptions={}): Pr
   if(action==="logs")return {event:"GATEWAY_LOGS",
     output:await logs(info,options.lines??60,uid)};
   if(action==="privacy"){
+    if(process.platform!=="darwin")failure("PRIVACY_DIAGNOSTICS_MACOS_ONLY");
     const env=await envFor(info,home);
     const {privacyReport}=await import("./privacy-diagnostics.js");
     return privacyReport({port:Number(env.MAC_MCP_PROJECT_PORT),home,

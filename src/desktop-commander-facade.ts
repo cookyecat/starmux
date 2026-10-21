@@ -1,10 +1,10 @@
-import type { AuditSink,DenyRules,GitWorkflow,McpUpstream,ResourceProvider,UpstreamRouter,WorkspacePolicy } from "./contracts.js";
+import type { RequestContext,AuditSink,DenyRules,GitWorkflow,McpUpstream,ResourceProvider,UpstreamRouter,WorkspacePolicy } from "./contracts.js";
 import type { InvocationMiddleware } from "./invocation.js";
 import { createInvocationPipeline,safeAuditSink } from "./invocation.js";
 import type { LocalDesktopReadProbe } from './local-desktop-read-probe.js';
 import { createToolDispatcher } from "./tool-dispatch.js";
 export type BridgeUpstream = McpUpstream & Partial<ResourceProvider> & Partial<Pick<LocalDesktopReadProbe,'callApprovedRead'|'callApprovedProjectRead'|'callApprovedCanaryWrite'|'callApprovedSystemName'>>;
-export interface BridgeOptions {workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
+export interface BridgeOptions {request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
 // Desktop Commander tool-schema facade. Upstream catalog remains unmodified.
 // Preserve all native upstream tools; owner-approved native mode forwards unchanged.
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -60,6 +60,7 @@ export function createDesktopCommanderBridge(upstream: BridgeUpstream, audit: Au
   const invoke = createInvocationPipeline({
     dispatch: createToolDispatcher(upstream, safeAudit, options),
     audit: safeAudit,
+    ...(options.request ? {request:options.request} : {}),
     ...(options.denyRules ? {denyRules: options.denyRules} : {}),
     ...(options.middleware ? {middleware: options.middleware} : {})
   });

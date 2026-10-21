@@ -1,3 +1,4 @@
+import {shellQuote,gitBinary,commandOptions,windows} from "./platform.js";
 import type { CallToolResult,McpUpstream,Tool,ToolArguments,WorkspacePolicy } from "./contracts.js";
 interface Ticket {path: string; created: number; hash?: string; head?: string}
 // Git review/stage/commit/push adapter. Actual Git work is delegated to
@@ -14,7 +15,7 @@ export class GitWorkflowDenied extends Error{
   constructor(public readonly code: string){super(code);}
 }
 function fail(code: string): never{throw new GitWorkflowDenied(code);}
-const quote=(value: string)=>"'"+value.replace(/'/g,"'\\''")+"'";
+const quote=shellQuote;
 function strict(o: ToolArguments,keys: string[]){
   if(!o||typeof o!=="object"||Array.isArray(o)||Object.keys(o).length!==keys.length||
      Object.keys(o).some(k=>!keys.includes(k)))fail("INVALID_ARGUMENTS");
@@ -34,11 +35,12 @@ function sha(data: string){
 export function createGitWorkflow({policy,upstream,writesEnabled=false,pushEnabled=false}: {policy: WorkspacePolicy; upstream: McpUpstream; writesEnabled?: boolean; pushEnabled?: boolean}){
   if(!policy||!upstream)throw new TypeError("Git workflow needs project policy and real Desktop Commander MCP client");
   const reviews=new Map<string, Ticket>(),staged=new Map<string, Ticket>(),committed=new Map<string, Ticket>();
+  const next=windows?"; if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}; ":" && ";
   const dir=quote(policy.root);
-  const cmdHead="/usr/bin/git -C "+dir+" ";
+  const cmdHead=gitBinary+" -C "+dir+" ";
   async function run(command: string,timeout_ms=15000){
     return output(await upstream.forwardWorkspaceInvocation({
-      name:"start_process",arguments:{command,timeout_ms}
+      name:"start_process",arguments:{...commandOptions(command),timeout_ms}
     }));
   }
   async function hashWorking(p: string){
@@ -68,8 +70,8 @@ export function createGitWorkflow({policy,upstream,writesEnabled=false,pushEnabl
         const contentHash=await hashWorking(p);
         // One file only, no arbitrary shell fragments or outside-directory paths.
         const show=await run(cmdHead+"status --short -- "+quote(p)+
-          " && "+cmdHead+"diff -- "+quote(p)+
-          " && "+cmdHead+"diff --cached -- "+quote(p),10000);
+          next+cmdHead+"diff -- "+quote(p)+
+          next+cmdHead+"diff --cached -- "+quote(p),10000);
         if(show.length>16000)fail("PATCH_TOO_LARGE");
         const token=randomUUID();
         reviews.set(token,{path:p,hash:contentHash,created:Date.now()});

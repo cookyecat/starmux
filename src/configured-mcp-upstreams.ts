@@ -1,7 +1,8 @@
+import {ownedByUser,childEnvKeys} from "./platform.js";
 import { upstreamDefinitionSchema } from "./config-schemas.js";
 import type { AuditSink,RouteDefinition,Tool,ToolInvocation,UpstreamStatus } from "./contracts.js";
 import { toolResult } from "./mcp-results.js";
-import { GatewayError,currentUid,errorCode,parseJSON,record } from "./validation.js";
+import { GatewayError,errorCode,parseJSON,record } from "./validation.js";
 // Operator-owned, opt-in multi-upstream configuration. No marketplace code
 // execution or public authorization is implied by discovery.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -54,8 +55,7 @@ export async function readConfiguredUpstreams(configFile: string){
   if(typeof configFile!=="string"||!path.isAbsolute(configFile))invalid("UPSTREAM_CONFIG_ABSOLUTE_PATH_REQUIRED");
   const stat=await lstat(configFile);
   if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1||
-     (typeof process.getuid==="function"&&stat.uid!==currentUid())||
-     stat.size>MAX_CONFIG_BYTES||(stat.mode&0o077)!==0)
+     !ownedByUser(configFile,stat,true)||stat.size>MAX_CONFIG_BYTES)
     invalid("UPSTREAM_CONFIG_OWNER_OR_MODE_DENIED");
   const raw=await readFile(configFile,"utf8");
   let value;
@@ -64,7 +64,7 @@ export async function readConfiguredUpstreams(configFile: string){
 }
 function cleanEnv(additions: Readonly<Record<string,string>>){
   const env: Record<string,string>={};
-  for(const key of ["PATH","HOME","TMPDIR","LANG","LC_ALL","USER","LOGNAME"])
+  for(const key of childEnvKeys)
     if(process.env[key])env[key]=process.env[key]!;
   return {...env,...additions};
 }

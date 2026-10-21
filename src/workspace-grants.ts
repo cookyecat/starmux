@@ -1,6 +1,7 @@
+import {ownedByUser,createPrivateDirectory,within} from "./platform.js";
 import { grantsSchema } from "./config-schemas.js";
 import type { AuditSink,GrantsConfig } from "./contracts.js";
-import { GatewayError,currentUid,errorCode,parseJSON,record } from "./validation.js";
+import { GatewayError,errorCode,parseJSON,record } from "./validation.js";
 // Owner-managed multi-root grants. Separate from MCP tool authorization;
 // a remotely controlled tool cannot modify this file or learn the admin secret.
 import { randomBytes,timingSafeEqual } from "node:crypto";
@@ -12,17 +13,16 @@ function deny(s: string): never {const e=new GatewayError(s);throw e;};
 export const defaultGrantsPath=(home=os.homedir())=>
   path.join(home,".config","mac-mcp-gateway","workspace-grants-v1.json");
 const expected=new Set(["version","homeRead","outsideRead","custom"]);
-export const isInside=(p: string,r: string)=>p===r||p.startsWith(r+path.sep);
+export const isInside=within;
 async function safeStat(file: string,{directory=false,missing=false}={}){
   const st=await lstat(file).catch(e=>errorCode(e)==="ENOENT"&&missing?null:Promise.reject(e));
   if(!st)return null;
   if(st.isSymbolicLink()||(directory?!st.isDirectory():!st.isFile())||
-    st.uid!==currentUid()||(!directory&&st.nlink!==1)||
-    (st.mode&0o077)!==0)deny("GRANTS_UNSAFE_OWNERSHIP");
+    !ownedByUser(file,st,true)||(!directory&&st.nlink!==1))deny("GRANTS_UNSAFE_OWNERSHIP");
   return st;
 }
 async function privateFolder(folder: string){
-  await mkdir(folder,{recursive:true,mode:0o700});
+  createPrivateDirectory(folder);
   await safeStat(folder,{directory:true});
 }
 async function writePrivate(file: string,body: string){
@@ -37,9 +37,9 @@ async function checkCustom(raw: unknown,home: string){
     raw.includes("\0")||raw.split(path.sep).includes(".."))deny("GRANT_PATH_INVALID");
   const canon=await realpath(raw);
   const st=await lstat(canon);
-  if(!st.isDirectory()||st.isSymbolicLink()||st.uid!==currentUid())
+  if(!st.isDirectory()||st.isSymbolicLink()||!ownedByUser(canon,st))
     deny("GRANT_ROOT_UNSAFE");
-  if(canon==="/"||canon===home||canon==="/Users"||canon==="/Volumes")
+  if(canon===path.parse(canon).root||canon===home||canon==="/Users"||canon==="/Volumes")
     deny("GRANT_ROOT_TOO_BROAD");
   const sensitive=new Set([".ssh",".aws",".gnupg",".config","keychains",
     "secrets","credentials"]);

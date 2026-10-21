@@ -8,10 +8,9 @@
     "node": ">=22"
   },
   "os": [
-    "darwin"
-  ],
-  "cpu": [
-    "arm64"
+    "darwin",
+    "linux",
+    "win32"
   ],
   "bin": {
     "mac-mcp-gateway": "bin/mac-mcp-gateway.mjs"
@@ -47,6 +46,7 @@
     "scripts/prepare.mjs",
     "test/fixtures/p1-fixture.txt",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "docs/ACCESS_CONTROL.md"
   ]
 }

@@ -39,6 +39,7 @@ export function formatGatewayStatus(s: GatewayStatus,{version="",color=false}={}
     line("Core",tint(state,kind,color)+"  "+description),
     line("Local endpoint",endpoint),
     line("Dashboard",port?endpoint+"/dashboard":"Not available"),
+    line("Access control",s.accessMode==="api-key"?"Gateway API key required":s.accessMode==="ingress"?"Managed by ingress":s.accessMode==="unavailable"?"Unavailable · MCP blocked":"Not confirmed"),
     line("Permissions",permission),
     line("Write scope",s.writeScope==="home-only"?"Home only · Outside read-only":
       s.writeScope==="unrestricted"?"Unrestricted (trusted)": "Not confirmed"),

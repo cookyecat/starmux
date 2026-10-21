@@ -1,3 +1,4 @@
+import {ownedByUser,createPrivateDirectory,supportedHost} from "./platform.js";
 import { setupSchema,type GatewayConfig } from "./config-schemas.js";
 import { GatewayError,errorCode,isSafeInteger,parseJSON,record } from "./validation.js";
 // Release 1 guided local setup: operator opts in; never installs remote software,
@@ -10,8 +11,6 @@ import { createProjectPolicy } from "./project-workspace-policy.js";
 
 const CONFIG_NAME="onboarding-v1.json";
 function denied(code: string): never{const error=new GatewayError(code);throw error;}
-function own(st: import("node:fs").Stats){return st.uid===(process.getuid?.()??st.uid);}
-function safeMode(st: import("node:fs").Stats){return (st.mode&0o077)===0;}
 export function defaultSetupPath(home=os.homedir()){
   return path.join(home,".config","mac-mcp-gateway",CONFIG_NAME);
 }
@@ -42,8 +41,8 @@ function validateFields(value: unknown): GatewayConfig {
 }
 export async function checkSetupValues(value: unknown){
   const c=validateFields(value);
-  if(process.platform!=="darwin"||Number(process.versions.node.split(".")[0])<22)
-    denied("REQUIRES_MACOS_NODE_22");
+  supportedHost();
+  if(c.version===3&&process.platform!=="darwin")denied("HOME_WRITE_SANDBOX_PLATFORM_UNSUPPORTED");
   const trusted=c.version!==1&&c.accessRole==="trusted";
   await createProjectPolicy({root:c.projectRoot,mode:c.mode,
     developerCommands:trusted?"trusted-project":"presets",
@@ -54,20 +53,20 @@ export async function saveSetupConfig(value: unknown,{file=defaultSetupPath(),re
   const config=await checkSetupValues(value);
   if(!path.isAbsolute(file))denied("SETUP_CONFIG_PATH_ABSOLUTE_REQUIRED");
   const folder=path.dirname(file);
-  await mkdir(folder,{recursive:true,mode:0o700});
+  createPrivateDirectory(folder);
   const st=await lstat(folder);
-  if(!st.isDirectory()||st.isSymbolicLink()||!own(st)||!safeMode(st))
+  if(!st.isDirectory()||st.isSymbolicLink()||!ownedByUser(folder,st,true))
     denied("SETUP_CONFIG_DIRECTORY_UNSAFE");
   const previous=await lstat(file).catch(e=>errorCode(e)==="ENOENT"?null:Promise.reject(e));
   if(previous&&(!replace||!previous.isFile()||previous.isSymbolicLink()||
-     previous.nlink!==1||!own(previous)||!safeMode(previous)))
+     previous.nlink!==1||!ownedByUser(file,previous,true)))
     denied("SETUP_EXISTING_CONFIG_PROTECTED");
   const scratch=path.join(folder,"."+CONFIG_NAME+"."+process.pid+"."+randomBytes(8).toString("hex")+".tmp");
   try{
     await writeFile(scratch,JSON.stringify(config,null,2)+"\n",
       {flag:"wx",mode:0o600});
     const check=await lstat(scratch);
-    if(!own(check)||!safeMode(check))denied("SETUP_TMP_UNSAFE");
+    if(!ownedByUser(scratch,check,true))denied("SETUP_TMP_UNSAFE");
     // Operator expressly opts into replacement; never overwrite an unknown file.
     await rename(scratch,file);
   }finally{await rm(scratch,{force:true});}
@@ -76,11 +75,10 @@ export async function saveSetupConfig(value: unknown,{file=defaultSetupPath(),re
 export async function loadSetupConfig(file=defaultSetupPath()){
   if(!path.isAbsolute(file))denied("SETUP_CONFIG_PATH_ABSOLUTE_REQUIRED");
   const parent=await lstat(path.dirname(file));
-  if(!parent.isDirectory()||parent.isSymbolicLink()||!own(parent)||!safeMode(parent))
+  if(!parent.isDirectory()||parent.isSymbolicLink()||!ownedByUser(path.dirname(file),parent,true))
     denied("SETUP_CONFIG_DIRECTORY_UNSAFE");
   const st=await lstat(file);
-  if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||!own(st)||
-     !safeMode(st)||st.size>8192)denied("SETUP_CONFIG_FILE_UNSAFE");
+  if(!st.isFile()||st.isSymbolicLink()||st.nlink!==1||!ownedByUser(file,st,true)||st.size>8192)denied("SETUP_CONFIG_FILE_UNSAFE");
   let obj;
   try{obj=parseJSON(await readFile(file,"utf8"));}
   catch{denied("SETUP_CONFIG_JSON_INVALID");}

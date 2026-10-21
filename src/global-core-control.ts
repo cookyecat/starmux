@@ -1,5 +1,6 @@
+import {ownedByUser,createPrivateDirectory,controlRoot,windows} from "./platform.js";
 import { ownerSchema } from "./config-schemas.js";
-import { GatewayError,currentUid,errorCode,isSafeInteger,parseJSON,record } from "./validation.js";
+import { GatewayError,errorCode,isSafeInteger,parseJSON,record } from "./validation.js";
 type ControlPaths=ReturnType<typeof controlPaths>;
 type Owner=ReturnType<typeof ownerSchema.parse>;
 interface ControlReply {result:string;runId:string;launcher:string}
@@ -11,24 +12,23 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
+function proof(token:string,value:string){return crypto.createHmac("sha256",token).update(value).digest("hex");}
 function deny(reason: string): never {const e=new GatewayError(reason);throw e;};
 const validPort=(p: unknown): p is number=>isSafeInteger(p)&&p>=1024&&p<=65535;
-export function controlPaths(port: number,root=`/private/tmp/mac-mcp-gateway-${currentUid()}`){
+export function controlPaths(port: number,root=controlRoot()){
   if(!validPort(port))deny("CORE_INVALID_PORT");
   const lock=path.join(root,`core-${port}.lease`);
   return {root,lock,recovery:lock+".recovery",
-    meta:path.join(lock,"owner.json"),socket:path.join(lock,"control.sock")};
+    meta:path.join(lock,"owner.json"),socket:windows?`\\\\.\\pipe\\mac-mcp-gateway-${crypto.createHash("sha256").update(path.resolve(lock).toLowerCase()).digest("hex").slice(0,32)}`:path.join(lock,"control.sock")};
 }
 function secureDir(p: string,create=false){
-  if(create){try{fs.mkdirSync(p,{mode:0o700});}catch(e){if(errorCode(e)!=="EEXIST")throw e;}}
+  if(create)createPrivateDirectory(p);
   const st=fs.lstatSync(p);
-  if(!st.isDirectory()||st.isSymbolicLink()||st.uid!==currentUid()||
-    (st.mode&0o077)!==0)deny("CORE_CONTROL_DIRECTORY_UNTRUSTED");
+  if(!st.isDirectory()||st.isSymbolicLink()||!ownedByUser(p,st,true))deny("CORE_CONTROL_DIRECTORY_UNTRUSTED");
 }
 function secureFile(p: string,type: string){
   const st=fs.lstatSync(p);
-  if(st.isSymbolicLink()||st.uid!==currentUid()||
-     (st.mode&0o077)!==0||
+  if(st.isSymbolicLink()||!ownedByUser(p,st,true)||
      !(type==="file"?st.isFile():st.isSocket()))
        deny("CORE_CONTROL_FILE_UNTRUSTED");
 }
@@ -48,23 +48,25 @@ function readOwner(paths: ControlPaths){
   return owner;
 }
 async function exchange(paths: ControlPaths,owner: Owner,method: "status"|"stop",timeoutMs=11500){
-  secureFile(paths.socket,"socket");
+  if(!windows)secureFile(paths.socket,"socket");
   return await new Promise<ControlReply>((resolve,reject)=>{
     let body="",done=false;
     const client=net.createConnection(paths.socket);
+    const nonce=crypto.randomBytes(24).toString("hex");
     const timer=setTimeout(()=>finish(Error("CORE_CONTROL_TIMEOUT")),timeoutMs);
     const finish=(error: unknown,result?: ControlReply)=>{
       if(done)return;done=true;clearTimeout(timer);client.destroy();
       if(error)reject(error);else resolve(result!);
     };
     client.once("connect",()=>client.write(JSON.stringify({
-      version:1,token:owner.token,runId:owner.runId,method})+"\n"));
+      version:1,...(windows?{nonce,proof:proof(owner.token,nonce+":"+owner.runId+":"+method)}:{token:owner.token}),runId:owner.runId,method})+"\n"));
     client.on("data",d=>{
       body+=d.toString("utf8");
       if(body.length>2048)return finish(Error("CORE_CONTROL_REPLY_TOO_LARGE"));
       if(!body.includes("\n"))return;
       try{
         const reply=record(parseJSON(body.split("\n")[0]!));
+        if(windows&&reply.proof!==proof(owner.token,nonce+":"+String(reply.result)))throw Error("CORE_CONTROL_REPLY_UNAUTHENTICATED");
         if(reply.runId!==owner.runId||!["RUNNING","STARTING","STOPPED",
              "STOP_FAILED"].includes(String(reply.result)))throw Error("CORE_CONTROL_REPLY_INVALID");
         finish(null,{result:String(reply.result),runId:owner.runId,launcher:owner.launcher});
@@ -98,7 +100,7 @@ function cleanStale(paths: ControlPaths){
     for(const n of names){
       const item=path.join(paths.lock,n);
       const st=fs.lstatSync(item);
-      if(st.uid!==currentUid()||st.isDirectory())
+      if(!ownedByUser(item,st,true)||st.isDirectory())
         deny("CORE_CONTROL_STALE_UNTRUSTED");
       fs.unlinkSync(item);
     }
@@ -171,14 +173,15 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
       const line=raw.split("\n")[0];raw="";
       let request;
       try{request=record(parseJSON(line!));}catch{socket.destroy();return;}
-      if(request.version!==1||request.token!==owner.token||
+      if(request.version!==1||
+         (windows?typeof request.nonce!=="string"||request.nonce.length!==48||request.proof!==proof(owner.token,request.nonce+":"+owner.runId+":"+String(request.method)):request.token!==owner.token)||
          request.runId!==owner.runId){socket.destroy();return;}
       let result="STOP_FAILED";
       if(request.method==="status")result=phase;
       else if(request.method==="stop"&&onStop){
         try{result=await onStop();}catch{result="STOP_FAILED";}
       }
-      socket.end(JSON.stringify({result,runId:owner.runId,launcher:owner.launcher})+"\n");
+      socket.end(JSON.stringify({result,runId:owner.runId,launcher:owner.launcher,...(windows?{proof:proof(owner.token,String(request.nonce)+":"+result)}:{})})+"\n");
     });
   });
   try{
@@ -186,8 +189,8 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
       server.once("error",reject);
       server.listen(paths.socket,()=>{server.removeListener("error",reject);resolve();});
     });
-    fs.chmodSync(paths.socket,0o600);
-    secureFile(paths.socket,"socket");
+    if(!windows)fs.chmodSync(paths.socket,0o600);
+    if(!windows)secureFile(paths.socket,"socket");
   }catch(e){
     server.close();
     try{fs.unlinkSync(paths.meta);}catch{}
@@ -212,7 +215,7 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
         deny("CORE_CONTROL_LEASE_CHANGED");
       // node:net automatically unlinks a Unix socket on server.close().
       // A second unlink is not required and must not abort lease cleanup.
-      try{fs.unlinkSync(paths.socket);}
+      try{if(!windows)fs.unlinkSync(paths.socket);}
       catch(e){if(errorCode(e)!=="ENOENT")throw e;}
       fs.unlinkSync(paths.meta);
       fs.rmdirSync(paths.lock);

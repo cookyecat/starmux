@@ -1,6 +1,7 @@
+import {ownedByUser,createPrivateDirectory,within} from "./platform.js";
 import { denySchema } from "./config-schemas.js";
 import type { AuditSink,DenyConfig,ToolArguments } from "./contracts.js";
-import { GatewayError,currentUid,errorCode,parseJSON,record } from "./validation.js";
+import { GatewayError,errorCode,parseJSON,record } from "./validation.js";
 // Optional explicit-deny preferences. Never a sandbox; native tools and command
 // semantics belong to upstream Desktop Commander and the macOS execution user.
 // Reads the owner-only 0600 profile on EVERY discovery/call, so revocation applies
@@ -35,9 +36,8 @@ function verify(value: unknown): DenyConfig {
 async function secureFile(file: string,{optional=false,directory=false}={}){
   const st=await lstat(file).catch(e=>errorCode(e)==="ENOENT"&&optional?null:Promise.reject(e));
   if(!st)return null;
-  if(st.isSymbolicLink()||st.uid!==currentUid()||
-     (directory?!st.isDirectory():(!st.isFile()||st.nlink!==1))||
-     (st.mode&0o077)!==0)issue("DENY_FILE_UNSAFE");
+  if(st.isSymbolicLink()||!ownedByUser(file,st,true)||
+     (directory?!st.isDirectory():(!st.isFile()||st.nlink!==1)))issue("DENY_FILE_UNSAFE");
   return st;
 }
 async function atomic(file: string,payload: string){
@@ -70,7 +70,7 @@ async function canonical(raw: unknown,{mustExist=false}={}){
     }
   }
 }
-const isWithin=(candidate: string,root: string)=>root==="/"||candidate===root||candidate.startsWith(root+path.sep);
+const isWithin=within;
 function referencedPaths(name: string,args: ToolArguments){
   if(name==="start_process"||name==="interact_with_process"||name==="get_config"||
      name==="set_config_value")return [];
@@ -88,7 +88,7 @@ export async function createDenyRules({file=defaultDenyRulesPath(),audit=()=>{}}
   if(typeof file!=="string"||!path.isAbsolute(file)||path.basename(file).length>160)
     issue("DENY_RULES_FILE_PATH_REQUIRED");
   const folder=path.dirname(file);
-  await mkdir(folder,{recursive:true,mode:0o700});
+  createPrivateDirectory(folder);
   await secureFile(folder,{directory:true});
   if(!await secureFile(file,{optional:true}))
     await atomic(file,JSON.stringify(defaults(),null,2)+"\n");

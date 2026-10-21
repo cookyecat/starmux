@@ -1,7 +1,10 @@
+import {execFile} from "node:child_process";
+import {promisify} from "node:util";
+import {windows,ownedByUser,childEnvKeys,systemNameCommand,commandOptions} from "./platform.js";
 import type { Tool,ToolInvocation } from "./contracts.js";
 import { toolResult } from "./mcp-results.js";
 import { desktopCommanderEntry,fixtureRoot,packageRoot } from "./runtime-paths.js";
-import { currentUid,errorCode } from "./validation.js";
+import { errorCode } from "./validation.js";
 // Desktop Commander stdio MCP client for fixture tests and the private P1 bridge.
 // NOT imported into public P0 src/server.mjs; only explicitly approved operations.
 // This adapter exposes no arbitrary callTool capability.
@@ -25,7 +28,7 @@ const MAX_READ = 4096;
 const MAX_PROJECT_README_BYTES = 16384; // Project README may grow; synthetic fixture limit remains 4096.
 
 function sanitizedEnv() {
-  const allow = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "USER", "LOGNAME"];
+  const allow = childEnvKeys;
   const env: Record<string,string> = {};
   for (const key of allow) if (process.env[key]) env[key] = process.env[key]!;
   // no .zshrc loading; no ALIYUN_ACCESSKEY*, OPENAI_API_KEY, or other inherited secrets
@@ -40,6 +43,7 @@ function assertNoCredentials(env: Record<string,string>) {
 
 export class LocalDesktopReadProbe {
   #client: Client|null = null;
+  #transport:StdioClientTransport|null=null;
   #toolNames: string[] = [];
   #upstreamCatalog: Tool[] = [];
   #writeScope: string;
@@ -78,6 +82,7 @@ export class LocalDesktopReadProbe {
       this.#upstreamCatalog = structuredClone(tools.tools);
       this.#toolNames = names.filter(name => EXPOSED_LOCAL_TOOLS.includes(name));
       this.#client = client;
+      this.#transport=transport;
     } catch (e) {
       await client.close().catch(() => {});
       throw e;
@@ -124,7 +129,7 @@ export class LocalDesktopReadProbe {
     const candidate = path.join(PROJECT, "README.md");
     const st = await lstat(candidate);
     if (!st.isFile() || st.isSymbolicLink() || st.nlink !== 1 ||
-        st.uid !== currentUid() || st.size > MAX_PROJECT_README_BYTES)
+        !ownedByUser(candidate,st) || st.size > MAX_PROJECT_README_BYTES)
       throw new Error("Project file failed read approval");
     return toolResult(await this.#client.callTool({name:"read_file",arguments:{path:candidate}}));
   }
@@ -135,14 +140,14 @@ export class LocalDesktopReadProbe {
       throw new Error("Canary content exceeds approved bound");
     const root = await lstat(FIXTURES);
     if (!root.isDirectory() || root.isSymbolicLink() ||
-        root.uid !== currentUid()) throw new Error("Fixture directory denied");
+        !ownedByUser(FIXTURES,root)) throw new Error("Fixture directory denied");
     const candidate = path.join(FIXTURES, "dc-bridge-canary.txt");
     const existing = await lstat(candidate).catch(e => {
       if (errorCode(e) === "ENOENT") return null;
       throw e;
     });
     if (existing && (!existing.isFile() || existing.isSymbolicLink() ||
-        existing.nlink !== 1 || existing.uid !== currentUid()))
+        existing.nlink !== 1 || !ownedByUser(candidate,existing)))
       throw new Error("Canary target denied");
     return toolResult(await this.#client.callTool({name:"write_file",arguments:{
       path:candidate,content,mode:"rewrite"
@@ -152,7 +157,7 @@ export class LocalDesktopReadProbe {
   async callApprovedSystemName() {
     if (!this.#client) throw new Error("Not connected");
     return toolResult(await this.#client.callTool({name:"start_process",arguments:{
-      command:"/usr/bin/uname -s",timeout_ms:3000
+      ...commandOptions(systemNameCommand),timeout_ms:3000
     }}));
   }
 
@@ -179,8 +184,11 @@ export class LocalDesktopReadProbe {
 
   async close() {
     const client = this.#client;
+    const pid=this.#transport?.pid;this.#transport=null;
     this.#client = null;
     this.#upstreamCatalog = [];
+    // Only the upstream PID spawned by this instance is eligible for tree cleanup.
+    if(windows&&pid)await promisify(execFile)("taskkill.exe",["/PID",String(pid),"/T","/F"],{windowsHide:true,timeout:8000}).catch(()=>{});
     if (client) await client.close().catch(() => {});
   }
 }

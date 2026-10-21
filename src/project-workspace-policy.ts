@@ -1,5 +1,6 @@
+import {ownedByUser,windows,within,inDirectory,commandOptions} from "./platform.js";
 import type { ToolArguments,WorkspacePolicy } from "./contracts.js";
-import { currentUid,errorCode,isInteger,isSafeInteger } from "./validation.js";
+import { errorCode,isInteger,isSafeInteger } from "./validation.js";
 // User-selected project workspace admission policy for real Desktop Commander tools.
 // This validates path/arguments but is NOT an OS sandbox against same-UID races.
 import { lstat,realpath } from "node:fs/promises";
@@ -25,7 +26,7 @@ async function checked(target: string,kind: string,bytes?: number){
     throw e;
   });
   if(!st){if(kind!=="new")fail("NOT_FOUND");return;}
-  if(st.isSymbolicLink()||st.uid!==currentUid())fail("UNSAFE_OWNER_OR_LINK");
+  if(st.isSymbolicLink()||!ownedByUser(target,st))fail("UNSAFE_OWNER_OR_LINK");
   if(kind==="directory"&&!st.isDirectory())fail("NOT_DIRECTORY");
   if(kind==="file"&&!st.isFile())fail("NOT_FILE");
   if(kind==="new"&&(!st.isFile()||st.nlink!==1))fail("UNSAFE_EXISTING_FILE");
@@ -43,24 +44,24 @@ export async function createProjectPolicy({root,mode="read-only",
   if(typeof root!=="string"||!path.isAbsolute(root))fail("ROOT_REQUIRED");
   const base=await realpath(root);
   const segments=base.split(path.sep).filter(Boolean);
-  if((base===homedir()&&!allowTrustedHomeRoot)||base==="/"||base==="/Users"||base==="/Volumes"||
-    ((allowOwnerSelectedRoot||allowTrustedHomeRoot)?segments.length<2:segments.length<4))
+  if((base===homedir()&&!allowTrustedHomeRoot)||base===path.parse(base).root||base==="/Users"||base==="/Volumes"||
+    ((allowOwnerSelectedRoot||allowTrustedHomeRoot)?segments.length<2:segments.length<(process.platform==="darwin"?4:2)))
     fail("ROOT_TOO_BROAD");
   if(path.resolve(root)!==base)fail("ROOT_MUST_BE_CANONICAL");
   await checked(base,"directory");
   const devPresets=createDevPresets(base,mode);
   async function scoped(raw: unknown,kind: string,bytes?: number){
     if(typeof raw!=="string"||!raw||raw.length>1024||
-       raw.includes("\0")||raw.includes("\\")||
+       raw.includes("\0")||(!windows&&raw.includes("\\"))||
        raw.startsWith("~")||/^[a-z]+:\/\//i.test(raw))
       fail("INVALID_PATH");
     const relative=path.isAbsolute(raw)?path.relative(base,raw):raw;
-    const parts=relative==="."?[]:relative.split("/");
-    if(parts.some(x=>!x||x==="."||x===".."||deniedParts.has(x.toLowerCase())||
+    const parts=(relative==="."||relative==="")?[]:relative.split(windows?/[\\/]/:/\//);
+    if(parts.some(x=>(windows&&(/[<>:"|?*]/.test(x)||/[. ]$/.test(x)))||!x||x==="."||x===".."||deniedParts.has(x.toLowerCase())||
        /^\.env(\.|$)/i.test(x)||/\.(pem|key|p12|pfx)$/i.test(x)))
       fail("PROTECTED_OR_TRAVERSAL");
     const final=path.resolve(base,...parts);
-    if(final!==base&&!final.startsWith(base+path.sep))fail("OUTSIDE_PROJECT");
+    if(!within(final,base))fail("OUTSIDE_PROJECT");
     let current=base;
     for(let i=0;i<parts.length;i++){
       current=path.join(current,parts[i]!);
@@ -85,9 +86,7 @@ export async function createProjectPolicy({root,mode="read-only",
            !isSafeInteger(args.timeout_ms)||args.timeout_ms<100||
            args.timeout_ms>30000)fail("DEVELOPER_COMMAND_INVALID");
         // cwd is NOT a file-system sandbox. All effective user privileges remain.
-        const tick=String.fromCharCode(39);
-        const quotedRoot=tick+base.replaceAll(tick, String.fromCharCode(39,92,39,39))+tick;
-        return {name,arguments:{command:"cd "+quotedRoot+" && "+args.command,
+        return {name,arguments:{...commandOptions(inDirectory(base,args.command)),
           timeout_ms:args.timeout_ms}};
       }
       if(name==="start_process")return devPresets.prepareStart(args);

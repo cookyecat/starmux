@@ -1,3 +1,4 @@
+import {gitBinary} from "./platform.js";
 import type { UpstreamStatus } from "./contracts.js";
 import { packageRoot } from "./runtime-paths.js";
 import { errorCode } from "./validation.js";
@@ -21,7 +22,7 @@ export const MODULES=Object.freeze([
   {id:"caddy",label:"Caddy / Direct URL HTTPS",service:"ai.home.mac-mcp-caddy",ports:[80,443],phase:"paused",role:"未来公网 URL 直连；保留证书与配置",transport:"inbound"},
   {id:"uid450",label:"UID450 Isolated Worker v2",service:"ai.home.mac-mcp-worker-v2",ports:[],phase:"research",role:"系统级 Unix Socket Worker；不在当前 DC 主链",transport:"unix"}
 ]);
-const env={PATH:"/usr/bin:/bin:/usr/sbin:/sbin",HOME:home||"/"};
+const env=process.env;
 async function cmd(exe: string,args: string[]): Promise<{ok:true;stdout:string}|{ok:false;error:string;stdout?:undefined}>{
   try{
     const v=await execute(exe,args,{timeout:3000,maxBuffer:130000,env});
@@ -63,14 +64,15 @@ function tunnelTarget(xml: string){
   return "unknown (inspect LaunchAgent)";
 }
 async function projectGit(at: string){
-  const r=await cmd("/usr/bin/git",["-C",at,"status","--porcelain=v1"]);
-  const br=await cmd("/usr/bin/git",["-C",at,"branch","--show-current"]);
-  const h=await cmd("/usr/bin/git",["-C",at,"rev-parse","--short","HEAD"]);
+  const r=await cmd(gitBinary,["-C",at,"status","--porcelain=v1"]);
+  const br=await cmd(gitBinary,["-C",at,"branch","--show-current"]);
+  const h=await cmd(gitBinary,["-C",at,"rev-parse","--short","HEAD"]);
   return {branch:br.ok?br.stdout.trim():"unavailable",
     commit:h.ok?h.stdout.trim():"unavailable",
     dirtyCount:r.ok?r.stdout.split("\n").filter(Boolean).length:null};
 }
 export async function collectOperationsSnapshot(){
+  if(process.platform!=="darwin")return {capturedAt:new Date().toISOString(),host:process.platform+" local (loopback only)",mode:"read-only",tunnelBackend:"not verified",modules:[],git:await projectGit(root),workspaceGit:await projectGit(process.env.MAC_MCP_PROJECT_ROOT||root),errors:[],milestones:[]};
   const uid=process.getuid?.();
   const [jobs,disables,listeners,worker,git,plist]=await Promise.all([
     cmd("/bin/launchctl",["list"]),
@@ -171,6 +173,7 @@ export function renderOperationsHtml(data: Awaited<ReturnType<typeof collectOper
   (data.nativeAccessEnabled?'当前为可信开发原生透传：Home/自定义目录授权开关不限制原生文件及 Shell 工具；由本地 Desktop Commander 与 macOS 用户权限控制。':'当前支持 Home 与 Home 外只读扫描、自定义目录读写授权。')+
   ' <a href="/permissions">查看目录授权与说明</a></p></section>':''}
   ${messages.length?`<section class="panel"><h2>采集警告</h2><p>${esc(messages.join("; "))}</p></section>`:""}
+  <section><h2>Access control</h2><p><a href="/access">Manage authentication and client credentials</a></p><p>Credentials use the owner permission configuration. Network access and tool permissions are managed separately.</p></section>
   <footer>JSON 数据接口：/dashboard.json · 不另占用端口 · 127.0.0.1 本机访问</footer></main></body></html>`;
 }
 export const dashboardHeaders=Object.freeze({

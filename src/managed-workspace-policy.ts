@@ -1,3 +1,4 @@
+import {windows,commandOptions,diskUsageCommand} from "./platform.js";
 import type { GrantsConfig,ToolArguments,WorkspaceGrants,WorkspacePolicy } from "./contracts.js";
 import { GatewayError,isInteger,isSafeInteger } from "./validation.js";
 // Release 1 broad read-only inventory, narrow independent write grants.
@@ -24,7 +25,7 @@ const safeSegments=(value: string)=>{
 };
 async function broadPath(raw: unknown,kind: string){
   if(typeof raw!=="string"||!path.isAbsolute(raw)||raw.length>2048||
-    raw.includes("\0")||raw.includes("\\")||raw.split(path.sep).includes("..")||
+    raw.includes("\0")||(!windows&&raw.includes("\\"))||raw.split(path.sep).includes("..")||
     path.normalize(raw)!==raw)fail("INVENTORY_ABSOLUTE_PATH_REQUIRED");
   safeSegments(raw);
   const canonical=await realpath(raw);
@@ -126,13 +127,12 @@ export function createManagedWorkspacePolicy({basePolicy,grants}: {basePolicy: W
       fail("INVENTORY_DISK_DEPTH_LIMIT");
     if(typeof raw!=="string"||!path.isAbsolute(raw))fail("INVENTORY_ABSOLUTE_PATH_REQUIRED");
     const target=await broadPath(raw,"dir");
-    if(target==="/")fail("INVENTORY_SCAN_TOO_BROAD");
+    if(target===path.parse(target).root)fail("INVENTORY_SCAN_TOO_BROAD");
     const allowed=await select(target,await grants.snapshot());
     if(allowed.kind==="denied")fail("SCOPE_NOT_GRANTED");
     // Does not permit user-provided shell text; quoted path only, no delete.
     return {name:"start_process",arguments:{
-      command:(depth===0?"/usr/bin/du -sk -- ":"/usr/bin/du -k -d 1 -- ")+
-        quote(target),timeout_ms:30000
+      ...commandOptions(diskUsageCommand(target,depth)),timeout_ms:30000
     }};
   }
   return Object.freeze<WorkspacePolicy>({

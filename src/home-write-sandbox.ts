@@ -23,6 +23,7 @@ export async function sandboxedDesktopSpawn({
   home, nodeBinary, entryArgs,
   binary="/usr/bin/sandbox-exec"
 }: {home?: string|undefined; nodeBinary?: string; entryArgs?: string[]; binary?: string}={}){
+  if(process.platform!=="darwin")denied("HOME_WRITE_SANDBOX_PLATFORM_UNSUPPORTED");
   if(typeof nodeBinary!=="string"||!path.isAbsolute(nodeBinary)||
      !Array.isArray(entryArgs)||entryArgs.some(a=>typeof a!=="string"))
     denied("HOME_WRITE_SANDBOX_INVALID_EXEC");

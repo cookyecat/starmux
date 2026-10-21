@@ -1,3 +1,4 @@
+import {supportedHost} from "../platform.js";
 import { z } from "zod";
 import { cliEntry,packageRoot,desktopCommanderEntry } from "../runtime-paths.js";
 import { errorCode,errorMessage,isInteger,parseJSON } from "../validation.js";
@@ -14,14 +15,21 @@ function help(){
   process.stdout.write(`Mac MCP Gateway ${pkg.version}
 
 Usage:
-  mac-mcp-gateway run [--port N]         Foreground; Ctrl+C stops; terminal macOS privacy context
+  mac-mcp-gateway run [--port N]         Foreground; Ctrl+C stops; current OS account
   mac-mcp-gateway run --app-parent-pid PID  App-owned foreground; stops if GUI parent exits
-  mac-mcp-gateway stop                 Stop the one trusted global Core (CLI or App)
-  mac-mcp-gateway status               Human-readable health for the one local Core
+  mac-mcp-gateway stop                 Stop the Core at the configured local endpoint
+  mac-mcp-gateway status               Human-readable health for the configured Core
   mac-mcp-gateway status --json        Original structured status for scripts/agents
   mac-mcp-gateway logs [--lines N]     Inspect local Gateway logs (owner only)
   mac-mcp-gateway privacy [--all] [--target /absolute/path]
-                                          Compare real terminal vs Gateway macOS protected-directory access
+                                          macOS only: compare terminal and Gateway protected-directory access
+
+  mac-mcp-gateway access              Show access mode and client credentials
+  mac-mcp-gateway access create "Name" Create a key (displayed once)
+  mac-mcp-gateway access mode api-key Require a key on every MCP request
+  mac-mcp-gateway access mode ingress Delegate access control to ingress
+  mac-mcp-gateway access revoke ID    Revoke one credential immediately
+  mac-mcp-gateway access owner-token  Show the local Dashboard management token
 
   mac-mcp-gateway setup               Configure local access and connection preference
   mac-mcp-gateway doctor              Check saved configuration and Desktop Commander
@@ -44,8 +52,9 @@ Optional:
   MAC_MCP_GIT_MODE=off|review|write|push             (default off)
   MAC_MCP_WORKTREE_MODE=off|linked                  (default off)
 
-IMPORTANT: trusted-project Shell inherits the Mac account's OS permissions.
-This process has no public ingress authentication. Do not expose :8793 directly.
+IMPORTANT: trusted-project Shell inherits the current OS account's permissions.
+The Core binds loopback. Configure protected HTTPS or Tunnel for remote access.
+Gateway key authentication is optional; access defaults to managed by ingress.
 `);
 }
 async function doctor(){
@@ -58,8 +67,7 @@ async function doctor(){
   try{
     const {createProjectPolicy}=await import("../project-workspace-policy.js");
     const {LocalDesktopReadProbe}=await import("../local-desktop-read-probe.js");
-    const major=Number(process.versions.node.split(".")[0]);
-    if(process.platform!=="darwin"||major<22)throw Error("REQUIRES_MACOS_NODE_22");
+    supportedHost();
     if(!facts.workspaceConfigured)throw Error("MAC_MCP_PROJECT_ROOT_REQUIRED");
     const nativeAccessMode=process.env.MAC_MCP_DC_ACCESS_MODE||"workspace";
     if(!["workspace","native"].includes(nativeAccessMode)||
@@ -105,6 +113,9 @@ async function doctor(){
 if(command==="setup"){
   process.argv.splice(2,1);
   await import("./setup-wizard.js");
+}else if(command==="access"){
+  try{await (await import("./access.js")).accessCommand(process.argv.slice(3));}
+  catch(error){process.stderr.write("GATEWAY_ACCESS_ERROR "+errorMessage(error)+"\n");process.exitCode=1;}
 }else if(command==="verify"){
   await import("./verify-setup.js");
 }else if(command==="help"||command==="--help"||command==="-h"){

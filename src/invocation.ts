@@ -54,13 +54,15 @@ export function createInvocationPipeline(options: {
   audit?: AuditSink;
   denyRules?: Pick<DenyRules, 'check'>;
   middleware?: readonly InvocationMiddleware[];
+  request?: RequestContext;
 }) {
   const audit = safeAuditSink(options.audit || (() => {}));
   const hooks = [...(options.middleware || [])];
   return async (params: ToolInvocation): Promise<CallToolResult> => {
     const invocation = structuredClone(params);
-    // Ingress is a separate process. Loopback and caller headers do not prove identity.
-    const request: RequestContext = {requestId: randomUUID(), identity: {kind: 'unverified-local'}};
+    // Only the authenticated HTTP boundary supplies identity. Direct internal calls
+    // remain unverified; loopback and caller-supplied identity headers are not proof.
+    const request: RequestContext = options.request ?? {requestId: randomUUID(), identity: {kind: 'unverified-local'}};
     const context = frozenCopy({request, invocation});
     try {
       await options.denyRules?.check(invocation.name, invocation.arguments || {});

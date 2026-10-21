@@ -1,12 +1,14 @@
-# Install Mac MCP Gateway on your Mac
+# Install Mac MCP Gateway
 
-This is the source-based setup guide for the current **Apple Silicon development preview**. A signed, notarized community App ZIP is planned for GitHub Releases, but is **not available to independent users yet**.
+This is the source-based setup guide for the current **cross-platform CLI development preview**. A signed, notarized community App ZIP is planned for GitHub Releases, but is **not available to independent users yet**.
 
 **Want to connect ChatGPT after installing?** Go to [Connect ChatGPT](CONNECT_CHATGPT.md). Local installation does not establish a remote connection.
 
+See [Platform support](PLATFORMS.md) for native validation status and platform-specific limitations.
+
 ## Option 1: From source (CLI)
 
-**Prerequisites:** Apple Silicon Mac, Git, Node.js 22.12 or later with npm, and access to the checked-out source repository. Gateway declares Node 22 as its minimum; the locked Desktop Commander dependency requires 22.12 or later for strict engine checks. You do not need to install Desktop Commander separately: the project's locked npm dependencies include it.
+**Prerequisites:** macOS, Linux, or Windows, Git, Node.js 22.12 or later with npm, and access to the checked-out source repository. Gateway declares Node 22 as its minimum; the locked Desktop Commander dependency requires 22.12 or later for strict engine checks. You do not need to install Desktop Commander separately: the project's locked npm dependencies include it.
 
 1. Clone or download the repository from its future verified community URL and enter the project directory. The public repository URL is not finalized, so this guide deliberately does not invent one.
 2. In Terminal, run the following **inside the repository**:
@@ -44,7 +46,7 @@ mac-mcp-gateway doctor
 mac-mcp-gateway run
 ```
 
-Use `--connection https` instead if that is your intended deployment. Neither value provisions a remote connection. An optional `--project /absolute/directory` sets the default directory; in trusted mode it is not a project-only access boundary. New trusted profiles allow sandboxed Desktop Commander writes within Home, make outside-Home access read-only, and retain macOS permissions, upstream controls and explicit owner deny rules.
+Use `--connection https` instead if that is your intended deployment. Neither value provisions a remote connection. An optional `--project /absolute/directory` sets the default directory; in trusted mode it is not a project-only access boundary. On macOS, new trusted profiles allow sandboxed Desktop Commander writes within Home and make outside-Home access read-only. On Linux/Windows, append `--approve-unrestricted` to explicitly permit native tools and Shell with your current OS account permissions. These platforms do not provide the macOS Home-only sandbox; a copied v3 Home-only profile is rejected. Upstream controls and explicit owner deny rules still apply.
 
 The setup file is `~/.config/mac-mcp-gateway/onboarding-v1.json` (the historical filename also stores newer schema versions). If it already exists, setup refuses to overwrite it. Keep a private backup before intentionally replacing it; append `--replace` to the setup command only when you intend to replace that profile. An existing `live` profile is separate.
 
@@ -131,7 +133,11 @@ Read the [step-by-step ChatGPT connection guide](CONNECT_CHATGPT.md) for DNS, TL
 - **Port in use** — inspect `mac-mcp-gateway status` first; never force-start a duplicate Core.
 - **Trusted setup saved, but doctor reports `ROOT_TOO_BROAD`** — update and rebuild this checkout with `npm run build`, then rerun `mac-mcp-gateway doctor`. Earlier doctor code omitted the trusted Home-directory permission even though setup and Core accepted it. Your saved trusted profile does not need to be recreated.
 - **`verify:setup` reports `fetch failed` / status says `not-running`** — setup saves configuration and doctor checks dependencies; neither starts the HTTP server. Run `mac-mcp-gateway run` in one terminal and keep it running, then run `mac-mcp-gateway verify` in another. An older live Core on 8793 does not satisfy a setup profile configured for 18893.
-- **Denied file access** — check the wizard's project choice, read-only mode and actual macOS filesystem privacy permissions.
+- **Denied file access** — check the wizard's project choice, read-only mode and actual OS filesystem permissions.
 - **ChatGPT cannot connect** — a healthy local dashboard is not proof of remote HTTPS reachability or Tunnel authorization. Follow [Connect ChatGPT](CONNECT_CHATGPT.md).
 
 [Main README](../README.md) · [Safety and permissions](SECURITY.md) · [Release checklist](RELEASE_STATUS.md)
+
+## Optional client credentials
+
+First-run setup requires no Gateway key. For independent client credentials and immediate revocation, see [Gateway access control](ACCESS_CONTROL.md). `mac-mcp-gateway access` shows the mode; `/access` in the running Dashboard provides the same management actions. API key mode requires compatible clients to send a Bearer credential on every request.

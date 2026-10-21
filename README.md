@@ -16,7 +16,7 @@ An independent, self-hosted Gateway for the real [Desktop Commander MCP](https:/
 
 让 Mac 用户能够自行部署一个远程 AI 工作台，清楚地决定 AI 可以访问什么，并方便地启动、停止和撤销访问。
 
-**Apple Silicon** · **Menu bar App + CLI** · **MIT licensed**
+**Cross-platform CLI preview** · **Native macOS App** · **MIT licensed**
 
 </div>
 
@@ -25,7 +25,7 @@ An independent, self-hosted Gateway for the real [Desktop Commander MCP](https:/
 
 ## Quick Start
 
-**Run from a Git checkout.** You need Git and Node.js **22.12+** on an Apple Silicon Mac (matching the bundled Desktop Commander dependency). When the clean community repository is published, its URL will be provided here.
+**Run from a Git checkout.** You need Git and Node.js **22.12+** on macOS, Linux, or Windows (matching the bundled Desktop Commander dependency). When the clean community repository is published, its URL will be provided here.
 
 ```bash
 # In your checked-out mac-mcp-gateway directory
@@ -49,6 +49,8 @@ The global CLI installation was checked in an isolated npm prefix. The setup wiz
 
 `mac-mcp-gateway run` displays an English startup panel with **Config source**, **Core program**, **Build version**, and **Listening port**. The build identifier includes a fingerprint of the compiled code. Saved onboarding settings take precedence over legacy settings, and both use the Core shipped with the CLI you invoked. Daily use does not require `node bin/...` or a `--profile` option. Use `run --json` for structured startup diagnostics.
 
+**Linux / Windows:** See [platform support and permission differences](docs/PLATFORMS.md). The shared CLI is available for platform testing; the SwiftUI App remains macOS-only.
+
 **Prefer a Mac App?** The intended public distribution is a prebuilt Apple Silicon `.zip` on GitHub Releases: extract it, move the App to Applications, launch, choose permissions and connection mode. **No Xcode or separate Node.js for the packaged App.** A properly signed / Gatekeeper-verified public ZIP has **not yet been released**; today's ZIP builds are internal development artifacts.
 
 [Full local setup (English)](docs/INSTALL.md) · [Test TypeScript alongside an existing installation](docs/INSTALL.md#testing-this-typescript-checkout-with-an-existing-installation) · [Connect ChatGPT — HTTPS or Tunnel](docs/CONNECT_CHATGPT.md)
@@ -63,6 +65,19 @@ mac-mcp-gateway run
 
 This is an alternative to the basic interactive `mac-mcp-gateway setup` above, which asks for read/write mode but does not select the trusted native role. `--connection tunnel` only records a connection preference. Existing setup files are protected from replacement; see the installation guide before changing an existing profile.
 
+## Access control
+
+By default, the Gateway does not require a client key: access is controlled by your local boundary or protected ingress. There is no shared factory key. Optionally create separate client credentials and require them on every MCP request:
+
+```sh
+mac-mcp-gateway access create "My AI client"  # Secret displayed once
+mac-mcp-gateway access mode api-key
+mac-mcp-gateway access list
+mac-mcp-gateway access revoke CREDENTIAL_ID
+```
+
+Every credential uses your existing owner-approved permissions; authentication does not remove Desktop Commander coding tools. Manage credentials through the CLI or **Dashboard → Access control** (also reachable from the macOS App). See [access control, client compatibility and security boundaries](docs/ACCESS_CONTROL.md) before enabling key mode.
+
 ## Why run your own Gateway?
 
 **Your AI runs in the cloud. Your code, Git repositories, and terminal live on your Mac. Why should someone else control the bridge?**
@@ -75,13 +90,13 @@ Desktop Commander already gives AI powerful local tools. Its hosted Remote MCP s
 
 ![Remote AI clients accessing real development tools through a self-hosted Mac MCP Gateway](docs/assets/multi-client-gateway.png)
 
-<sub>Illustrative multi-client/multi-computer deployment vision. The current community preview has only been verified with one macOS Gateway; Linux support and unified multi-host management are not shipped.</sub>
+<sub>Illustrative multi-client/multi-computer deployment vision. CLI platform validation is tracked in [Platform support](docs/PLATFORMS.md); unified multi-host management is not shipped.</sub>
 
 ### First release: a self-hosted Desktop Commander remote workbench
 
 The first release focuses on people who want Desktop Commander's remote coding capabilities while operating their own Gateway. Desktop Commander remains the execution engine; Mac MCP Gateway provides the self-hosted connection, routing, and native SwiftUI App / TypeScript CLI management experience. The longer-term direction is a general-purpose Gateway for multiple MCP servers and AI clients.
 
-In owner-approved **trusted native mode**, the Gateway forwards the upstream Desktop Commander tool names, input schemas, arguments, and results without replacing them with a reduced read-only tool set. This supports the coding loop: read code, edit files, run commands and tests, inspect results, and iterate. Explicit owner deny rules, Desktop Commander controls, and macOS permissions still apply. The JavaScript version has been used by its maintainer to develop and iterate on the Gateway itself.
+In owner-approved **trusted native mode**, the Gateway forwards the upstream Desktop Commander tool names, input schemas, arguments, and results without replacing them with a reduced read-only tool set. This supports the coding loop: read code, edit files, run commands and tests, inspect results, and iterate. Explicit owner deny rules, Desktop Commander controls, and OS account permissions still apply. The JavaScript version has been used by its maintainer to develop and iterate on the Gateway itself.
 
 **Permission profiles:** choose restricted mode for project-scoped read-only access, or explicitly approve trusted native mode for the upstream coding tools. Both use the same Core. See [security boundaries](docs/SECURITY.md) and the [connection guide](docs/CONNECT_CHATGPT.md) for deployment requirements.
 
@@ -137,7 +152,7 @@ The local Dashboard URL is printed by `mac-mcp-gateway status`. The owner's deve
 ## Security is the product, not an afterthought
 
 - **Restricted read-only:** project-scoped reads, no arbitrary Shell or write actions.
-- **Trusted developer:** deliberate owner approval for native Desktop Commander tools. The tested process sandbox allows direct writes within Home, denies writes outside Home, and still follows macOS permissions.
+- **Trusted developer:** deliberate owner approval for native Desktop Commander tools. On macOS, the tested process sandbox allows writes within Home and denies writes outside Home. Linux/Windows trusted setup additionally requires `--approve-unrestricted`: native tools and Shell use the current OS account permissions, without a Home-only OS sandbox.
 - **Identity first:** a TLS certificate or a Tunnel connection alone does not authenticate and authorize every calling AI user. Never expose the raw local port directly to the internet.
 - **Know the limit:** the process sandbox doesn't automatically contain unrelated apps, additional upstreams or IPC services. AI prompts and script execution can still carry risk.
 

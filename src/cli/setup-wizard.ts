@@ -17,6 +17,8 @@ Usage:
   mac-mcp-gateway setup --access-role trusted --connection tunnel|https [--project /default-directory] [--port 18893] --approve-trusted-developer
   mac-mcp-gateway setup --access-role restricted --project /specific/project --connection tunnel|https [--port 18893]
 
+On Linux/Windows, trusted mode additionally requires --approve-unrestricted.
+
 After setup:
   mac-mcp-gateway doctor
   mac-mcp-gateway run
@@ -27,7 +29,7 @@ Do not expose :8793 or another local HTTP port directly on the internet.
 `;
 function parse(argv: string[]){
   const result: Record<string,string|boolean|undefined>={};
-  const bare=new Set(["--replace","--approve-write","--approve-trusted-developer","--help","--app-json"]);
+  const bare=new Set(["--replace","--approve-write","--approve-trusted-developer","--approve-unrestricted","--help","--app-json"]);
   const valued=new Map([["--project","project"],["--mode","mode"],
     ["--connection","connection"],["--port","port"],["--access-role","accessRole"]]);
   for(let i=0;i<argv.length;i++){
@@ -50,7 +52,7 @@ if(!interactive&&((!args.project&&args.accessRole!=="trusted")||!args.connection
 const rl=interactive?createInterface({input,output}):null;
 try{
   say("Mac MCP Gateway · Release 1 onboarding\n");
-  say("No Desktop Commander hosted relay is used. Local MCP tools still run as your Mac user.\n");
+  say("No Desktop Commander hosted relay is used. Local MCP tools still run as your OS user.\n");
   const accessRole=args.accessRole;
   const root=args.project||(accessRole==="trusted"?homedir():
     await rl!.question("Approved project directory (absolute path): "));
@@ -65,6 +67,8 @@ try{
     throw Error("SETUP_ACCESS_ROLE_MISMATCH");
   if(accessRole==="trusted"&&!args["approve-trusted-developer"])
     throw Error("SETUP_TRUSTED_DEVELOPER_APPROVAL_REQUIRED");
+  if(accessRole==="trusted"&&process.platform!=="darwin"&&!args["approve-unrestricted"])
+    throw Error("SETUP_UNRESTRICTED_APPROVAL_REQUIRED: add --approve-unrestricted to allow native tools and Shell with your OS account permissions; Home-only sandbox is unavailable on this platform");
   const connection=args.connection||(await rl!.question("Remote connection (tunnel / https): "))||"tunnel";
   const port=Number(args.port||(interactive?((await rl!.question("Loopback port [18893]: "))||"18893"):"18893"));
   if(mode==="read-write"&&accessRole!=="trusted"&&!args["approve-write"]){
@@ -81,7 +85,9 @@ try{
   // macOS /var and /tmp may be aliases; normalize to the real canonical path.
   // v1 stays backward-compatible. Explicit access role is recorded in
   // schema v2; never silently escalate a legacy profile.
-  const config=accessRole==="trusted"?
+  const config=accessRole==="trusted"&&process.platform!=="darwin"?
+    {version:2,projectRoot:await realpath(inputRoot),mode,connection,port,accessRole}:
+    accessRole==="trusted"?
     {version:3,projectRoot:await realpath(inputRoot),mode,connection,port,
       accessRole,writeScope:"home-only"}:
     accessRole==="restricted"?
@@ -90,7 +96,9 @@ try{
   const location=await saveSetupConfig(config,{file:defaultSetupPath(),replace:Boolean(args.replace)});
   say("\nSETUP_LOCAL_PROFILE_SAVED\n");
   say("Profile: "+location+" (private, owner-only)\n");
-  say(accessRole==="trusted"?
+  say(accessRole==="trusted"&&process.platform!=="darwin"?
+    "Role: Trusted Developer; native tools and Shell run with your OS account permissions. No Home-only OS sandbox is applied.\n":
+    accessRole==="trusted"?
     "Role: Trusted Home-Write Developer; Home file writes allowed, outside Home read-only for sandboxed Desktop Commander and its subprocesses (subject to OS permissions). This does not secure unrelated upstreams or external apps reached via IPC.\n":
     "Role: Restricted; Gateway read/write workspace checks active; arbitrary Shell and Git writes disabled.\n");
   say("Next 1. mac-mcp-gateway doctor\nNext 2. mac-mcp-gateway run\n");

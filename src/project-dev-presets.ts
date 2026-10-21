@@ -1,3 +1,4 @@
+import {shellQuote,gitBinary,inDirectory,commandOptions} from "./platform.js";
 import type { CallToolResult,ToolArguments } from "./contracts.js";
 import { isSafeInteger } from "./validation.js";
 // Strict project development command presets executed by upstream Desktop Commander.
@@ -6,27 +7,23 @@ export class DevPresetDenied extends Error{
   constructor(public readonly code: string){super(code);}
 }
 function deny(code: string): never{throw new DevPresetDenied(code);}
-function quoted(root: unknown){
-  if(typeof root!=="string"||/[\r\n\0]/.test(root))deny("ROOT_UNSAFE");
-  return "'"+root.split("'").join("'\\''")+"'";
-}
 export function createDevPresets(projectRoot: string,mode: string,{now=()=>Date.now()}={}){
-  const dir=quoted(projectRoot);
+  const dir=shellQuote(projectRoot);
   const preset: Readonly<Record<string, {command:string;timeout_ms:number;readOnly:boolean}>>=Object.freeze({
     project_git_status:{
-      command:"/usr/bin/git -C "+dir+" status --short --untracked-files=normal",
+      command:gitBinary+" -C "+dir+" status --short --untracked-files=normal",
       timeout_ms:5000,readOnly:true
     },
     project_git_diff_stat:{
-      command:"/usr/bin/git -C "+dir+" diff --stat --",
+      command:gitBinary+" -C "+dir+" diff --stat --",
       timeout_ms:5000,readOnly:true
     },
     project_smoke_tests:{
-      command:"cd "+dir+" && /opt/homebrew/bin/npm run test:p0",
+      command:inDirectory(projectRoot,"npm run test:p0"),
       timeout_ms:15000,readOnly:false
     },
     project_full_tests:{
-      command:"cd "+dir+" && /opt/homebrew/bin/npm test",
+      command:inDirectory(projectRoot,"npm test"),
       timeout_ms:30000,readOnly:false
     }
   });
@@ -39,7 +36,7 @@ export function createDevPresets(projectRoot: string,mode: string,{now=()=>Date.
       if(!p)deny("PRESET_NOT_APPROVED");
       if(!p.readOnly&&mode!=="read-write")deny("TEST_NEEDS_WRITE_MODE");
       if(args.timeout_ms!==p.timeout_ms)deny("PRESET_TIMEOUT_REQUIRED");
-      return {name:"start_process",arguments:{command:p.command,timeout_ms:p.timeout_ms}};
+      return {name:"start_process",arguments:{...commandOptions(p.command),timeout_ms:p.timeout_ms}};
     },
     observe(name: string,result: CallToolResult,args: ToolArguments){
       if(name==="read_process_output"){

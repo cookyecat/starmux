@@ -1,3 +1,4 @@
+import {createPrivateDirectory} from "../src/platform.js";
 import assert from 'node:assert/strict';
 import { mkdtemp,readFile,rm,writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,13 +9,14 @@ import { ConfiguredStdioUpstream,bootstrapConfiguredUpstreams } from '../src/con
 
 test('optional startup failure is isolated; uncertain stdio call is not automatically retried',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'gateway-upstream-test-'));
-  const config=join(dir,'upstreams.json');
+  const privateDir=join(dir,'private');createPrivateDirectory(privateDir);
+  const config=join(privateDir,'upstreams.json');
   const marker=join(dir,'effects.txt');
   const definition={id:'optional',transport:'stdio',command:process.execPath,
     args:[fileURLToPath(new URL('./fixtures/uncertain-upstream.js',import.meta.url)),marker],allowTools:['write']};
   const upstream=new ConfiguredStdioUpstream(definition);
   try{
-    await writeFile(config,JSON.stringify({version:1,upstreams:[{...definition,command:'/nonexistent/gateway-test'}]}),{mode:0o600});
+    await writeFile(config,JSON.stringify({version:1,upstreams:[{...definition,command:join(dir,'nonexistent-gateway-test')}]}),{mode:0o600});
     const unavailable=await bootstrapConfiguredUpstreams(config);
     assert.equal(unavailable.routes.length,0);assert.equal(unavailable.status()[0]?.status,'UNAVAILABLE');
     for(const child of unavailable.upstreams)await child.close();

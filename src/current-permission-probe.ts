@@ -31,7 +31,7 @@ export async function probeCurrentDirectoryAccess({
   home=os.homedir(),openDirectory=(name: string)=>fs.opendir(name),now=()=>new Date()
 }={}){
   const checks=[];
-  for(const directory of protectedDirectories){
+  for(const directory of process.platform==="darwin"?protectedDirectories:[]){
     let handle=null;let state="INCONCLUSIVE";
     try{
       handle=await openDirectory(path.join(home,directory.suffix));
