@@ -178,3 +178,18 @@ The ChatGPT settings page confirms a connected account using OAuth. The OAuth co
 For this IPv6-hosted deployment, keep the issuer reachable from both the user's login browser and the local Tunnel/Core. An outbound Tunnel does not remove the local dependency on the configured HTTPS issuer. If the host address changes, update the proxy bind address, DNS and any local host mapping together; never disable TLS verification to compensate. An IPv4-only deployment instead needs a reachable HTTPS authorization endpoint or a separately designed local HTTPS route.
 
 The full `npm test` suite passed after the resource-alias change, including all 20 Node test-runner tests plus the preceding compatibility scripts. Real connector file read/write, process execution, token refresh and remote revocation rejection remain pending.
+
+### Real ChatGPT coding and revocation acceptance (2026-10-22 UTC)
+
+After IPv6 was restored, the HTTPS issuer returned 200 and the previously configured address was present again. The earlier idle session's refresh token had expired (`Token is not active`); signing in again with the unchanged callback restored the association.
+
+A fresh ChatGPT web conversation using only the OAuth plugin completed:
+
+- `health_check`, followed by genuine Desktop Commander calls under a new `verified-oauth` connection.
+- `create_directory`, `write_file`, and `read_file` in a dedicated Downloads acceptance directory.
+- `start_process` running the written Python file. Desktop Commander's recorded output contained `GATEWAY_OAUTH_OK_20261022` and process completion. The file was independently checked locally; the local executor did not create or run it as a substitute for the connector.
+- CLI revocation of that exact connection. Subsequent real `tools/call` and `initialize` requests returned HTTP 401. Token-endpoint calls still returned 200, but did not restore access to the revoked session. ChatGPT displayed a reconnect prompt.
+
+Evidence was correlated between Core request IDs/`verified-oauth` audit entries, Desktop Commander's per-tool history and Tunnel status codes. No bearer tokens, secrets or private login data are included here. The coding sequence ran at approximately 18:33 UTC, and revocation rejection at 18:34 UTC.
+
+Observed limitations: the interactive shell printed Homebrew initialization warnings before successfully executing Python; ChatGPT's final answer/app rendering also displayed loading failures even though the tool calls completed. These UI/environment issues must not be confused with failed tool execution or treated as resolved. Long-idle refresh expiry is expected to require a new login; unattended long-duration session behavior has not been accepted as a release guarantee.
