@@ -7,6 +7,8 @@ import {createHash} from 'node:crypto';
 const url=z.string().url().max(2048);
 export const oauthConfigSchema=z.object({
   issuer:url,resource:url,jwksUri:url,authorizationEndpoint:url,tokenEndpoint:url,
+  // Exact alternate identifiers for this same resource, explicitly approved by the owner.
+  resourceAliases:z.array(url).max(8).optional(),
   registrationEndpoint:url.optional(),clientRegistration:z.enum(['provided','cimd','dcr']),
   clientId:z.string().min(1).max(2048),tokenEndpointAuthMethod:z.enum(['none','client_secret_basic','client_secret_post','private_key_jwt']),
   allowedSubjects:z.array(z.string().min(1).max(256)).min(1).max(32),
@@ -35,6 +37,7 @@ export function validateOAuthConfig(value:unknown):OAuthConfig{
   const c=oauthConfigSchema.parse(value);
   const issuer=checkedUrl(c.issuer,c.allowLoopbackHttp);
   checkedUrl(c.resource,c.allowLoopbackHttp);
+  for(const alias of c.resourceAliases??[])checkedUrl(alias,c.allowLoopbackHttp);
   for(const value of [c.jwksUri,c.authorizationEndpoint,c.tokenEndpoint,...(c.registrationEndpoint?[c.registrationEndpoint]:[])]){
     if(checkedUrl(value,c.allowLoopbackHttp).origin!==issuer.origin)throw Error('OAUTH_ENDPOINT_ORIGIN_MISMATCH');
   }
@@ -96,7 +99,7 @@ export function createOAuthVerifier(c:OAuthConfig,key?:JWTVerifyGetKey){
   return async(header:string|undefined)=>{
     if(!header||header.length>16384||!/^Bearer [^\s]+$/i.test(header))throw new OAuthError(401,'OAUTH_TOKEN_REQUIRED');
     let payload;
-    try{({payload}=await jwtVerify(header.slice(7),keyset,{issuer:c.issuer,audience:c.resource,algorithms:['RS256','ES256','PS256'],
+    try{({payload}=await jwtVerify(header.slice(7),keyset,{issuer:c.issuer,audience:[c.resource,...(c.resourceAliases??[])],algorithms:['RS256','ES256','PS256'],
       requiredClaims:['sub','exp','iat','sid','azp'],clockTolerance:0}));}
     catch(error){
       const code=error&&typeof error==='object'&&'code' in error?error.code:'';

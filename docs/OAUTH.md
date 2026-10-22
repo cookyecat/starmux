@@ -158,3 +158,15 @@ The first code-to-token exchange returned HTTP 400: Keycloak reported an invalid
 Keycloak's default user profile also required an email even though this deployment does not use OIDC email claims. The deployment made email optional instead of inventing a user email. The previous profile configuration was backed up privately.
 
 After the failed exchange, ChatGPT's association button remained disabled. The failed plugin installation was removed while preserving its definition and OAuth settings. Reinstallation through the browser remains pending; do not report the plugin as connected until that succeeds. No credential values or authorization codes are recorded here.
+
+### Tunnel resource aliases and successful association (2026-10-22)
+
+Keycloak 26.8.1's `ResourceIndicatorsPostProcessor` first checks that the requested resource matches an audience granted to the client. Registering a resource client alone is insufficient: add an audience mapper for that resource to the granted scope. It then narrows the token audience to the requested resource URL. The Tunnel shim supplies a different resource URL from the canonical HTTPS endpoint.
+
+Core now supports an optional `oauth.resourceAliases` array in the private access configuration: at most eight exact HTTPS resource URLs identifying this same Gateway. Owners must explicitly configure these identifiers; they are never derived from request headers or automatically trusted from discovery. Issuer, signature, client, subject, scope, lifetime and session revocation checks still apply. Protected-resource metadata continues to advertise the canonical resource. Do not add arbitrary service audiences or wildcard hosts. Removing an alias immediately rejects tokens addressed only to that alias.
+
+The deployment added an exact Tunnel audience mapper and the matching Core resource alias. Reinstallation of the existing ChatGPT plugin then succeeded without changing the callback. The page now offers “Try in chat”, and Core recorded real `verified-oauth` requests. This proves token exchange and authenticated MCP initialization/discovery; coding and revocation acceptance are tracked separately below.
+
+Regression coverage checks default rejection of an unconfigured alias, explicit acceptance, rejection of a neighboring URL, wrong issuer/subject/scope, and rejection after alias removal. Build and the OAuth integration fixture pass.
+
+Source: [Keycloak resource indicator processing](https://github.com/keycloak/keycloak/blob/26.8.1/services/src/main/java/org/keycloak/protocol/oidc/resourceindicators/ResourceIndicatorsPostProcessor.java).

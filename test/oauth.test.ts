@@ -60,6 +60,19 @@ test('OAuth discovery, JWT validation, live revocation and preserved MCP policy'
   for(const [payload,status] of bad)assert.equal((await rpc(await token(payload))).status,status,JSON.stringify(payload));
   assert.equal((await rpc('mgw_'+'a'.repeat(43))).status,401);assert.equal(events.length,before);
   const valid=await token();assert.equal((await rpc(valid)).status,200);
+  const alias='https://tunnel.example/v1/mcp/owner-tunnel';
+  const aliasToken=await token({aud:alias});
+  assert.equal((await rpc(aliasToken)).status,401);
+  for(const invalid of ['http://remote.example/mcp','https://tunnel.example/mcp#fragment','https://user:pass@tunnel.example/mcp'])
+   assert.throws(()=>validateOAuthConfig({...config,resourceAliases:[invalid]}),/HTTPS/);
+  await access.configureOAuth({...config,resourceAliases:[alias]});
+  assert.equal((await rpc(aliasToken)).status,200);
+  assert.equal((await rpc(await token({aud:alias+'-other'}))).status,401);
+  assert.equal((await rpc(await token({aud:alias,iss:'wrong'}))).status,401);
+  assert.equal((await rpc(await token({aud:alias,sub:'other'}))).status,403);
+  assert.equal((await rpc(await token({aud:alias,scope:'wrong'}))).status,403);
+  await access.configureOAuth(config);
+  assert.equal((await rpc(aliasToken)).status,401);
   const listed=await (await rpc(valid)).json() as {result:{tools:{name:string;securitySchemes:unknown}[]}};
   assert.ok(listed.result.tools.some(t=>t.name==='read_file'));
   assert.ok(listed.result.tools.every(t=>JSON.stringify(t.securitySchemes)==='[{"type":"oauth2","scopes":["gateway:access"]}]'));
