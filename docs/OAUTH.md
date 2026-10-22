@@ -123,3 +123,24 @@ The test exercises exact callback checks, consent rejection, PKCE mismatch, auth
 - [OpenAI Tunnel OAuth](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels#oauth)
 - [Keycloak MCP integration](https://www.keycloak.org/securing-apps/mcp-authz-server)
 - [Keycloak Docker setup](https://www.keycloak.org/getting-started/getting-started-docker)
+
+## Remote acceptance deployment checkpoint (2026-10-22)
+
+A separate macOS acceptance deployment now uses Keycloak 26.8.1 with PostgreSQL 17, a public IPv6 HTTPS ingress, and an OAuth-only Core. This is an infrastructure checkpoint, **not a passed ChatGPT end-to-end acceptance**.
+
+Verified on the deployment host:
+
+- The public issuer discovery document returns HTTP 200 with normal TLS certificate verification.
+- The Core returns HTTP 401 without a bearer token; protected-resource metadata remains discoverable.
+- The official tunnel-client 0.0.16 reports OAuth discovery complete and its configured Harpoon catalog settled.
+- The existing API-key Core uses a separate port and access store.
+
+Operational findings:
+
+- Local Fake-IP DNS can break issuer discovery even when direct IPv6 HTTPS works. Correct the deployment host's resolution for the issuer without disabling TLS verification. A host mapping must be updated when the public IPv6 changes.
+- Configure the issuer origin with `--mcp.oauth-trusted-origin`. Trusting an origin alone does not prove that OAuth HTTP callouts are available through the tunnel. Inspect the Harpoon catalog as well as discovery status. In this deployment, an empty catalog produced `unsupported channel "harpoon"` during a ChatGPT discovery retry; explicit targets were then configured for protected-resource metadata and the authorization-server realm. The webpage retry remains pending.
+- `--harpoon.allow-plaintext-http` is needed only for an explicitly configured loopback HTTP target here. Keep targets narrowly scoped; it does not justify arbitrary private-network access.
+- Run the acceptance Core and authorization server independently of disposable debugging terminals. The test jobs are manually bootstrapped into the current login session, with private logs and no automatic login installation. PostgreSQL data persists; the HTTPS proxy still needs its privileged process to remain running.
+- Keep client secrets, owner credentials, database passwords, access stores, deployment-specific launchers and logs outside the repository.
+
+Still required: successful ChatGPT discovery or validated manual settings, login and consent with the exact current callback, token exchange, authenticated tool discovery and a controlled coding call, followed by revocation rejection. A callback displayed in the configuration dialog is not evidence that the authorization redirect has succeeded.
