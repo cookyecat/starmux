@@ -148,3 +148,13 @@ Operational findings:
 Still required: client-secret submission, login and consent with the exact current callback, token exchange, authenticated tool discovery and a controlled coding call, followed by revocation rejection. A callback displayed in the configuration dialog is not evidence that the authorization redirect has succeeded.
 
 Reference: [tunnel-client 0.0.16 configuration](https://github.com/openai/tunnel-client/blob/v0.0.16/docs/configuration.md), including OAuth shim rewriting and Harpoon OAuth target metadata.
+
+### Login and token exchange checkpoint
+
+The real ChatGPT authorization request used the configured client, exact registered callback, `gateway:access`, and PKCE S256. Owner login and explicit consent completed, and the browser returned to ChatGPT. Client-secret authentication reached Keycloak successfully. This proves the login/callback path, not a usable MCP authorization.
+
+The first code-to-token exchange returned HTTP 400: Keycloak reported an invalid/unknown requested resource. ChatGPT's Tunnel discovery had replaced the resource with the exact Tunnel MCP URL; the reference realm knew only the canonical Gateway resource. The deployment now registers that exact Tunnel resource as an additional bearer-only resource client. Core issuer/audience validation remains enabled and unchanged. Successful token exchange and the resulting token audience still need verification; registering a resource alone is not proof of acceptance.
+
+Keycloak's default user profile also required an email even though this deployment does not use OIDC email claims. The deployment made email optional instead of inventing a user email. The previous profile configuration was backed up privately.
+
+After the failed exchange, ChatGPT's association button remained disabled. The failed plugin installation was removed while preserving its definition and OAuth settings. Reinstallation through the browser remains pending; do not report the plugin as connected until that succeeds. No credential values or authorization codes are recorded here.
