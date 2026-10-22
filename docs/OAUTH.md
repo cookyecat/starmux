@@ -132,15 +132,19 @@ Verified on the deployment host:
 
 - The public issuer discovery document returns HTTP 200 with normal TLS certificate verification.
 - The Core returns HTTP 401 without a bearer token; protected-resource metadata remains discoverable.
-- The official tunnel-client 0.0.16 reports OAuth discovery complete and its configured Harpoon catalog settled.
+- The official tunnel-client 0.0.16 reports OAuth discovery complete and ten OAuth targets automatically registered.
+- A real ChatGPT Tunnel connector now automatically discovers the authorization URL, tunneled token endpoint, resource and `gateway:access` scope. The pre-registered client configuration has been prepared; secret submission and login/consent are pending.
 - The existing API-key Core uses a separate port and access store.
 
 Operational findings:
 
 - Local Fake-IP DNS can break issuer discovery even when direct IPv6 HTTPS works. Correct the deployment host's resolution for the issuer without disabling TLS verification. A host mapping must be updated when the public IPv6 changes.
-- Configure the issuer origin with `--mcp.oauth-trusted-origin`. Trusting an origin alone does not prove that OAuth HTTP callouts are available through the tunnel. Inspect the Harpoon catalog as well as discovery status. In this deployment, an empty catalog produced `unsupported channel "harpoon"` during a ChatGPT discovery retry; explicit targets were then configured for protected-resource metadata and the authorization-server realm. The webpage retry remains pending.
-- `--harpoon.allow-plaintext-http` is needed only for an explicitly configured loopback HTTP target here. Keep targets narrowly scoped; it does not justify arbitrary private-network access.
+- In tunnel-client 0.0.16, trusting an issuer for discovery does not automatically allow registration of its HTTP callout targets. The original loopback MCP URL plus public resource/issuer origin produced `private-host-registration-disabled`. Generic manually configured targets also lacked the OAuth categories/tags used by discovery. The verified fix was to point the tunnel at the same-origin HTTPS MCP endpoint served by the local proxy. The proxy still forwards MCP to the loopback-only Core. Ten typed OAuth targets were then auto-registered, and ChatGPT discovery succeeded. Temporary generic targets and hostname-classification overrides were removed.
+- The HTTPS proxy and valid issuer hostname resolution are now dependencies of the local Tunnel route. This does not require the ChatGPT backend to reach the host over public IPv6: MCP and registered token callouts still traverse the outbound tunnel. Browser login remains a direct HTTPS navigation to the issuer.
+- The final same-origin HTTPS configuration does not enable `--harpoon.allow-plaintext-http`. Keep auto-registered OAuth endpoints behind the narrow proxy allowlist; do not expose authorization-server administration.
 - Run the acceptance Core and authorization server independently of disposable debugging terminals. The test jobs are manually bootstrapped into the current login session, with private logs and no automatic login installation. PostgreSQL data persists; the HTTPS proxy still needs its privileged process to remain running.
 - Keep client secrets, owner credentials, database passwords, access stores, deployment-specific launchers and logs outside the repository.
 
-Still required: successful ChatGPT discovery or validated manual settings, login and consent with the exact current callback, token exchange, authenticated tool discovery and a controlled coding call, followed by revocation rejection. A callback displayed in the configuration dialog is not evidence that the authorization redirect has succeeded.
+Still required: client-secret submission, login and consent with the exact current callback, token exchange, authenticated tool discovery and a controlled coding call, followed by revocation rejection. A callback displayed in the configuration dialog is not evidence that the authorization redirect has succeeded.
+
+Reference: [tunnel-client 0.0.16 configuration](https://github.com/openai/tunnel-client/blob/v0.0.16/docs/configuration.md), including OAuth shim rewriting and Harpoon OAuth target metadata.
