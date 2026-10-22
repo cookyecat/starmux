@@ -170,3 +170,11 @@ The deployment added an exact Tunnel audience mapper and the matching Core resou
 Regression coverage checks default rejection of an unconfigured alias, explicit acceptance, rejection of a neighboring URL, wrong issuer/subject/scope, and rejection after alias removal. Build and the OAuth integration fixture pass.
 
 Source: [Keycloak resource indicator processing](https://github.com/keycloak/keycloak/blob/26.8.1/services/src/main/java/org/keycloak/protocol/oidc/resourceindicators/ResourceIndicatorsPostProcessor.java).
+
+### Acceptance boundary and network dependency
+
+The ChatGPT settings page confirms a connected account using OAuth. The OAuth connector is now independently exposed to the agent, but its first real `health_check` attempt failed before reaching Core: the Tunnel could not complete a token-endpoint call after the host's global IPv6 connectivity was disabled. Keycloak remained healthy on loopback, while the canonical HTTPS issuer was unreachable. This is distinct from the earlier audience mismatch. Do not count this attempt as a successful coding or refresh test.
+
+For this IPv6-hosted deployment, keep the issuer reachable from both the user's login browser and the local Tunnel/Core. An outbound Tunnel does not remove the local dependency on the configured HTTPS issuer. If the host address changes, update the proxy bind address, DNS and any local host mapping together; never disable TLS verification to compensate. An IPv4-only deployment instead needs a reachable HTTPS authorization endpoint or a separately designed local HTTPS route.
+
+The full `npm test` suite passed after the resource-alias change, including all 20 Node test-runner tests plus the preceding compatibility scripts. Real connector file read/write, process execution, token refresh and remote revocation rejection remain pending.
