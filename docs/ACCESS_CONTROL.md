@@ -1,6 +1,8 @@
 # Gateway access control
 
-The Core keeps network connectivity, credential authentication and tool authorization separate. HTTPS or Tunnel carries MCP requests to the loopback Core. The optional authentication component checks a Gateway key; the existing owner policy still controls tool execution.
+The Core keeps network connectivity, credential authentication and tool authorization separate. HTTPS or Tunnel carries MCP requests to the loopback Core. The optional authentication component checks a Gateway key or OAuth token; the existing owner policy still controls tool execution.
+
+For complete HTTPS proxy and client setup, follow [Remote installation and deployment](REMOTE_SETUP.md).
 
 ## Default: managed by ingress
 

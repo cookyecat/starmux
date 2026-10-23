@@ -5,6 +5,9 @@ import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {mkdtemp,realpath,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {fileURLToPath} from 'node:url';
 import {createAccessControl} from '../src/access-control.js';
 import {createGatewayRuntime} from '../src/dc-workspace-http.js';
 import {discoverOAuth,validateOAuthConfig} from '../src/oauth-resource.js';
@@ -66,6 +69,18 @@ test('OAuth discovery, JWT validation, live revocation and preserved MCP policy'
   for(const invalid of ['http://remote.example/mcp','https://tunnel.example/mcp#fragment','https://user:pass@tunnel.example/mcp'])
    assert.throws(()=>validateOAuthConfig({...config,resourceAliases:[invalid]}),/HTTPS/);
   await access.configureOAuth({...config,resourceAliases:[alias]});
+  const cli=fileURLToPath(new URL('../../bin/mac-mcp-gateway.mjs',import.meta.url));
+  const invoke=(args:string[])=>promisify(execFile)(process.execPath,[cli,'access','oauth',...args],
+    {env:{...process.env,MAC_MCP_ACCESS_FILE:file}});
+  assert.match((await invoke(['doctor'])).stdout,/"PASS"/);
+  const configure=['configure','--issuer',issuer,'--resource',resource,'--client-id','chatgpt-test',
+    '--subjects','owner','--allow-loopback-http'];
+  await invoke([...configure,'--resource-aliases',alias]);
+  assert.deepEqual((await access.snapshot()).oauth?.resourceAliases,[alias]);
+  await assert.rejects(invoke([...configure,'--resource-aliases','http://remote.example/mcp']));
+  metadataOverrides={jwks_uri:issuer+'/different-keys'};
+  await assert.rejects(invoke(['doctor']),/OAUTH_METADATA_CHANGED_RECONFIGURE/);
+  metadataOverrides={};
   assert.equal((await rpc(aliasToken)).status,200);
   assert.equal((await rpc(await token({aud:alias+'-other'}))).status,401);
   assert.equal((await rpc(await token({aud:alias,iss:'wrong'}))).status,401);

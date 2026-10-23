@@ -2,6 +2,12 @@
 
 # Mac MCP Gateway
 
+**AI clients: ChatGPT web · Codex · WorkBuddy · Doubao (豆包)**
+
+**OAuth · HTTPS + Bearer API Key · Protected Tunnel**
+
+[Client compatibility and tested paths](#ai-client-compatibility) · [Remote deployment guide](docs/REMOTE_SETUP.md)
+
 ### Your Mac. Your tools. **Your gateway.**
 
 **Let remote AI agents code on your own Mac — without relying on Desktop Commander's hosted remote relay.**
@@ -21,7 +27,18 @@ An independent, self-hosted Gateway for the real [Desktop Commander MCP](https:/
 </div>
 
 > [!NOTE]
-> **Community pre-release.** The local App/CLI and a private Tunnel workflow have been tested. Public binaries, independent first-user setup and external identity / authorization / revocation acceptance are still release gates.
+> **Community pre-release.** Real ChatGPT OAuth coding/revocation through Tunnel and WorkBuddy HTTPS + API-key file access have been exercised. Public signed binaries, independent first-user setup and the remaining platform/transport combinations are still release gates.
+
+## AI client compatibility
+
+| Client | Connection/authentication | Evidence and limits |
+| --- | --- | --- |
+| **ChatGPT web** | OpenAI Tunnel + OAuth (Keycloak) | Real login, discovery, file read/write, Python execution, session revocation and reauthentication passed; owner also confirmed a real read-only Downloads scan. Direct-HTTPS OAuth remains a separate acceptance item. |
+| **Codex** | Installed Gateway plugin + protected OpenAI Tunnel, ingress-managed | Real coding workflow tested. The API-key HTTP configuration is documented; a separate Codex-native OAuth flow has not been accepted. |
+| **WorkBuddy** | HTTPS + public IPv6 + Bearer API key | Remote health/discovery and file reads/writes confirmed by the owner; local key rejection/revocation checks also passed. |
+| **Doubao (豆包)** | Custom MCP connection | Owner reports successful use. Exact version, transport/authentication and tested operations are not yet recorded. |
+
+These are compatible clients, not a promise that every client supports every authentication mode or network combination. Other Streamable HTTP MCP clients can be tested with the same endpoint and a supported authentication method.
 
 ## Quick Start
 
@@ -78,7 +95,7 @@ mac-mcp-gateway access revoke CREDENTIAL_ID
 
 Every credential uses your existing owner-approved permissions; authentication does not remove Desktop Commander coding tools. Manage credentials through the CLI or **Dashboard → Access control** (also reachable from the macOS App). See [access control, client compatibility and security boundaries](docs/ACCESS_CONTROL.md) before enabling key mode.
 
-OAuth for ChatGPT is now available as an opt-in resource-server integration with a separate authorization server. See [OAuth setup and acceptance status](docs/OAUTH.md); real remote-client acceptance is still pending.
+**OAuth and HTTPS + Bearer API Key are implemented.** OAuth uses a separate authorization server; it preserves the existing owner-approved coding capabilities. Follow [remote installation and deployment](docs/REMOTE_SETUP.md) for API-key client JSON, HTTPS proxy configuration, Keycloak setup, ChatGPT fields, Tunnel resource aliases, diagnostics and revocation. See [OAuth contracts and acceptance evidence](docs/OAUTH.md). One Core selects one authentication mode; keys and OAuth are not simultaneous fallbacks.
 
 ## Why run your own Gateway?
 
@@ -134,11 +151,11 @@ After a tool result:
 
 **In ChatGPT web:** open **Plugins → + → Add custom MCP server**, enter a name, then either paste your public `https://your-domain.example/mcp` URL or choose **Tunnel** and select your own Tunnel ID. Configure authentication and confirm access by making an actual permitted tool call.
 
-**DNS alone is not enough.** Direct HTTPS also requires public reachability, a valid certificate, an authenticated reverse proxy and a protected MCP endpoint; none of those are created just by pointing a domain at your Mac. Tunnel setup instead follows OpenAI's official workflow and does not require inbound router ports.
+**DNS alone is not enough.** Direct HTTPS also requires public reachability, a valid certificate, a reverse proxy and a protected MCP endpoint with Core OAuth/API-key authentication or a separately controlled ingress; none of those are created just by pointing a domain at your Mac. Tunnel setup instead follows OpenAI's official workflow and does not require inbound router ports.
 
 **[Connect ChatGPT — step-by-step HTTPS and Tunnel instructions →](docs/CONNECT_CHATGPT.md)**
 
-> **Current release gate:** Private Tunnel coding workflows have been exercised, but independent end-to-end identity, permitted-operation, denied-operation and revocation acceptance for **both** connection methods remains incomplete. Expected permissions depend on the selected profile; trusted native mode is not limited to reads. A healthy local Core is not proof of an authenticated remote session.
+> **Validation scope:** ChatGPT OAuth over Tunnel has passed real coding and revocation acceptance. WorkBuddy HTTPS + API-key remote reads/writes have passed. This does not certify every client/transport/platform combination or independent first-user onboarding. Expected permissions depend on the selected profile; a healthy local Core alone is not proof of an authenticated remote session.
 
 ## One Gateway. App or CLI.
 
@@ -162,7 +179,7 @@ The local Dashboard URL is printed by `mac-mcp-gateway status`. The owner's deve
 
 ## Release status and contributions
 
-This repository remains **pre-release development source**. A clean public repository, developer-signed distribution, independent clean-Mac installation, remote security verification and third-party license notice review are still pending. The current private owner's Tunnel configuration and Git history are **not community defaults** and must not be distributed.
+This repository remains **pre-release development source**. A clean public repository, developer-signed distribution, independent clean-Mac installation, remaining remote/platform verification and third-party license notice review are still pending. The current private owner's Tunnel configuration and Git history are **not community defaults** and must not be distributed.
 
 [Community release checklist](docs/RELEASE_STATUS.md) · [Contributing](CONTRIBUTING.md) · [Report security issues](SECURITY.md)
 

@@ -2,6 +2,10 @@
 
 Gateway is the OAuth **resource server**. A separate authorization server owns user login, consent, PKCE authorization codes, token issuance and refresh. The Core remains loopback-only; HTTPS/Tunnel transport is independent of authorization. Existing ingress and API-key installations remain unchanged until the owner explicitly selects OAuth.
 
+**Start here:** [step-by-step remote installation](REMOTE_SETUP.md) covers Keycloak, HTTPS proxy, CLI configuration, ChatGPT fields and the tested Tunnel layout. This document describes contracts and historical acceptance evidence.
+
+**Current result:** ChatGPT web OAuth through the official Tunnel passed real coding, session revocation and fresh-login recovery. The owner additionally confirmed a real read-only disk scan. Direct-HTTPS OAuth and native Linux/Windows OAuth acceptance remain open.
+
 ## Current implementation and acceptance boundaries
 
 - Implemented: protected-resource discovery, Bearer challenges, JWT validation, owner subject/client allowlists, tool security metadata, live local session revocation, CLI and Dashboard management.
@@ -25,6 +29,8 @@ mac-mcp-gateway access oauth doctor
 mac-mcp-gateway access mode oauth
 mac-mcp-gateway access oauth status
 ```
+
+For an explicitly approved alternate resource identifier, append `--resource-aliases 'https://exact-resource.example/mcp'` (comma-separated, maximum eight). Include all intended aliases on reconfiguration; omitting the option removes them. `doctor` checks discovery separately from these owner-configured aliases.
 
 `configure` fetches standard OAuth/OIDC discovery, checks exact issuer and PKCE S256, validates HTTPS endpoints on the same origin, and saves configuration without changing the active mode. Cross-origin authorization/JWKS endpoints are deliberately not supported in this first adapter. Redirecting discovery endpoints are rejected. `--allow-loopback-http` is explicitly for isolated development, never remote deployment.
 
@@ -103,7 +109,7 @@ Existing Tunnel coding acceptance in ingress mode is recorded separately in [the
 - [x] Local revocation rejects refreshed token claims with the same session ID.
 - [x] Real Keycloak 26.8.1 authorization code, PKCE, consent, refresh and replay tests (local macOS).
 - [ ] Real ChatGPT HTTPS: discovery → authorization → coding → refresh → revoke.
-- [ ] Real ChatGPT Tunnel: same flow, including separate authorization endpoint reachability.
+- [x] Real ChatGPT Tunnel: discovery, provided-client authorization, coding, token-endpoint updates, local revocation rejection and fresh-login recovery. Long-idle unattended operation remains outside this acceptance.
 - [ ] Native Linux/Windows validation of the new OAuth feature.
 
 ## Reproduce the local provider test
@@ -124,7 +130,11 @@ The test exercises exact callback checks, consent rejection, PKCE mismatch, auth
 - [Keycloak MCP integration](https://www.keycloak.org/securing-apps/mcp-authz-server)
 - [Keycloak Docker setup](https://www.keycloak.org/getting-started/getting-started-docker)
 
-## Remote acceptance deployment checkpoint (2026-10-22)
+## Historical acceptance checkpoints
+
+The following entries preserve the investigation chronology. Statements such as “pending” describe that checkpoint only; use the current result and checklist above for present status.
+
+### Remote acceptance deployment checkpoint (2026-10-22)
 
 A separate macOS acceptance deployment now uses Keycloak 26.8.1 with PostgreSQL 17, a public IPv6 HTTPS ingress, and an OAuth-only Core. This is an infrastructure checkpoint, **not a passed ChatGPT end-to-end acceptance**.
 

@@ -2,15 +2,17 @@
 
 **Your Gateway is running on your Mac. How does ChatGPT reach it?**
 
+For the complete current **OAuth / HTTPS + Bearer API Key** deployment procedure, use [Remote installation](REMOTE_SETUP.md). This page explains network choices. ChatGPT OAuth over Tunnel has passed real coding and revocation tests; direct-HTTPS OAuth remains separately unverified.
+
 Choose the connection that matches your network. **Start with Direct HTTPS** if your Mac can accept inbound internet traffic. Choose **Secure MCP Tunnel** if it cannot, or you prefer not to open a public HTTPS entry point.
 
 | | **1. Direct HTTPS — recommended for reachable networks** | **2. Secure MCP Tunnel — for restricted networks** |
 | --- | --- | --- |
 | ChatGPT connects using | Your public `https://your-domain.example/mcp` URL | Your personal OpenAI Platform `tunnel_id` |
 | Network requirement | Publicly reachable IPv4 and/or IPv6 + inbound TCP 443 | Outbound HTTPS from your Mac |
-| You operate | DNS, TLS, authenticated HTTPS reverse proxy, Gateway | `tunnel-client`, Gateway |
+| You operate | DNS, TLS, HTTPS reverse proxy, Gateway; authorization server for OAuth | `tunnel-client`, Gateway; reachable authorization server for OAuth |
 | Hosted forwarding | No Desktop Commander relay or OpenAI Tunnel | OpenAI Tunnel is used; no Desktop Commander relay |
-| Release status | Full external identity/security acceptance **pending** | Private owner workflow tested; independent new-user acceptance **pending** |
+| Release status | ChatGPT OAuth acceptance **pending** | Owner OAuth coding/revocation tested; independent new-user acceptance **pending** |
 
 This is a guide for **your own private ChatGPT connection**, not a claim that this project is already an independently verified public one-click service.
 
@@ -65,9 +67,9 @@ Check the result with `dig +short mcp.your-domain.example A` and `dig +short mcp
 
 Run an HTTPS reverse proxy such as **Caddy** or **Nginx**, listen on public **TCP 443**, and obtain a valid TLS certificate for `mcp.your-domain.example`. Its protected MCP route forwards requests internally to `http://127.0.0.1:<PORT>/mcp`.
 
-**Before** exposing this route, configure **real caller authentication and authorization**. For example, an OAuth-capable ingress must validate the token issuer, audience, expiry, scopes and revocation, and only then forward authorized MCP calls. HTTPS encryption by itself **does not** authenticate the AI client; a private-looking domain name is not access control.
+**Before** exposing this route, configure **real caller authentication and authorization**. Core OAuth validates the token and checks owner/session authorization; Core API-key mode validates supported clients’ Bearer keys. A separately controlled ingress is also supported in ingress mode. HTTPS encryption by itself **does not** authenticate the AI client; a private-looking domain name is not access control.
 
-**Important development limitation:** Mac MCP Gateway retains tested internal authentication and revocation primitives, but they are not connected to Core HTTP and **this repository does not yet supply a verified one-click public OAuth/reverse-proxy deployment**. If you have not configured and tested real authentication, **do not publish /mcp**. Never expose the local Gateway's `<PORT>` directly to the internet.
+**Implementation status:** OAuth and API-key authentication are connected to Core HTTP. Follow the [deployment guide](REMOTE_SETUP.md) to configure them. This is not yet a one-click public OAuth/reverse-proxy installation. If you have not configured and tested real authentication, **do not publish /mcp**. Never expose the local Gateway's `<PORT>` directly to the internet.
 
 ### Step 4 — Add the URL in ChatGPT
 
@@ -105,7 +107,8 @@ Save your **own `tunnel_id`**. The Mac MCP Gateway release doesn't bundle the ma
 Install OpenAI's supported `tunnel-client` using the official guide. Follow its current instructions to configure a profile with:
 
 - Your own Platform Tunnel ID and **restricted runtime API key**, kept out of Git, shell history and screenshots.
-- The MCP target **`http://127.0.0.1:<PORT>/mcp`**, reachable locally on the Mac.
+- For ingress-managed mode, the MCP target **`http://127.0.0.1:<PORT>/mcp`**, reachable locally on the Mac.
+- For the tested **OAuth** layout, use the same-origin HTTPS target and trusted issuer described in [OAuth Tunnel setup](REMOTE_SETUP.md#official-openai-tunnel--tested-chatgpt-path), not the loopback target above.
 
 Use the version-specific help and health check:
 
@@ -142,6 +145,6 @@ Neither route replaces Desktop Commander or changes your local file permissions.
 - **Tools appear, but write is denied:** This may be correct. Check remote caller authorization and local restricted/developer mode. Don't disable security just to make discovery green.
 - **No “Add custom MCP server” option:** ChatGPT's available custom MCP features depend on plan and workspace permissions. See [OpenAI's current connection instructions](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt).
 
-**Community release gate:** Neither route is independently accepted as a public one-click workflow yet; authenticated external end-to-end tests remain open. No public endpoint should be deployed without verified caller identity and revocation.
+**Community release gate:** Neither route is independently accepted as a public one-click workflow yet; ChatGPT OAuth Tunnel coding and revocation tests passed, while direct-HTTPS OAuth and independent onboarding remain open. No public endpoint should be deployed without verified caller identity and revocation.
 
 [Main README](../README.md) · [Local installation](INSTALL.md) · [Security](SECURITY.md)

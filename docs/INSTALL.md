@@ -6,6 +6,16 @@ This is the source-based setup guide for the current **cross-platform CLI develo
 
 See [Platform support](PLATFORMS.md) for native validation status and platform-specific limitations.
 
+## Remote deployment after local installation
+
+The Gateway supports **OAuth** and **HTTPS + Bearer API Key**, alongside existing ingress-managed access. Follow [Remote installation and deployment](REMOTE_SETUP.md) after the local setup below:
+
+- **WorkBuddy / header-capable clients:** create a key, enable API-key mode, configure the HTTPS proxy and client JSON, then verify and revoke.
+- **ChatGPT web OAuth:** deploy Keycloak with persistent storage, configure discovery and the allowed owner, connect through HTTPS or the tested OpenAI Tunnel path, then verify coding and revocation.
+- **Codex / Doubao:** see [client compatibility and evidence](../README.md#ai-client-compatibility). Do not assume all clients offer the same credential fields.
+
+The guide includes Caddy examples, exact CLI commands, ChatGPT fields and network diagnostics. Authorization-server installation and native OAuth onboarding are not yet automated.
+
 ## Option 1: From source (CLI)
 
 **Prerequisites:** macOS, Linux, or Windows, Git, Node.js 22.12 or later with npm, and access to the checked-out source repository. Gateway declares Node 22 as its minimum; the locked Desktop Commander dependency requires 22.12 or later for strict engine checks. You do not need to install Desktop Commander separately: the project's locked npm dependencies include it.

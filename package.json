@@ -50,6 +50,11 @@
     "README.md",
     "docs/ACCESS_CONTROL.md",
     "docs/OAUTH.md",
+    "docs/REMOTE_SETUP.md",
+    "docs/INSTALL.md",
+    "docs/CONNECT_CHATGPT.md",
+    "docs/PLATFORMS.md",
+    "docs/VALIDATION_WORKBUDDY.md",
     "docs/VALIDATION_TUNNEL.md"
   ]
 }
