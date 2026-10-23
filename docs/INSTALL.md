@@ -2,7 +2,7 @@
 
 This is the source-based setup guide for the current **cross-platform CLI development preview**. A signed, notarized community App ZIP is planned for GitHub Releases, but is **not available to independent users yet**.
 
-**Want to connect ChatGPT after installing?** Go to [Connect ChatGPT](CONNECT_CHATGPT.md). Local installation does not establish a remote connection.
+**New to the project?** Start with [the documentation index](README.md). After local installation, [choose authentication](ACCESS_CONTROL.md#choose-an-authentication-mode) and follow the [remote deployment guide](REMOTE_SETUP.md). Local installation does not establish a remote connection.
 
 See [Platform support](PLATFORMS.md) for native validation status and platform-specific limitations.
 
@@ -12,7 +12,7 @@ The Gateway supports **OAuth** and **HTTPS + Bearer API Key**, alongside existin
 
 - **WorkBuddy / header-capable clients:** create a key, enable API-key mode, configure the HTTPS proxy and client JSON, then verify and revoke.
 - **ChatGPT web OAuth:** deploy Keycloak with persistent storage, configure discovery and the allowed owner, connect through HTTPS or the tested OpenAI Tunnel path, then verify coding and revocation.
-- **Codex / Doubao:** see [client compatibility and evidence](../README.md#ai-client-compatibility). Do not assume all clients offer the same credential fields.
+- **Codex / Doubao:** see [client compatibility and evidence](CLIENTS.md). Do not assume all clients offer the same credential fields.
 
 The guide includes Caddy examples, exact CLI commands, ChatGPT fields and network diagnostics. Authorization-server installation and native OAuth onboarding are not yet automated.
 
@@ -114,7 +114,7 @@ The community release will offer a **prebuilt Apple Silicon App ZIP** on GitHub 
 
 The planned user flow is simple: download the official Release ZIP, check its published SHA-256, unzip, move **Mac MCP Gateway.app** to Applications, launch it, approve an access scope and connection preference, then start the local Core. Once connected locally, the App shows health, route readiness and quick actions; it doesn't enroll remote clients automatically.
 
-**Distribution gate:** Current owner builds use ad-hoc signatures. The public App ZIP, Gatekeeper/notarization behavior, independent clean-Mac installation and both remote routes are **not yet accepted**. Do not download random binaries claiming to be official.
+**Distribution gate:** Current owner builds use ad-hoc signatures. The public App ZIP, Gatekeeper/notarization behavior, independent clean-Mac installation remain **unaccepted distribution gates**. Remote workflow results are recorded separately in [client compatibility](CLIENTS.md). Do not download random binaries claiming to be official.
 
 ### Build a TypeScript-backed SwiftUI App locally
 
@@ -130,10 +130,10 @@ The script verifies the pinned archive checksum, compiles TypeScript in staging 
 
 ## Next: connect an AI client
 
-Local success means the Gateway and its real Desktop Commander tools can run on this Mac. ChatGPT needs a **separately configured remote path**.
+Local success means the Gateway and its real Desktop Commander tools can run on this host. Your AI client needs a **separately configured remote path**.
 
 - **Direct HTTPS — preferred if your network is publicly reachable.** Register a domain, point DNS to your reachable IP, configure TLS and authenticated HTTPS ingress, then enter your `https://.../mcp` URL in ChatGPT.
-- **Secure MCP Tunnel — for difficult inbound networks.** Create your own Tunnel in OpenAI Platform, configure `tunnel-client` against your local MCP URL, and select your Tunnel in ChatGPT.
+- **Secure MCP Tunnel — for difficult inbound networks.** Create your own Tunnel in OpenAI Platform, configure `tunnel-client` and select your Tunnel in ChatGPT. Ingress mode can target the loopback MCP URL; OAuth uses the [tested same-origin layout](REMOTE_SETUP.md#official-openai-tunnel--tested-chatgpt-path).
 
 Read the [step-by-step ChatGPT connection guide](CONNECT_CHATGPT.md) for DNS, TLS, authentication, Tunnel IDs and verification.
 

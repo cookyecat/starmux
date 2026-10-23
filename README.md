@@ -2,195 +2,109 @@
 
 # Mac MCP Gateway
 
-**AI clients: ChatGPT web · Codex · WorkBuddy · Doubao (豆包)**
+### A self-hosted remote workbench for Desktop Commander.
 
-**OAuth · HTTPS + Bearer API Key · Protected Tunnel**
+Connect your AI client to files, terminals and development tools on your own computer. **Choose what AI can access. Start, stop and revoke access on your terms.**
 
-[Client compatibility and tested paths](#ai-client-compatibility) · [Remote deployment guide](docs/REMOTE_SETUP.md)
+**ChatGPT web · Codex · WorkBuddy · Doubao**
 
-### Your Mac. Your tools. **Your gateway.**
+**Three authentication choices · Cross-platform CLI preview · Native macOS App · MIT**
 
-**Let remote AI agents code on your own Mac — without relying on Desktop Commander's hosted remote relay.**
-
-An independent, self-hosted Gateway for the real [Desktop Commander MCP](https://github.com/wonderwhy-er/DesktopCommanderMCP).
-
-**Configure your own self-hosted MCP backend while retaining Desktop Commander's existing tool capabilities.**
-
-允许配置自托管后端，同时保留现有 Desktop Commander 工具执行能力。
-
-**Our goal: let Mac users self-host a remote AI workbench, clearly choose what AI can access, and easily start, stop, and revoke access.**
-
-让 Mac 用户能够自行部署一个远程 AI 工作台，清楚地决定 AI 可以访问什么，并方便地启动、停止和撤销访问。
-
-**Cross-platform CLI preview** · **Native macOS App** · **MIT licensed**
+[**Get started**](#get-started) · [**Choose authentication**](#choose-authentication) · [**Documentation**](docs/README.md)
 
 </div>
 
-> [!NOTE]
-> **Community pre-release.** Real ChatGPT OAuth coding/revocation through Tunnel and WorkBuddy HTTPS + API-key file access have been exercised. Public signed binaries, independent first-user setup and the remaining platform/transport combinations are still release gates.
+> **Community preview — available from source.** ChatGPT OAuth over Tunnel and WorkBuddy HTTPS + API-key file access have been tested. See [client compatibility](docs/CLIENTS.md) for the exact combinations, including Claude App as a validation target.
+
+## Your AI client here. Your tools there.
+
+Use your preferred AI client to read a project, edit files and run tests on the computer hosting Gateway. In owner-approved coding mode, Desktop Commander's native tools remain available, subject to your permission policy and upstream controls.
+
+- **Keep your development environment.** Work with the repositories, runtimes and tools already on your computer.
+- **Host your own MCP connection.** No Desktop Commander hosted relay is required. Use HTTPS or a protected Tunnel for network access.
+- **Control the same Core from CLI or App.** The CLI/Core spans macOS, Linux and Windows previews; the native App currently supports macOS.
+
+This is an independent project built around [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP). It provides its own MCP connection; it does not replace the backend inside the official Desktop Commander plugin. The first release focuses on the [community request for self-hosting](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/714).
+
+## How it connects
+
+![Remote AI clients connect through HTTPS or a protected Tunnel to Gateway Core and Desktop Commander.](docs/assets/mcp-gateway-simple.svg)
+
+Install Gateway on the **computer whose files and tools you want to use**. Your AI client can run elsewhere. HTTPS or Tunnel carries the connection; the authentication choice below controls access; your permission profile determines what tools may do.
+
+## Choose authentication
+
+Start with the option your client and deployment support. You do not need to configure all three.
+
+| Your situation | Choose | What setup involves |
+| --- | --- | --- |
+| You already use a protected Tunnel or another ingress that restricts access | **Access managed by your connection** (`ingress`) | No Gateway key or OAuth server. Configure access in the ingress you already operate. |
+| Your client accepts a Bearer key, such as WorkBuddy | **API Key** | Create a key per client, add it to the client configuration and revoke it independently. |
+| Your client supports browser login and consent, such as ChatGPT web | **OAuth** | Users sign in and approve access; the client manages tokens. The host operator must first deploy an authorization server. |
+
+**The default is ingress-managed access, with no shared factory key.** For remote use, the ingress must actually restrict who can connect. HTTPS encryption alone is not authentication. One Core uses one active mode.
+
+All three choices retain the same owner-approved tool permissions. A key or OAuth login does not create a separate workspace or sandbox for each user. Manage Gateway keys and OAuth sessions through the CLI or **Dashboard → Access control**; ingress-managed access is revoked at the ingress.
+
+[Compare modes and manage access](docs/ACCESS_CONTROL.md) · [API Key deployment](docs/REMOTE_SETUP.md#2-https--bearer-api-key) · [OAuth deployment](docs/REMOTE_SETUP.md#3-oauth-deploy-the-authorization-server)
+
+## Get started
+
+1. **Install on your tool host.** Follow [local installation](docs/INSTALL.md) to install the CLI and choose a read-only or coding permission profile. Source installation requires Git and Node.js 22.12+.
+2. **Connect your AI client.** Follow [remote deployment](docs/REMOTE_SETUP.md) for HTTPS + API Key or ChatGPT OAuth, or the [protected Tunnel guide](docs/CONNECT_CHATGPT.md#2-secure-mcp-tunnel--no-inbound-port) for ingress-managed access.
+3. **Verify a real tool call.** Ask the connected client to check Gateway health and read an approved test file. Local health or a connected icon alone does not verify remote tool execution.
+
+After installation, everyday control is simple:
+
+```sh
+mac-mcp-gateway run
+mac-mcp-gateway status   # In another terminal while the Core runs
+mac-mcp-gateway stop
+```
+
+Setup configures the local Gateway. It does not provision DNS, TLS, a Tunnel or an OAuth server. [Installation and configuration guides →](docs/README.md)
 
 ## AI client compatibility
 
-| Client | Connection/authentication | Evidence and limits |
+| Client | Current validation |
+| --- | --- |
+| **ChatGPT web** | Tested: Tunnel + OAuth, including coding and session revocation |
+| **Codex** | Tested: installed Gateway plugin through protected Tunnel |
+| **WorkBuddy** | Tested: HTTPS + IPv6 + API-key file reads/writes |
+| **Doubao (豆包)** | Owner-reported successful use; connection details not yet recorded |
+| **Claude App** | Compatibility target; Gateway end-to-end validation pending |
+
+[Exact test scope, connection guides and pending combinations](docs/CLIENTS.md)
+
+## Platform support
+
+| Gateway host | Core / CLI | Native App |
 | --- | --- | --- |
-| **ChatGPT web** | OpenAI Tunnel + OAuth (Keycloak) | Real login, discovery, file read/write, Python execution, session revocation and reauthentication passed; owner also confirmed a real read-only Downloads scan. Direct-HTTPS OAuth remains a separate acceptance item. |
-| **Codex** | Installed Gateway plugin + protected OpenAI Tunnel, ingress-managed | Real coding workflow tested. The API-key HTTP configuration is documented; a separate Codex-native OAuth flow has not been accepted. |
-| **WorkBuddy** | HTTPS + public IPv6 + Bearer API key | Remote health/discovery and file reads/writes confirmed by the owner; local key rejection/revocation checks also passed. |
-| **Doubao (豆包)** | Custom MCP connection | Owner reports successful use. Exact version, transport/authentication and tested operations are not yet recorded. |
+| **macOS** | Tested locally and in recorded remote workflows | SwiftUI source / development builds |
+| **Linux** | Preview; Ubuntu arm64 local integration tests passed | Not available |
+| **Windows** | Preview implementation; native validation pending | Not available |
 
-These are compatible clients, not a promise that every client supports every authentication mode or network combination. Other Streamable HTTP MCP clients can be tested with the same endpoint and a supported authentication method.
-
-## Quick Start
-
-**Run from a Git checkout.** You need Git and Node.js **22.12+** on macOS, Linux, or Windows (matching the bundled Desktop Commander dependency). When the clean community repository is published, its URL will be provided here.
-
-```bash
-# In your checked-out mac-mcp-gateway directory
-npm ci
-npm install --global .
-mac-mcp-gateway setup
-mac-mcp-gateway doctor
-mac-mcp-gateway run
-```
-
-In another terminal:
-
-```bash
-mac-mcp-gateway verify             # Verify real local MCP tools
-mac-mcp-gateway status           # Core status + Dashboard
-mac-mcp-gateway stop             # Stop the single Core
-mac-mcp-gateway run              # Start it from the installed CLI
-```
-
-The global CLI installation was checked in an isolated npm prefix. The setup wizard configures a private local profile, normally on port **18893**. It does **not** automatically create a ChatGPT connection. An already-running Gateway session must be stopped before starting another Core.
-
-`mac-mcp-gateway run` displays an English startup panel with **Config source**, **Core program**, **Build version**, and **Listening port**. The build identifier includes a fingerprint of the compiled code. Saved onboarding settings take precedence over legacy settings, and both use the Core shipped with the CLI you invoked. Daily use does not require `node bin/...` or a `--profile` option. Use `run --json` for structured startup diagnostics.
-
-**Linux / Windows:** See [platform support and permission differences](docs/PLATFORMS.md). The shared CLI is available for platform testing; the SwiftUI App remains macOS-only.
-
-**Prefer a Mac App?** The intended public distribution is a prebuilt Apple Silicon `.zip` on GitHub Releases: extract it, move the App to Applications, launch, choose permissions and connection mode. **No Xcode or separate Node.js for the packaged App.** A properly signed / Gatekeeper-verified public ZIP has **not yet been released**; today's ZIP builds are internal development artifacts.
-
-[Full local setup (English)](docs/INSTALL.md) · [Test TypeScript alongside an existing installation](docs/INSTALL.md#testing-this-typescript-checkout-with-an-existing-installation) · [Connect ChatGPT — HTTPS or Tunnel](docs/CONNECT_CHATGPT.md)
-
-**Testing the full coding workflow?** Configure the trusted developer role explicitly, then start the Gateway:
-
-```bash
-mac-mcp-gateway setup --access-role trusted --connection tunnel --approve-trusted-developer
-mac-mcp-gateway doctor
-mac-mcp-gateway run
-```
-
-This is an alternative to the basic interactive `mac-mcp-gateway setup` above, which asks for read/write mode but does not select the trusted native role. `--connection tunnel` only records a connection preference. Existing setup files are protected from replacement; see the installation guide before changing an existing profile.
-
-## Access control
-
-By default, the Gateway does not require a client key: access is controlled by your local boundary or protected ingress. There is no shared factory key. Optionally create separate client credentials and require them on every MCP request:
-
-```sh
-mac-mcp-gateway access create "My AI client"  # Secret displayed once
-mac-mcp-gateway access mode api-key
-mac-mcp-gateway access list
-mac-mcp-gateway access revoke CREDENTIAL_ID
-```
-
-Every credential uses your existing owner-approved permissions; authentication does not remove Desktop Commander coding tools. Manage credentials through the CLI or **Dashboard → Access control** (also reachable from the macOS App). See [access control, client compatibility and security boundaries](docs/ACCESS_CONTROL.md) before enabling key mode.
-
-**OAuth and HTTPS + Bearer API Key are implemented.** OAuth uses a separate authorization server; it preserves the existing owner-approved coding capabilities. Follow [remote installation and deployment](docs/REMOTE_SETUP.md) for API-key client JSON, HTTPS proxy configuration, Keycloak setup, ChatGPT fields, Tunnel resource aliases, diagnostics and revocation. See [OAuth contracts and acceptance evidence](docs/OAUTH.md). One Core selects one authentication mode; keys and OAuth are not simultaneous fallbacks.
-
-## Why run your own Gateway?
-
-**Your AI runs in the cloud. Your code, Git repositories, and terminal live on your Mac. Why should someone else control the bridge?**
-
-Desktop Commander already gives AI powerful local tools. Its hosted Remote MCP service makes them accessible from the web. But what if you want to **own and operate that connection yourself?**
-
-**Mac MCP Gateway puts that bridge in your hands.** It lets ChatGPT and other remote MCP clients access the real files, Git, terminal, and development tools on your Mac — through a self-hosted connection you control, without relying on Desktop Commander's hosted relay.
-
-**It's not another coding agent. It's the connection layer that brings remote AI to your own development environment.**
-
-![Remote AI clients accessing real development tools through a self-hosted Mac MCP Gateway](docs/assets/multi-client-gateway.png)
-
-<sub>Illustrative multi-client/multi-computer deployment vision. CLI platform validation is tracked in [Platform support](docs/PLATFORMS.md); unified multi-host management is not shipped.</sub>
-
-### First release: a self-hosted Desktop Commander remote workbench
-
-The first release focuses on people who want Desktop Commander's remote coding capabilities while operating their own Gateway. Desktop Commander remains the execution engine; Mac MCP Gateway provides the self-hosted connection, routing, and native SwiftUI App / TypeScript CLI management experience. The longer-term direction is a general-purpose Gateway for multiple MCP servers and AI clients.
-
-In owner-approved **trusted native mode**, the Gateway forwards the upstream Desktop Commander tool names, input schemas, arguments, and results without replacing them with a reduced read-only tool set. This supports the coding loop: read code, edit files, run commands and tests, inspect results, and iterate. Explicit owner deny rules, Desktop Commander controls, and OS account permissions still apply. The JavaScript version has been used by its maintainer to develop and iterate on the Gateway itself.
-
-**Permission profiles:** choose restricted mode for project-scoped read-only access, or explicitly approve trusted native mode for the upstream coding tools. Both use the same Core. See [security boundaries](docs/SECURITY.md) and the [connection guide](docs/CONNECT_CHATGPT.md) for deployment requirements.
-
-Community interest in this use case is reflected in [DesktopCommanderMCP issue #714](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/714), which requests a configurable self-hosted backend for the official remote integration. Mac MCP Gateway offers a separate self-hosted MCP connection; it does not implement backend selection inside the official plugin or claim drop-in compatibility with its private hosted service.
-
-### Programmable MCP Middleware — own what happens between AI and tools
-
-**A connection layer you operate can become a policy and automation layer you customize.** Instead of treating the MCP protocol as a black-box pipe, imagine having explicit decision points before and after a tool call.
-
-The direction is **programmable MCP middleware**: intercept requests, evaluate conditional rules, require approval, block risky operations, choose an upstream, validate permitted argument changes, or trigger owner-approved scripts when a tool returns. For example:
-
-```text
-Before a tool call:
-  if the client requests a protected operation → require approval
-  else → forward the tool call to the actual MCP server
-
-After a tool result:
-  if a build failed → record the outcome or trigger a local notification
-```
-
-**Implementation status:** the Gateway already provides MCP routing, authorization checks and limited auditing. **General-purpose user-defined hooks and script plugins are planned, not yet a shipped feature.** Custom logic must never silently bypass caller authorization or the upstream's execution boundaries.
-
-## How ChatGPT connects
-
-**Local installation is only step one.** After your Gateway is healthy, you still need to make it reachable to ChatGPT and add it as a custom MCP server in the ChatGPT web interface. Choose one of two connection paths:
-
-![Two MCP connection paths: Direct HTTPS with your domain, DNS, TLS and authentication (preferred); or outbound OpenAI Secure MCP Tunnel (alternative). Both connect ChatGPT to one Mac MCP Gateway and the actual Desktop Commander MCP server.](docs/assets/mcp-gateway-simple.svg)
-
-| Connection | Best for | What you configure |
-| --- | --- | --- |
-| **1. Direct HTTPS — preferred** | Users with a reachable public IPv4/IPv6 address and domain | Your DNS **A/AAAA** record → HTTPS/TLS reverse proxy on port **443** → real caller authentication → Gateway |
-| **2. Secure MCP Tunnel** | CGNAT, restricted firewalls and difficult inbound networking | Your **own** OpenAI Platform Tunnel, local `tunnel-client`, ChatGPT workspace permissions |
-
-**In ChatGPT web:** open **Plugins → + → Add custom MCP server**, enter a name, then either paste your public `https://your-domain.example/mcp` URL or choose **Tunnel** and select your own Tunnel ID. Configure authentication and confirm access by making an actual permitted tool call.
-
-**DNS alone is not enough.** Direct HTTPS also requires public reachability, a valid certificate, a reverse proxy and a protected MCP endpoint with Core OAuth/API-key authentication or a separately controlled ingress; none of those are created just by pointing a domain at your Mac. Tunnel setup instead follows OpenAI's official workflow and does not require inbound router ports.
-
-**[Connect ChatGPT — step-by-step HTTPS and Tunnel instructions →](docs/CONNECT_CHATGPT.md)**
-
-> **Validation scope:** ChatGPT OAuth over Tunnel has passed real coding and revocation acceptance. WorkBuddy HTTPS + API-key remote reads/writes have passed. This does not certify every client/transport/platform combination or independent first-user onboarding. Expected permissions depend on the selected profile; a healthy local Core alone is not proof of an authenticated remote session.
-
-## One Gateway. App or CLI.
-
-Both interfaces control the **same** local Core. Start, inspect or stop it from the menu bar, or keep everything in the terminal.
+[Platform setup and permission differences](docs/PLATFORMS.md). The project retains the `mac-mcp-gateway` name for now.
 
 <div align="center">
-  <img src="docs/assets/mac-mcp-gateway-menu-en.png" width="365" alt="Actual English-language Mac MCP Gateway menu bar App showing connection route, quick actions, and tool activity" />
-  <p><sub>Actual Mac menu bar App · English and Chinese supported · Route readiness is not client identity verification.</sub></p>
+  <img src="docs/assets/mac-mcp-gateway-menu-en.png" width="365" alt="Native macOS menu bar App showing Gateway status, controls and tool activity" />
+  <p><sub>Native macOS App · English and Chinese supported</sub></p>
 </div>
 
-The local Dashboard URL is printed by `mac-mcp-gateway status`. The owner's development instance uses `http://127.0.0.1:8793/dashboard`; a new source setup normally uses another port.
+## Before deploying
 
-## Security is the product, not an afterthought
+- **OAuth currently needs operator setup.** Automatic provider deployment and a native OAuth setup wizard are not shipped. A signed, notarized public macOS App download is also not yet available.
+- **Choose coding permissions deliberately.** Trusted mode enables native tools and Shell. The macOS Home-write sandbox is specific to the configured Desktop Commander process; Linux/Windows trusted mode uses OS-account permissions. Credentials do not isolate those tools from the owner's account.
+- **This is a community preview.** Independent first-user setup and sustained operation across deployment combinations still need validation. [Release status](docs/RELEASE_STATUS.md) · [Security boundaries](docs/SECURITY.md)
 
-- **Restricted read-only:** project-scoped reads, no arbitrary Shell or write actions.
-- **Trusted developer:** deliberate owner approval for native Desktop Commander tools. On macOS, the tested process sandbox allows writes within Home and denies writes outside Home. Linux/Windows trusted setup additionally requires `--approve-unrestricted`: native tools and Shell use the current OS account permissions, without a Home-only OS sandbox.
-- **Identity first:** a TLS certificate or a Tunnel connection alone does not authenticate and authorize every calling AI user. Never expose the raw local port directly to the internet.
-- **Know the limit:** the process sandbox doesn't automatically contain unrelated apps, additional upstreams or IPC services. AI prompts and script execution can still carry risk.
+## Roadmap and contributing
 
-[Security and trust boundaries](docs/SECURITY.md) · [Architecture](docs/ARCHITECTURE.md)
+The first release focuses on a self-hosted Desktop Commander workbench. The longer-term direction is a general-purpose Gateway for more MCP servers and clients, with programmable middleware. A public Middleware SDK and user-script plugins are not shipped.
 
-## Release status and contributions
+Core and CLI use strict TypeScript; the macOS App uses SwiftUI. Contributions to setup, client compatibility and platform testing are welcome.
 
-This repository remains **pre-release development source**. A clean public repository, developer-signed distribution, independent clean-Mac installation, remaining remote/platform verification and third-party license notice review are still pending. The current private owner's Tunnel configuration and Git history are **not community defaults** and must not be distributed.
-
-[Community release checklist](docs/RELEASE_STATUS.md) · [Contributing](CONTRIBUTING.md) · [Report security issues](SECURITY.md)
+[Contributing and development commands](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Report a security issue](SECURITY.md)
 
 ## License
 
-Mac MCP Gateway original code is released under the **[MIT License](LICENSE)**, copyright © 2026 Mac MCP Gateway contributors.
-
-Desktop Commander is a **separate MIT-licensed upstream project**; preserve its original notices when redistributing bundled binaries. Mac MCP Gateway is independent of, and not endorsed by, Desktop Commander or OpenAI.
-
-## Core development
-
-Gateway Core and CLI use strict TypeScript in a single ESM package; the macOS App remains native SwiftUI. Run `npm ci` to install and build, `npm run typecheck` for type checking, and `npm test` for compiled contract and integration tests. Source changes require `npm run build`. npm tarballs and App bundles include compiled JavaScript, so runtime users do not need a TypeScript compiler or loader. Existing `.mjs` CLI/helper entrypoints and configuration formats remain supported.
-
-See [architecture and internal middleware](docs/ARCHITECTURE.md) and [contributor validation](CONTRIBUTING.md). Internal hooks do not yet constitute a public Middleware SDK or a user-script plugin system.
+Gateway original code is **[MIT licensed](LICENSE)**. Desktop Commander is a separate upstream project with its own license and notices. Mac MCP Gateway is independent of, and not endorsed by, Desktop Commander, OpenAI, Anthropic or Tencent.

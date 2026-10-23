@@ -55,6 +55,15 @@
     "docs/CONNECT_CHATGPT.md",
     "docs/PLATFORMS.md",
     "docs/VALIDATION_WORKBUDDY.md",
-    "docs/VALIDATION_TUNNEL.md"
+    "docs/VALIDATION_TUNNEL.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "docs/README.md",
+    "docs/CLIENTS.md",
+    "docs/SECURITY.md",
+    "docs/RELEASE_STATUS.md",
+    "docs/ARCHITECTURE.md",
+    "docs/assets/mcp-gateway-simple.svg",
+    "docs/assets/mac-mcp-gateway-menu-en.png"
   ]
 }

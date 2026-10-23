@@ -2,6 +2,8 @@
 
 This guide follows the paths exercised with the real Gateway and Desktop Commander. Start with [local installation](INSTALL.md). Commands use the installed `mac-mcp-gateway` CLI. Shell examples use POSIX syntax; on Windows set environment variables in PowerShell and use the corresponding `.bat` Keycloak commands.
 
+For help choosing between the three authentication modes, read [the access-control comparison](ACCESS_CONTROL.md#choose-an-authentication-mode). For other guides, use the [documentation index](README.md).
+
 ## Choose authentication independently of transport
 
 | Authentication | Choose it when | Validated path |
@@ -10,7 +12,7 @@ This guide follows the paths exercised with the real Gateway and Desktop Command
 | Bearer API key | Your client accepts an `Authorization` header | WorkBuddy over public HTTPS + IPv6, including remote reads and writes |
 | OAuth | Your client presents a login/consent flow | ChatGPT web through OpenAI Tunnel + Keycloak, including coding and revocation |
 
-HTTPS and Tunnel are transport choices; API key and OAuth are authentication choices. OAuth does not require Tunnel, and HTTPS alone does not authenticate callers. ChatGPT direct-HTTPS OAuth has not received the same end-to-end acceptance as the Tunnel deployment. Doubao compatibility is owner-reported; its precise transport/authentication combination has not been recorded. See the [client matrix](../README.md#ai-client-compatibility).
+HTTPS and Tunnel are transport choices; API key and OAuth are authentication choices. OAuth does not require Tunnel, and HTTPS alone does not authenticate callers. ChatGPT direct-HTTPS OAuth has not received the same end-to-end acceptance as the Tunnel deployment. Doubao compatibility is owner-reported; its precise transport/authentication combination has not been recorded. See the [client matrix](CLIENTS.md).
 
 A Core has one active authentication mode. Switching to OAuth makes existing API keys unusable on that Core, and vice versa. This guide configures one Core at a time, not simultaneous API-key/OAuth listeners. The separate acceptance instances used during development are not a prerequisite for ordinary installation.
 
