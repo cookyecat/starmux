@@ -18,6 +18,8 @@ Mac MCP Gateway connects an AI client to tools on your own computer. Start with 
 
 ## Operate and troubleshoot
 
+- [Instances and configuration](INSTANCES.md): App/CLI instance management, JSONC editing, import/bind, saved versus active configuration, and legacy migration.
+
 - [Access control](ACCESS_CONTROL.md): modes, key/session management, revocation and private configuration.
 - [Remote deployment](REMOTE_SETUP.md): proxy and provider setup, client fields, diagnostics and recovery.
 - [Connect ChatGPT](CONNECT_CHATGPT.md): HTTPS and Tunnel networking.

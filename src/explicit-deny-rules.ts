@@ -1,3 +1,4 @@
+import {withPrivateLock} from './private-store-lock.js';
 import {ownedByUser,createPrivateDirectory,within} from "./platform.js";
 import { denySchema } from "./config-schemas.js";
 import type { AuditSink,DenyConfig,ToolArguments } from "./contracts.js";
@@ -90,8 +91,10 @@ export async function createDenyRules({file=defaultDenyRulesPath(),audit=()=>{}}
   const folder=path.dirname(file);
   createPrivateDirectory(folder);
   await secureFile(folder,{directory:true});
+  await withPrivateLock(file+".lock",async()=>{
   if(!await secureFile(file,{optional:true}))
     await atomic(file,JSON.stringify(defaults(),null,2)+"\n");
+  });
   let sequence: Promise<unknown>=Promise.resolve();
   async function snapshot(){
     const st=await secureFile(file);
@@ -121,7 +124,7 @@ export async function createDenyRules({file=defaultDenyRulesPath(),audit=()=>{}}
         ...(op.endsWith("tool")?{tool:value}:{ruleType:"directory"})});
       return state;
     }
-    const next=sequence.then(change);
+    const next=sequence.then(()=>withPrivateLock(file+".lock",change));
     sequence=next.catch(()=>{});
     return next;
   }

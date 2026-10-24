@@ -15,6 +15,7 @@ struct UnifiedSnapshotCLI {
         do {
             switch args {
             case ["--selftest"]:
+                try await InstanceController.selfTest()
                 try StatusSelfTest.run()
                 try NativeDiagnosticSelfTest.run()
                 try ConnectionDiagnosticsSelfTest.run()

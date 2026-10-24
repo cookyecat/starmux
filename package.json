@@ -34,7 +34,9 @@
     "@modelcontextprotocol/sdk": "1.32.1",
     "@wonderwhy-er/desktop-commander": "0.3.0",
     "jose": "6.2.12",
-    "zod": "3.25.76"
+    "jsonc-parser": "3.3.1",
+    "zod": "3.25.76",
+    "zod-to-json-schema": "3.25.2"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
@@ -52,6 +54,7 @@
     "docs/OAUTH.md",
     "docs/REMOTE_SETUP.md",
     "docs/INSTALL.md",
+    "docs/INSTANCES.md",
     "docs/CONNECT_CHATGPT.md",
     "docs/PLATFORMS.md",
     "docs/VALIDATION_WORKBUDDY.md",

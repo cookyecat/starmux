@@ -455,3 +455,11 @@ export async function operatorCommand(action: string,options: CliOptions={}): Pr
     failure("SERVICE_MODE_DEFERRED");
   failure("INVALID_ACTION");
 }
+
+/** Validated legacy settings for the explicit instance migration workflow. */
+export async function legacyProfileDetails(profile:'setup'|'live',home=homedir()){
+  const uid=process.getuid?.()??0;const info=await locate(home,uid,profile);
+  const env=await envFor(info,home);
+  return {kind:info.kind,source:info.kind==='setup'?defaultSetupPath(home):info.plist,
+    env,label:info.label,plist:info.plist,installed:info.installed,registered:await registered(info.label,uid)};
+}

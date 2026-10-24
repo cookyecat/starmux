@@ -20,7 +20,7 @@ import { createDenyRules } from "./explicit-deny-rules.js";
 import { LocalDesktopReadProbe } from "./local-desktop-read-probe.js";
 import { createManagedWorkspacePolicy } from "./managed-workspace-policy.js";
 import { createMCPUpstreamRouter } from "./mcp-upstream-router.js";
-import { collectOperationsSnapshot,dashboardHeaders,renderOperationsHtml } from "./ops-dashboard.js";
+import { collectOperationsSnapshot,dashboardHeaders,renderOperationsHtml,instancePage } from "./ops-dashboard.js";
 import { applyPermissionPost,permissionHeaders,renderPermissionDashboard } from "./permissions-dashboard.js";
 import { createPrivateMCPActivity } from "./private-mcp-activity.js";
 import { createGitWorkflow } from "./project-git-workflow.js";
@@ -55,6 +55,7 @@ export function createGatewayRuntime(options: RuntimeOptions={}): GatewayRuntime
 }
 async function initializeGateway({env=process.env,audit:externalAudit}: RuntimeOptions){
 const access=await createAccessControl(env.MAC_MCP_ACCESS_FILE);
+const page=(html:string)=>instancePage(html,env.MAC_MCP_INSTANCE_NAME,env.MAC_MCP_INSTANCE_ID);
 const root=env.MAC_MCP_PROJECT_ROOT;
 if(!root)throw new Error("OWNER_APPROVED_PROJECT_ROOT_REQUIRED");
 const mode=env.MAC_MCP_WORKSPACE_MODE||"read-only";
@@ -158,10 +159,10 @@ http=createServer(async(req,res)=>{
   if(route==="/access"){
     try{
       if(req.method==="GET"){
-        res.writeHead(200,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(accessPage(await access.snapshot()));
+        res.writeHead(200,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(page(accessPage(await access.snapshot())));
       }else if(req.method==="POST"){
         const result=await accessPost(req,access);
-        res.writeHead(result.status,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(result.html||"Access update rejected");
+        res.writeHead(result.status,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(page(result.html||"Access update rejected"));
       }else res.writeHead(405).end();
     }catch{res.writeHead(503,{...accessHeaders}).end("Access configuration unavailable");}
     return;
@@ -199,10 +200,10 @@ http=createServer(async(req,res)=>{
         const data=await grants.snapshot({validatePaths:false});
         res.writeHead(200,{...permissionHeaders,
           "content-type":"text/html; charset=utf-8"});
-        res.end(renderPermissionDashboard({
+        res.end(page(renderPermissionDashboard({
           project:{path:policy.root,mode:policy.mode},home:grants.home,config:data,
           nativeAccessEnabled:nativeAccessMode==="native"
-        }));
+        })));
       }catch{
         res.writeHead(503,{...permissionHeaders}).end("Permissions unavailable");
       }
@@ -221,6 +222,7 @@ http=createServer(async(req,res)=>{
   if((route==="/dashboard"||route==="/dashboard.json")&&req.method==="GET"){
     try{
       const snapshot={...await collectOperationsSnapshot(),configuredUpstreams:configured!.status(),
+        ...(env.MAC_MCP_INSTANCE_ID?{instance:{id:env.MAC_MCP_INSTANCE_ID,name:env.MAC_MCP_INSTANCE_NAME??env.MAC_MCP_INSTANCE_ID,port:desiredPort}}:{}),
         accessControl:await access.snapshot(),
         permissionManagementEnabled:Boolean(grants),
         nativeAccessEnabled:nativeAccessMode==="native",
@@ -258,7 +260,7 @@ http=createServer(async(req,res)=>{
     res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});
     const accessMode=await access.snapshot().then(s=>s.mode).catch(()=>"unavailable");
     res.end(JSON.stringify({status:"ok",service:"dc-project-workspace",mode,
-      writeScope,accessMode}));
+      writeScope,accessMode,...(env.MAC_MCP_INSTANCE_ID?{instanceId:env.MAC_MCP_INSTANCE_ID,instanceName:env.MAC_MCP_INSTANCE_NAME}:{})}));
     return;
   }
   if(route!=="/mcp"){

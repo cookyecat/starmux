@@ -108,3 +108,7 @@ Core and CLI use strict TypeScript; the macOS App uses SwiftUI. Contributions to
 ## License
 
 Gateway original code is **[MIT licensed](LICENSE)**. Desktop Commander is a separate upstream project with its own license and notices. Mac MCP Gateway is independent of, and not endorsed by, Desktop Commander, OpenAI, Anthropic or Tencent.
+
+### Named instances and configuration
+
+The App and CLI support named local instances with independent configuration, credentials, policies and logs. Start with `mac-mcp-gateway instance create dev --project /absolute/project`, then `mac-mcp-gateway run --instance dev`. Configuration can be edited in the App, imported, or linked to a JSONC file. Saving does not restart an instance; apply changes explicitly. Quitting the App stops only instances started by that App session. See [Instances and configuration](docs/INSTANCES.md) for the full workflow and migration preview.

@@ -796,29 +796,7 @@ struct UnifiedGatewayMenu: View {
 // lifecycle controller. Both windows observe the same first-run state.
 extension AppForegroundExitDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // The initial setup must be discoverable after double-clicking the
-        // .app. Normal runs stay menu-bar-only; no second menu icon/Service.
-        // Do not surprise an owner of an existing private live profile.
-        Task { @MainActor in
-            let wizard = FirstRunCoordinator.shared
-            wizard.refresh()
-            guard wizard.available && !wizard.configured else { return }
-            let legacy = await Task.detached(priority: .utility) {
-                (try? StatusProbe.read().profile) == "live"
-            }.value
-            guard !legacy else { return }
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 430, height: 530),
-                styleMask: [.titled, .closable, .miniaturizable],
-                backing: .buffered, defer: false)
-            window.title = tx("欢迎使用 Mac MCP Gateway")
-            window.contentView = NSHostingView(rootView: UnifiedGatewayMenu())
-            window.center()
-            window.isReleasedWhenClosed = false
-            self.welcomeWindow = window
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-        }
+        Task { @MainActor in InstanceManagerWindow.shared.show() }
     }
 }
 
@@ -835,7 +813,7 @@ struct MacMCPUnifiedApp: App {
     }()
     var body: some Scene {
         MenuBarExtra {
-            UnifiedGatewayMenu()
+            InstanceMenu()
         } label: {
             if let menuMark {
                 Image(nsImage: menuMark)

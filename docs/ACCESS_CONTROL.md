@@ -90,7 +90,9 @@ A client API key is not an owner management token. The owner token is stored sep
 
 ## Files and security boundary
 
-The default store is `~/.config/mac-mcp-gateway/access-v1.json`, shared by CLI and Core for the same OS user. `access-v1.json.owner-token` is created only when the owner requests a management token. Files are owner-only (Unix permissions or Windows ACL checks); symlinks and multiple hard links are refused. Atomic replacement and an exclusive lock directory serialize CLI/Core writes. A leftover `.lock` after an abnormal process crash causes updates to fail closed; stop all processes using that store before removing a verified stale lock.
+For named instances, use `--instance NAME` on access commands; each instance stores access state under `instances/<id>/state/`. The App and instance Dashboard use the same store. Copies exclude credentials and preserve the requirement to configure authentication. See [Instances](INSTANCES.md).
+
+For unmigrated installations, the default store is `~/.config/mac-mcp-gateway/access-v1.json`, shared by CLI and Core for the same OS user. `access-v1.json.owner-token` is created only when the owner requests a management token. Files are owner-only (Unix permissions or Windows ACL checks); symlinks and multiple hard links are refused. Atomic replacement and an exclusive lock directory serialize CLI/Core writes. A leftover `.lock` after an abnormal process crash causes updates to fail closed; stop all processes using that store before removing a verified stale lock.
 
 For isolated instances/tests, set the absolute path `MAC_MCP_ACCESS_FILE` consistently on the CLI and Core. A persistent `access-v1.json.initialized` marker prevents deletion of an initialized store from silently restoring unauthenticated mode on restart. Back up the private store as sensitive configuration. Do not delete it as a way to revoke credentials; use the revoke command.
 

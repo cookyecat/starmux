@@ -6,6 +6,10 @@ This is the source-based setup guide for the current **cross-platform CLI develo
 
 See [Platform support](PLATFORMS.md) for native validation status and platform-specific limitations.
 
+## Named instances (App and CLI)
+
+For the new configuration and multi-instance workflow, use [Instances and configuration](INSTANCES.md). The sections below retain the legacy setup workflow for existing scripts. In an interactive terminal, a fresh `setup` now starts the named-instance wizard; `instance create` selects the new workflow explicitly. Preview old settings with `instance migrate` before switching an existing installation.
+
 ## Remote deployment after local installation
 
 The Gateway supports **OAuth** and **HTTPS + Bearer API Key**, alongside existing ingress-managed access. Follow [Remote installation and deployment](REMOTE_SETUP.md) after the local setup below:
@@ -98,7 +102,7 @@ Owner control prevents competing starts on the configured endpoint. Stop an exis
 
 Stop the trial with Ctrl+C before returning to your existing App/profile. This source trial does not replace the installed SwiftUI App; starting that existing App later can still run its bundled JavaScript version.
 
-### Controlling the single Core
+### Controlling an unmigrated single Core
 
 ```bash
 mac-mcp-gateway status

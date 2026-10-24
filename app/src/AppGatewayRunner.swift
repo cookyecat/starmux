@@ -257,7 +257,9 @@ final class AppForegroundExitDelegate: NSObject, NSApplicationDelegate {
         if stopInProgress { return .terminateCancel }
         stopInProgress = true
         Task { @MainActor in
-            let stopped = await AppGatewayRunner.shared.stopGlobal()
+            let managedStopped = await InstanceController.shared.stopOwned()
+            let legacyStopped = AppGatewayRunner.shared.ownsGateway ? await AppGatewayRunner.shared.stopGlobal() : true
+            let stopped = managedStopped && legacyStopped
             self.stopInProgress = false
             if stopped {
                 self.stopVerified = true

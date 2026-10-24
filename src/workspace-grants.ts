@@ -1,3 +1,4 @@
+import {withPrivateLock} from './private-store-lock.js';
 import {ownedByUser,createPrivateDirectory,within} from "./platform.js";
 import { grantsSchema } from "./config-schemas.js";
 import type { AuditSink,GrantsConfig } from "./contracts.js";
@@ -72,11 +73,13 @@ export async function createWorkspaceGrants({file=defaultGrantsPath(),home=os.ho
     deny("GRANTS_FILE_ABSOLUTE_REQUIRED");
   const canonicalHome=await realpath(home);
   await privateFolder(path.dirname(file));
+  const tokenFile=file+".owner-token";
+  await withPrivateLock(file+".lock",async()=>{
   const existing=await safeStat(file,{missing:true});
   if(!existing)await writePrivate(file,JSON.stringify(defaults(),null,2)+"\n");
-  const tokenFile=file+".owner-token";
   if(!await safeStat(tokenFile,{missing:true}))
     await writePrivate(tokenFile,randomBytes(32).toString("hex")+"\n");
+  });
   let queue: Promise<unknown>=Promise.resolve();
   async function snapshot({validatePaths=true}={}){
     const st=await safeStat(file);
@@ -125,7 +128,7 @@ export async function createWorkspaceGrants({file=defaultGrantsPath(),home=os.ho
         op.startsWith("outside")?"outside":"custom",mode:mode||"toggle"});
       return await snapshot({validatePaths:false});
     };
-    const pending=queue.then(step);
+    const pending=queue.then(()=>withPrivateLock(file+".lock",step));
     queue=pending.catch(()=>{});
     return pending;
   }

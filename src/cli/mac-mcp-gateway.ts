@@ -15,6 +15,16 @@ function help(){
   process.stdout.write(`Mac MCP Gateway ${pkg.version}
 
 Usage:
+  mac-mcp-gateway instance create NAME --project /absolute/path
+  mac-mcp-gateway instance list [--json]
+  mac-mcp-gateway instance import FILE --name NAME [--link]
+  mac-mcp-gateway instance copy|rename NAME NEW_NAME
+  mac-mcp-gateway instance default|archive|restore NAME
+  mac-mcp-gateway instance migrate [setup|live] [--confirm]
+  mac-mcp-gateway config path|show|edit|validate|diff|apply --instance NAME
+  mac-mcp-gateway run|stop|status|doctor|verify|logs --instance NAME
+  mac-mcp-gateway status --all --json
+
   mac-mcp-gateway run [--port N]         Foreground; Ctrl+C stops; current OS account
   mac-mcp-gateway run --app-parent-pid PID  App-owned foreground; stops if GUI parent exits
   mac-mcp-gateway stop                 Stop the Core at the configured local endpoint
@@ -115,7 +125,9 @@ async function doctor(){
   process.stdout.write(JSON.stringify(facts)+"\n");
   process.exitCode=code;
 }
-if(command==="setup"){
+if(await (await import("./instances.js")).maybeHandleInstances(process.argv.slice(2))){
+  // Shared named-instance commands own their complete lifecycle.
+}else if(command==="setup"){
   process.argv.splice(2,1);
   await import("./setup-wizard.js");
 }else if(command==="access"){
