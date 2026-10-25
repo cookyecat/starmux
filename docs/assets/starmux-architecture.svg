@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1672 941" width="1672" height="941" role="img" aria-labelledby="diagram-title diagram-desc">
-<title id="diagram-title">Starmux — Many AI clients, many self-hosted computers</title>
-<desc id="diagram-desc">Editable vector architecture diagram with vectorized official WorkBuddy logo showing MCP-capable AI clients connected over Direct HTTPS or Secure Tunnel to Starmux instances installed on macOS, Windows, and Linux machines.</desc>
+<title id="diagram-title">Starmux — Cloud AI clients. Real computers on earth.</title>
+<desc id="diagram-desc">Editable vector diagram: remote cloud AI clients connect through HTTPS or a secure tunnel to independent self-hosted Starmux instances. Each instance acts as programmable middleware for policies, routing and tool adapters before accessing real macOS, Windows and Linux computers. Programmable elements depict the architectural role rather than a claim of which features are implemented in a specific release.</desc>
 <defs>
  <linearGradient id="brandText" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2765f4"/><stop offset="1" stop-color="#1c55e9"/></linearGradient>
  <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fcfdff"/><stop offset="1" stop-color="#f9fbff"/></linearGradient>
@@ -33,59 +33,59 @@
 <clipPath id="workbuddyOfficialRoundedSquare"><rect x="0" y="0" width="104" height="104" rx="20"/></clipPath>
 
  </defs>
-<style><![CDATA[
+<style>
   text { font-family: 'Inter', 'Arial', sans-serif; font-feature-settings: 'kern'; }
   .connector { fill:none; stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
   .pill { font-size:17px; font-weight:500; }
-]]></style>
+</style>
 
-<rect x="0" y="0" width="1672" height="941" rx="0" fill="#ffffff" stroke="none" stroke-width="1.5" />
-<g id="heading" >
-<text x="810" y="61" fill="#090d34" font-size="51" font-weight="790" text-anchor="end" letter-spacing="-1.8" >Many AI clients.</text>
-<text x="838" y="61" fill="url(#brandText)" font-size="51" font-weight="790" text-anchor="start" letter-spacing="-1.8" >Many self-hosted computers.</text>
-<text x="836" y="103" fill="#475778" font-size="23" font-weight="400" text-anchor="middle" letter-spacing="0" >Use Direct HTTPS or Secure Tunnel to connect remote AI clients to the real tools on your own machines.</text>
+<rect x="0" y="0" width="1672" height="941" rx="0" fill="#ffffff" stroke="none" stroke-width="1.5"/>
+<g id="heading">
+<text x="317" y="61" fill="#090d34" font-size="50" font-weight="790" text-anchor="start" letter-spacing="0">Cloud AI clients.</text>
+<text x="741" y="61" fill="url(#brandText)" font-size="50" font-weight="790" text-anchor="start" letter-spacing="0">Real computers on earth.</text>
+<text x="836" y="103" fill="#475778" font-size="22" font-weight="400" text-anchor="middle" letter-spacing="0">Use Direct HTTPS or Secure Tunnel to let cloud AI clients securely access and operate tools on your computers anywhere on earth.</text>
 </g>
-<g id="four-column-panels" >
-<rect x="28" y="137" width="366" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5" />
-<rect x="436" y="137" width="389" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5" />
-<rect x="866" y="137" width="380" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5" />
-<rect x="1275" y="137" width="366" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5" />
+<g id="four-column-panels">
+<rect x="28" y="137" width="366" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5"/>
+<rect x="423" y="137" width="315" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5"/>
+<rect x="764" y="137" width="420" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5"/>
+<rect x="1210" y="137" width="431" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5"/>
 </g>
-<g id="connections" >
+<g id="connections">
 <title>Client, transport and gateway connection routes</title>
-<path d="M 335 257.5 C 392 257.5 393 323 454 335" stroke="#298cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrBlue)"/>
-<path d="M 335 275.5 C 392 275.5 398 493 454 505" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
-<path d="M 335 339.5 C 392 339.5 393 336 454 348" stroke="#298cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrBlue)"/>
-<path d="M 335 356.5 C 392 356.5 398 502 454 514" stroke="#a084f4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrLavender)"/>
-<path d="M 335 425.5 C 402 422.5 393 374 454 364" stroke="#14b78a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
-<path d="M 335 443.5 C 402 443.5 398 516 454 528" stroke="#298cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrBlue)"/>
-<path d="M 335 499.5 C 402 496.5 393 354 454 344" stroke="#14b78a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
-<path d="M 335 518.5 C 402 518.5 398 536 454 548" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
-<path d="M 335 585.5 C 402 582.5 398 563 454 553" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
-<path d="M 335 665.5 C 402 662.5 393 375 454 365" stroke="#14b78a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
-<path d="M 794 334 C 853 337 851 293 898 292" stroke="#12b784" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
-<path d="M 794 356 C 847 362 846 448 898 447" stroke="#48475c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrDark)"/>
-<path d="M 794 381 C 853 396 843 602 898 603" stroke="#12b784" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
-<path d="M 794 522 C 845 524 851 318 898 315" stroke="#a084f4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrLavender)"/>
-<path d="M 794 537 C 853 542 848 481 898 478" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
-<path d="M 794 553 C 850 557 847 628 898 631" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
-<path d="M 1222 308 L 1292 308" stroke="#298cff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrBlue)"/>
-<path d="M 1222 466 L 1292 466" stroke="#10b787" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrGreen)"/>
-<path d="M 1222 626 L 1292 626" stroke="#8059f5" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrPurple)"/>
+<path d="M 335 257.5 C 392 257.5 393 323 439 335" stroke="#298cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrBlue)"/>
+<path d="M 335 275.5 C 392 275.5 398 493 439 505" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
+<path d="M 335 339.5 C 392 339.5 393 336 439 348" stroke="#298cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrBlue)"/>
+<path d="M 335 356.5 C 392 356.5 398 502 439 514" stroke="#a084f4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrLavender)"/>
+<path d="M 335 425.5 C 402 422.5 393 374 439 364" stroke="#14b78a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
+<path d="M 335 443.5 C 402 443.5 398 516 439 528" stroke="#298cff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrBlue)"/>
+<path d="M 335 499.5 C 402 496.5 393 354 439 344" stroke="#14b78a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
+<path d="M 335 518.5 C 402 518.5 398 536 439 548" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
+<path d="M 335 585.5 C 402 582.5 398 563 439 553" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
+<path d="M 335 665.5 C 402 662.5 393 375 439 365" stroke="#14b78a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
+<path d="M 718 334 C 754 335 751 292 782 292" stroke="#12b784" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
+<path d="M 718 356 C 751 357 747 448 782 447" stroke="#48475c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrDark)"/>
+<path d="M 718 381 C 753 399 744 602 782 603" stroke="#12b784" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrGreen)"/>
+<path d="M 718 522 C 750 515 752 320 782 315" stroke="#a084f4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrLavender)"/>
+<path d="M 718 537 C 752 541 747 481 782 478" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
+<path d="M 718 553 C 751 557 748 628 782 631" stroke="#8059f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" class="connector" marker-end="url(#arrPurple)"/>
+<path d="M 1160 308 L 1228 308" stroke="#298cff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrBlue)"/>
+<path d="M 1160 466 L 1228 466" stroke="#10b787" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrGreen)"/>
+<path d="M 1160 626 L 1228 626" stroke="#8059f5" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrPurple)"/>
 </g>
-<g id="panel-headings" >
-<text x="58" y="184" fill="#080d34" font-size="31" font-weight="760" text-anchor="start" letter-spacing="0" >AI clients</text>
-<text x="58" y="213" fill="#607193" font-size="20" font-weight="400" text-anchor="start" letter-spacing="0" >Any MCP-capable client</text>
-<text x="466" y="190" fill="#080d34" font-size="29" font-weight="760" text-anchor="start" letter-spacing="0" >Connection options</text>
-<text x="895" y="184" fill="#080d34" font-size="27" font-weight="760" text-anchor="start" letter-spacing="0" >Self-hosted Starmux</text>
-<text x="895" y="211" fill="#607193" font-size="18" font-weight="400" text-anchor="start" letter-spacing="0" >One instance on each computer</text>
-<text x="1304" y="183" fill="#080d34" font-size="29" font-weight="760" text-anchor="start" letter-spacing="0" >Your computers</text>
-<text x="1304" y="211" fill="#607193" font-size="18" font-weight="400" text-anchor="start" letter-spacing="0" >The real tools on your machines</text>
+<g id="panel-headings">
+<text x="58" y="184" fill="#080d34" font-size="31" font-weight="760" text-anchor="start" letter-spacing="0">Cloud AI Clients</text>
+<text x="58" y="213" fill="#607193" font-size="20" font-weight="400" text-anchor="start" letter-spacing="0">Any MCP-capable client</text>
+<text x="447" y="190" fill="#080d34" font-size="26" font-weight="760" text-anchor="start" letter-spacing="0">Connection options</text>
+<text x="790" y="184" fill="#080d34" font-size="27" font-weight="760" text-anchor="start" letter-spacing="0">Self-hosted Starmux</text>
+<text x="790" y="211" fill="#607193" font-size="17.5" font-weight="400" text-anchor="start" letter-spacing="0">Programmable middleware on each computer</text>
+<text x="1238" y="183" fill="#080d34" font-size="28" font-weight="760" text-anchor="start" letter-spacing="0">Your computers on earth</text>
+<text x="1238" y="211" fill="#607193" font-size="18" font-weight="400" text-anchor="start" letter-spacing="0">The real tools on your machines</text>
 </g>
-<g id="client-chatgpt" >
+<g id="client-chatgpt">
 <rect x="52" y="232" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
-<g id="chatgpt-vector-mark" >
-<rect x="73" y="238.5" width="54" height="54" rx="12" fill="#10a780" stroke="none" stroke-width="1.5" />
+<g id="chatgpt-vector-mark">
+<rect x="73" y="238.5" width="54" height="54" rx="12" fill="#10a780" stroke="none" stroke-width="1.5"/>
 <g transform="translate(100 265.5) rotate(0)">
 <path d="M -2 -19 C 9 -22 19 -12 17 -2 C 16 5 10 9 4 12" stroke="#ffffff" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.98"/>
 </g>
@@ -104,266 +104,242 @@
 <g transform="translate(100 265.5) rotate(300)">
 <path d="M -2 -19 C 9 -22 19 -12 17 -2 C 16 5 10 9 4 12" stroke="#ffffff" stroke-width="2.15" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.98"/>
 </g>
-<path d="M 95 261.5 L 103 256.5 L 110 262.5 L 109 271.5 L 101 275.5 L 93 269.5 Z" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+<path d="M 95 261.5 L 103 256.5 L 110 262.5 L 109 271.5 L 101 275.5 L 93 269.5 Z" stroke="#ffffff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </g>
-<text x="153" y="274" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0" >ChatGPT</text>
+<text x="153" y="274" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0">ChatGPT</text>
 </g>
-<g id="client-claude" >
+<g id="client-claude">
 <rect x="52" y="312" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
-<g id="claude-vector-mark" >
+<g id="claude-vector-mark">
 <g transform="translate(100 345.5) rotate(0)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(30)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(60)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(90)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(120)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(150)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(180)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(210)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(240)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(270)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(300)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
 <g transform="translate(100 345.5) rotate(330)">
-<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553" />
+<path d="M 0 -9 L -2.8 -23 Q 0 -26 2.8 -23 L 0 -9 Z" stroke="#e57553" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#e57553"/>
 </g>
-<circle cx="100" cy="345.5" r="8" fill="#e57553" stroke="none" stroke-width="1.5" />
+<circle cx="100" cy="345.5" r="8" fill="#e57553" stroke="none" stroke-width="1.5"/>
 </g>
-<text x="153" y="354" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0" >Claude</text>
+<text x="153" y="354" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0">Claude</text>
 </g>
-<g id="client-cursor" >
+<g id="client-cursor">
 <rect x="52" y="392" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
-<g id="cursor-vector-mark" >
-<rect x="73" y="398.5" width="54" height="54" rx="12" fill="#222326" stroke="none" stroke-width="1.5" />
-<path d="M 81 418.5 L 105 406.5 L 119 415.5 L 109 439.5 L 94 446.5 L 81 428.5 Z" stroke="#ffffff" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#ffffff" />
-<path d="M 81 418.5 L 101 427.5 L 105 406.5 Z" stroke="#b0b5bc" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#b0b5bc" />
-<path d="M 101 427.5 L 119 415.5 L 109 439.5 Z" stroke="#5e626a" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#5e626a" />
-<path d="M 94 446.5 L 101 427.5 L 109 439.5 Z" stroke="#dddddf" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#dddddf" />
+<g id="cursor-vector-mark">
+<rect x="73" y="398.5" width="54" height="54" rx="12" fill="#222326" stroke="none" stroke-width="1.5"/>
+<path d="M 81 418.5 L 105 406.5 L 119 415.5 L 109 439.5 L 94 446.5 L 81 428.5 Z" stroke="#ffffff" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#ffffff"/>
+<path d="M 81 418.5 L 101 427.5 L 105 406.5 Z" stroke="#b0b5bc" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#b0b5bc"/>
+<path d="M 101 427.5 L 119 415.5 L 109 439.5 Z" stroke="#5e626a" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#5e626a"/>
+<path d="M 94 446.5 L 101 427.5 L 109 439.5 Z" stroke="#dddddf" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#dddddf"/>
 </g>
-<text x="153" y="434" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0" >Cursor</text>
+<text x="153" y="434" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0">Cursor</text>
 </g>
-<g id="client-workbuddy" >
+<g id="client-workbuddy">
 <rect x="52" y="472" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
 <g id="workbuddy-vector-mark" aria-label="WorkBuddy icon vectorized from the uploaded official PNG">
 <g transform="translate(73 478.5) scale(0.519230769)">
 <g clip-path="url(#workbuddyOfficialRoundedSquare)">
   <rect x="0" y="0" width="104" height="104" fill="url(#workbuddyOfficialGreen)"/>
-  <path d="M 81.3,7.1
-       C 76.6,6.7 70.8,25.0 65.7,33.8
-       C 55.1,37.0 43.6,45.0 34.1,51.3
-       C 23.6,49.7 10.9,48.3 6.4,50.5
-       C 1.8,53.3 10.6,72.1 15.8,79.0
-       C 16.9,83.6 17.4,87.5 16.8,90.4
-       C 14.6,94.7 13.7,98.7 14.6,104
-       L 36.6,104
-       C 31.6,97.9 28.4,90.7 28.9,83.0
-       C 29.4,71.0 41.6,64.9 57.0,55.2
-       C 69.7,47.3 79.5,42.2 86.1,41.8
-       C 92.9,40.5 99.5,44.7 104,47.9
-       L 104,34.5
-       C 98.5,25.3 86.9,7.5 81.3,7.1 Z"
-       fill="url(#workbuddyOfficialCream)"/>
-  <path d="M 82.6,62.3 C 86.5,61.1 88.0,67.7 90.2,71.3
-           C 92.5,75.1 94.5,78.1 90.7,80.7
-           C 87.0,83.5 84.2,78.2 82.2,74.4
-           L 78.8,68.3 C 77.3,65.3 79.6,62.7 82.6,62.3 Z"
-        fill="#FFFFFF"/>
-  <path d="M 54.2,78.5 C 58.3,77.4 59.9,83.2 61.8,86.3
-           C 63.9,90.0 67.0,94.2 62.6,96.9
-           C 58.5,99.7 55.8,94.2 53.9,90.6
-           L 50.8,85.2 C 48.8,81.6 51.2,79.0 54.2,78.5 Z"
-        fill="#FFFFFF"/>
+  <path d="M 81.3,7.1        C 76.6,6.7 70.8,25.0 65.7,33.8        C 55.1,37.0 43.6,45.0 34.1,51.3        C 23.6,49.7 10.9,48.3 6.4,50.5        C 1.8,53.3 10.6,72.1 15.8,79.0        C 16.9,83.6 17.4,87.5 16.8,90.4        C 14.6,94.7 13.7,98.7 14.6,104        L 36.6,104        C 31.6,97.9 28.4,90.7 28.9,83.0        C 29.4,71.0 41.6,64.9 57.0,55.2        C 69.7,47.3 79.5,42.2 86.1,41.8        C 92.9,40.5 99.5,44.7 104,47.9        L 104,34.5        C 98.5,25.3 86.9,7.5 81.3,7.1 Z" fill="url(#workbuddyOfficialCream)"/>
+  <path d="M 82.6,62.3 C 86.5,61.1 88.0,67.7 90.2,71.3            C 92.5,75.1 94.5,78.1 90.7,80.7            C 87.0,83.5 84.2,78.2 82.2,74.4            L 78.8,68.3 C 77.3,65.3 79.6,62.7 82.6,62.3 Z" fill="#FFFFFF"/>
+  <path d="M 54.2,78.5 C 58.3,77.4 59.9,83.2 61.8,86.3            C 63.9,90.0 67.0,94.2 62.6,96.9            C 58.5,99.7 55.8,94.2 53.9,90.6            L 50.8,85.2 C 48.8,81.6 51.2,79.0 54.2,78.5 Z" fill="#FFFFFF"/>
 </g>
 </g>
 </g>
-<text x="153" y="514" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0" >WorkBuddy</text>
+<text x="153" y="514" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0">WorkBuddy</text>
 </g>
-<g id="client-vscode" >
+<g id="client-vscode">
 <rect x="52" y="552" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
-<g id="vscode-vector-mark" >
-<path d="M 77 573.5 L 86 565.5 L 101 580.5 L 115 565.5 L 126 570.5 L 126 602.5 L 115 608.5 L 101 593.5 L 86 608.5 L 77 599.5 L 93 584.5 Z" stroke="#1878f6" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#1878f6" />
-<path d="M 115 565.5 L 115 608.5 L 126 602.5 L 126 570.5 Z" stroke="#45a4ff" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#45a4ff" />
-<path d="M 86 565.5 L 115 587.5 L 101 593.5 L 77 573.5 Z" stroke="#0065ce" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#0065ce" />
+<g id="vscode-vector-mark">
+<path d="M 77 573.5 L 86 565.5 L 101 580.5 L 115 565.5 L 126 570.5 L 126 602.5 L 115 608.5 L 101 593.5 L 86 608.5 L 77 599.5 L 93 584.5 Z" stroke="#1878f6" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#1878f6"/>
+<path d="M 115 565.5 L 115 608.5 L 126 602.5 L 126 570.5 Z" stroke="#45a4ff" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#45a4ff"/>
+<path d="M 86 565.5 L 115 587.5 L 101 593.5 L 77 573.5 Z" stroke="#0065ce" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" fill="#0065ce"/>
 </g>
-<text x="153" y="594" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0" >VS Code / CLI</text>
+<text x="153" y="594" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0">VS Code / CLI</text>
 </g>
-<g id="client-other" >
+<g id="client-other">
 <rect x="52" y="632" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
-<circle cx="100" cy="665.5" r="27" fill="#e2e7ed" stroke="none" stroke-width="1.5" />
-<circle cx="90" cy="665.5" r="2.7" fill="#2c4a78" stroke="none" stroke-width="1.5" />
-<circle cx="100" cy="665.5" r="2.7" fill="#2c4a78" stroke="none" stroke-width="1.5" />
-<circle cx="110" cy="665.5" r="2.7" fill="#2c4a78" stroke="none" stroke-width="1.5" />
-<text x="153" y="674" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0" >Other MCP client</text>
+<circle cx="100" cy="665.5" r="27" fill="#e2e7ed" stroke="none" stroke-width="1.5"/>
+<circle cx="90" cy="665.5" r="2.7" fill="#2c4a78" stroke="none" stroke-width="1.5"/>
+<circle cx="100" cy="665.5" r="2.7" fill="#2c4a78" stroke="none" stroke-width="1.5"/>
+<circle cx="110" cy="665.5" r="2.7" fill="#2c4a78" stroke="none" stroke-width="1.5"/>
+<text x="153" y="674" fill="#101436" font-size="19.5" font-weight="565" text-anchor="start" letter-spacing="0">Other MCP client</text>
 </g>
-<g id="transport-direct-https" >
-<rect x="461" y="270" width="334" height="153" rx="17" fill="url(#directBg)" stroke="#44cdb0" stroke-width="1.5" filter="url(#softShadow)"/>
-<circle cx="517" cy="334" r="38" fill="url(#greenDisc)" stroke="none" stroke-width="1.5" />
-<path d="M 504 333 V 326 C 504 308 528 308 529 326 V 333" stroke="#008963" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<rect x="503" y="330" width="27" height="24" rx="5" fill="#03996d" stroke="none" stroke-width="1.5" />
-<circle cx="516.5" cy="341.2" r="2.6" fill="#ffffff" stroke="none" stroke-width="1.5" />
-<path d="M 516.5 342 L 516.5 348" stroke="#ffffff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<text x="574" y="326" fill="#0c1236" font-size="24" font-weight="750" text-anchor="start" letter-spacing="0" >Direct HTTPS</text>
-<rect x="573" y="344" width="200" height="57" rx="12" fill="#d5f7eb" stroke="none" stroke-width="1.5" />
-<text x="588" y="369" fill="#04755e" font-size="17" font-weight="500" text-anchor="start" letter-spacing="0" >Preferred when your</text>
-<text x="588" y="392" fill="#04755e" font-size="17" font-weight="500" text-anchor="start" letter-spacing="0" >network is reachable</text>
+<g id="transport-direct-https">
+<rect x="445" y="270" width="273" height="153" rx="17" fill="url(#directBg)" stroke="#44cdb0" stroke-width="1.5" filter="url(#softShadow)"/>
+<circle cx="485" cy="331" r="31" fill="url(#greenDisc)"/>
+<path d="M 474 331 V 324 C 474 307 496 307 496 324 V 331" fill="none" stroke="#008963" stroke-width="3.6" stroke-linecap="round"/>
+<rect x="473" y="329" width="25" height="23" rx="5" fill="#03996d"/>
+<circle cx="485.5" cy="340.2" r="2.5" fill="#ffffff"/>
+<path d="M 485.5 342 L 485.5 348" fill="none" stroke="#ffffff" stroke-width="2.5"/>
+<text x="529" y="325" font-size="22" font-weight="750" fill="#0c1236">Direct HTTPS</text>
+<rect x="528" y="344" width="177" height="58" rx="11" fill="#d5f7eb"/>
+<text x="540" y="368" font-size="15" font-weight="500" fill="#04755e">Preferred when your</text>
+<text x="540" y="388" font-size="15" font-weight="500" fill="#04755e">network is reachable</text>
 </g>
-<g id="transport-secure-tunnel" >
-<rect x="461" y="473" width="334" height="153" rx="17" fill="url(#tunnelBg)" stroke="#a783ff" stroke-width="1.5" filter="url(#softShadow)"/>
-<circle cx="517" cy="536" r="38" fill="url(#purpleDisc)" stroke="none" stroke-width="1.5" />
-<path d="M 502 542 L 528 524 M 508 548 L 528 556" stroke="#4a23bc" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<circle cx="501" cy="543" r="7" fill="#e7ddff" stroke="#4a23bc" stroke-width="3.3" />
-<circle cx="530" cy="521" r="7" fill="#e7ddff" stroke="#4a23bc" stroke-width="3.3" />
-<circle cx="529" cy="556" r="7" fill="#e7ddff" stroke="#4a23bc" stroke-width="3.3" />
-<text x="574" y="530" fill="#101036" font-size="22" font-weight="740" text-anchor="start" letter-spacing="0" >Secure Tunnel</text>
-<rect x="573" y="547" width="200" height="57" rx="12" fill="#e9e1ff" stroke="none" stroke-width="1.5" />
-<text x="588" y="572" fill="#5938e4" font-size="17" font-weight="500" text-anchor="start" letter-spacing="0" >Best for restrictive</text>
-<text x="588" y="595" fill="#5938e4" font-size="17" font-weight="500" text-anchor="start" letter-spacing="0" >networks</text>
+<g id="transport-secure-tunnel">
+<rect x="445" y="473" width="273" height="153" rx="17" fill="url(#tunnelBg)" stroke="#a783ff" stroke-width="1.5" filter="url(#softShadow)"/>
+<circle cx="485" cy="536" r="31" fill="url(#purpleDisc)"/>
+<path d="M 474 542 L 494 527 M 479 549 L 496 554" fill="none" stroke="#4a23bc" stroke-width="3.2" stroke-linecap="round"/>
+<circle cx="472" cy="542" r="6.2" fill="#e7ddff" stroke="#4a23bc" stroke-width="3"/>
+<circle cx="496" cy="523" r="6.2" fill="#e7ddff" stroke="#4a23bc" stroke-width="3"/>
+<circle cx="496" cy="555" r="6.2" fill="#e7ddff" stroke="#4a23bc" stroke-width="3"/>
+<text x="529" y="529" font-size="21.5" font-weight="740" fill="#101036">Secure Tunnel</text>
+<rect x="528" y="547" width="177" height="58" rx="11" fill="#e9e1ff"/>
+<text x="540" y="571" font-size="15.5" font-weight="500" fill="#5938e4">Best for restrictive</text>
+<text x="540" y="591" font-size="15.5" font-weight="500" fill="#5938e4">networks</text>
 </g>
-<g id="starmux-instance-A" >
-<rect x="904" y="247" width="318" height="122" rx="15" fill="url(#gateway)" stroke="#3b9cff" stroke-width="1.5" filter="url(#softShadow)"/>
+<g id="starmux-instance-A" transform="translate(-116 0)">
+<rect x="904" y="247" width="372" height="122" rx="15" fill="url(#gateway)" stroke="#3b9cff" stroke-width="1.5" filter="url(#softShadow)"/>
 <g transform="translate(959 308) scale(1)">
-<circle cx="0" cy="0" r="38" fill="url(#blueDisc)" stroke="none" stroke-width="1.5" />
-<path d="M -15 -10 L 1 15 L 17 -10 M -15 -10 L 17 -10" stroke="#1265c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<circle cx="-15" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
-<circle cx="17" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
-<circle cx="1" cy="17" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
+<circle cx="0" cy="0" r="38" fill="url(#blueDisc)" stroke="none" stroke-width="1.5"/>
+<path d="M -15 -10 L 1 15 L 17 -10 M -15 -10 L 17 -10" stroke="#1265c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<circle cx="-15" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
+<circle cx="17" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
+<circle cx="1" cy="17" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
 </g>
-<text x="1017" y="290" fill="#0a1039" font-size="23" font-weight="750" text-anchor="start" letter-spacing="0" >Starmux A</text>
-<text x="1017" y="319" fill="#2462b0" font-size="18" font-weight="455" text-anchor="start" letter-spacing="0" >Starmux</text>
-<rect x="1017" y="331" width="92" height="27" rx="14" fill="#dbfaeb" stroke="#b2edcf" stroke-width="1.1" />
-<circle cx="1034" cy="344.5" r="6.4" fill="#0bb585" stroke="none" stroke-width="1.5" />
-<text x="1047" y="350" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0" >Online</text>
-</g>
-<g id="starmux-instance-B" >
-<rect x="904" y="402" width="318" height="122" rx="15" fill="url(#gateway)" stroke="#3b9cff" stroke-width="1.5" filter="url(#softShadow)"/>
+<text x="1017" y="290" fill="#0a1039" font-size="23" font-weight="750" text-anchor="start" letter-spacing="0">Starmux A</text>
+<text x="1017" y="319" fill="#2462b0" font-size="17" font-weight="455" text-anchor="start" letter-spacing="0">Local runtime</text>
+<rect x="1017" y="331" width="92" height="27" rx="14" fill="#dbfaeb" stroke="#b2edcf" stroke-width="1.1"/>
+<circle cx="1034" cy="344.5" r="6.4" fill="#0bb585" stroke="none" stroke-width="1.5"/>
+<text x="1047" y="350" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0">Online</text>
+<g id="programmable-middleware-A"><path d="M 1137 264 L 1137 352" fill="none" stroke="#c7dff8" stroke-width="1.3"/><rect x="1147" y="263" width="113" height="90" rx="11" fill="#ffffff" fill-opacity=".70" stroke="#c7dff8" stroke-width="1.1"/><text x="1203.5" y="282" fill="#2361a4" font-size="13.0" font-weight="730" text-anchor="middle">Programmable</text><rect x="1156" y="293" width="44" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1178.0" y="308.5" fill="#2363a3" font-size="11.5" font-weight="560" text-anchor="middle">Policy</text><rect x="1204" y="293" width="48" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1228.0" y="308.5" fill="#2363a3" font-size="11.1" font-weight="560" text-anchor="middle">Routing</text><rect x="1156" y="321" width="96" height="23" rx="11.5" fill="#e7f7f4" stroke="#c8eee6" stroke-width=".8"/><text x="1204" y="336.5" fill="#087e72" font-size="11.7" font-weight="570" text-anchor="middle">Tool adapters</text></g></g>
+<g id="starmux-instance-B" transform="translate(-116 0)">
+<rect x="904" y="402" width="372" height="122" rx="15" fill="url(#gateway)" stroke="#3b9cff" stroke-width="1.5" filter="url(#softShadow)"/>
 <g transform="translate(959 463) scale(1)">
-<circle cx="0" cy="0" r="38" fill="url(#blueDisc)" stroke="none" stroke-width="1.5" />
-<path d="M -15 -10 L 1 15 L 17 -10 M -15 -10 L 17 -10" stroke="#1265c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<circle cx="-15" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
-<circle cx="17" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
-<circle cx="1" cy="17" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
+<circle cx="0" cy="0" r="38" fill="url(#blueDisc)" stroke="none" stroke-width="1.5"/>
+<path d="M -15 -10 L 1 15 L 17 -10 M -15 -10 L 17 -10" stroke="#1265c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<circle cx="-15" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
+<circle cx="17" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
+<circle cx="1" cy="17" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
 </g>
-<text x="1017" y="445" fill="#0a1039" font-size="23" font-weight="750" text-anchor="start" letter-spacing="0" >Starmux B</text>
-<text x="1017" y="474" fill="#2462b0" font-size="18" font-weight="455" text-anchor="start" letter-spacing="0" >Starmux</text>
-<rect x="1017" y="486" width="92" height="27" rx="14" fill="#dbfaeb" stroke="#b2edcf" stroke-width="1.1" />
-<circle cx="1034" cy="499.5" r="6.4" fill="#0bb585" stroke="none" stroke-width="1.5" />
-<text x="1047" y="505" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0" >Online</text>
-</g>
-<g id="starmux-instance-C" >
-<rect x="904" y="563" width="318" height="122" rx="15" fill="url(#gateway)" stroke="#3b9cff" stroke-width="1.5" filter="url(#softShadow)"/>
+<text x="1017" y="445" fill="#0a1039" font-size="23" font-weight="750" text-anchor="start" letter-spacing="0">Starmux B</text>
+<text x="1017" y="474" fill="#2462b0" font-size="17" font-weight="455" text-anchor="start" letter-spacing="0">Local runtime</text>
+<rect x="1017" y="486" width="92" height="27" rx="14" fill="#dbfaeb" stroke="#b2edcf" stroke-width="1.1"/>
+<circle cx="1034" cy="499.5" r="6.4" fill="#0bb585" stroke="none" stroke-width="1.5"/>
+<text x="1047" y="505" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0">Online</text>
+<g id="programmable-middleware-B"><path d="M 1137 419 L 1137 507" fill="none" stroke="#c7dff8" stroke-width="1.3"/><rect x="1147" y="418" width="113" height="90" rx="11" fill="#ffffff" fill-opacity=".70" stroke="#c7dff8" stroke-width="1.1"/><text x="1203.5" y="437" fill="#2361a4" font-size="13.0" font-weight="730" text-anchor="middle">Programmable</text><rect x="1156" y="448" width="44" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1178.0" y="463.5" fill="#2363a3" font-size="11.5" font-weight="560" text-anchor="middle">Policy</text><rect x="1204" y="448" width="48" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1228.0" y="463.5" fill="#2363a3" font-size="11.1" font-weight="560" text-anchor="middle">Routing</text><rect x="1156" y="476" width="96" height="23" rx="11.5" fill="#e7f7f4" stroke="#c8eee6" stroke-width=".8"/><text x="1204" y="491.5" fill="#087e72" font-size="11.7" font-weight="570" text-anchor="middle">Tool adapters</text></g></g>
+<g id="starmux-instance-C" transform="translate(-116 0)">
+<rect x="904" y="563" width="372" height="122" rx="15" fill="url(#gateway)" stroke="#3b9cff" stroke-width="1.5" filter="url(#softShadow)"/>
 <g transform="translate(959 624) scale(1)">
-<circle cx="0" cy="0" r="38" fill="url(#blueDisc)" stroke="none" stroke-width="1.5" />
-<path d="M -15 -10 L 1 15 L 17 -10 M -15 -10 L 17 -10" stroke="#1265c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<circle cx="-15" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
-<circle cx="17" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
-<circle cx="1" cy="17" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2" />
+<circle cx="0" cy="0" r="38" fill="url(#blueDisc)" stroke="none" stroke-width="1.5"/>
+<path d="M -15 -10 L 1 15 L 17 -10 M -15 -10 L 17 -10" stroke="#1265c7" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<circle cx="-15" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
+<circle cx="17" cy="-12" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
+<circle cx="1" cy="17" r="7" fill="#ecf7ff" stroke="#1265c7" stroke-width="3.2"/>
 </g>
-<text x="1017" y="606" fill="#0a1039" font-size="23" font-weight="750" text-anchor="start" letter-spacing="0" >Starmux C</text>
-<text x="1017" y="635" fill="#2462b0" font-size="18" font-weight="455" text-anchor="start" letter-spacing="0" >Starmux</text>
-<rect x="1017" y="647" width="92" height="27" rx="14" fill="#dbfaeb" stroke="#b2edcf" stroke-width="1.1" />
-<circle cx="1034" cy="660.5" r="6.4" fill="#0bb585" stroke="none" stroke-width="1.5" />
-<text x="1047" y="666" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0" >Online</text>
+<text x="1017" y="606" fill="#0a1039" font-size="23" font-weight="750" text-anchor="start" letter-spacing="0">Starmux C</text>
+<text x="1017" y="635" fill="#2462b0" font-size="17" font-weight="455" text-anchor="start" letter-spacing="0">Local runtime</text>
+<rect x="1017" y="647" width="92" height="27" rx="14" fill="#dbfaeb" stroke="#b2edcf" stroke-width="1.1"/>
+<circle cx="1034" cy="660.5" r="6.4" fill="#0bb585" stroke="none" stroke-width="1.5"/>
+<text x="1047" y="666" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0">Online</text>
+<g id="programmable-middleware-C"><path d="M 1137 580 L 1137 668" fill="none" stroke="#c7dff8" stroke-width="1.3"/><rect x="1147" y="579" width="113" height="90" rx="11" fill="#ffffff" fill-opacity=".70" stroke="#c7dff8" stroke-width="1.1"/><text x="1203.5" y="598" fill="#2361a4" font-size="13.0" font-weight="730" text-anchor="middle">Programmable</text><rect x="1156" y="609" width="44" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1178.0" y="624.5" fill="#2363a3" font-size="11.5" font-weight="560" text-anchor="middle">Policy</text><rect x="1204" y="609" width="48" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1228.0" y="624.5" fill="#2363a3" font-size="11.1" font-weight="560" text-anchor="middle">Routing</text><rect x="1156" y="637" width="96" height="23" rx="11.5" fill="#e7f7f4" stroke="#c8eee6" stroke-width=".8"/><text x="1204" y="652.5" fill="#087e72" font-size="11.7" font-weight="570" text-anchor="middle">Tool adapters</text></g></g>
+<g id="macos-tools" transform="translate(-64 0)">
+<rect x="1298" y="232" width="383" height="151" rx="15" fill="url(#machineBlue)" stroke="#c5e1ff" stroke-width="1.5"/>
+<rect x="1329" y="250" width="46" height="33" rx="3" fill="none" stroke="#1062cd" stroke-width="3.3"/>
+<path d="M 1323 287 L 1381 287 L 1374 292 L 1331 292 Z" stroke="#1062cd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#1062cd"/>
+<text x="1407" y="271" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">macOS</text>
+<rect x="1361.0" y="296" width="74" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
+<text x="1398.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Files</text>
+<rect x="1448.0" y="296" width="98" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
+<text x="1497.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Terminal</text>
+<rect x="1559.0" y="296" width="58" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
+<text x="1588.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Git</text>
+<rect x="1361.0" y="337" width="105" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
+<text x="1413.5" y="359" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Services</text>
+<rect x="1479.0" y="337" width="129" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
+<text x="1543.5" y="359" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Automation</text>
 </g>
-<g id="macos-tools" >
-<rect x="1298" y="232" width="317" height="151" rx="15" fill="url(#machineBlue)" stroke="#c5e1ff" stroke-width="1.5" />
-<rect x="1329" y="250" width="46" height="33" rx="3" fill="none" stroke="#1062cd" stroke-width="3.3" />
-<path d="M 1323 287 L 1381 287 L 1374 292 L 1331 292 Z" stroke="#1062cd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#1062cd" />
-<text x="1407" y="271" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0" >macOS</text>
-<rect x="1321" y="296" width="74" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5" />
-<text x="1358.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Files</text>
-<rect x="1408" y="296" width="98" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5" />
-<text x="1457.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Terminal</text>
-<rect x="1519" y="296" width="58" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5" />
-<text x="1548.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Git</text>
-<rect x="1321" y="337" width="105" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5" />
-<text x="1373.5" y="359" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Services</text>
-<rect x="1439" y="337" width="129" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5" />
-<text x="1503.5" y="359" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Automation</text>
+<g id="windows-tools" transform="translate(-64 0)">
+<rect x="1298" y="401" width="383" height="151" rx="15" fill="url(#machineGreen)" stroke="#aaeedf" stroke-width="1.5"/>
+<rect x="1329" y="419" width="46" height="33" rx="3" fill="none" stroke="#008c70" stroke-width="3.3"/>
+<path d="M 1340 429 L 1351 427 L 1351 441 L 1340 441 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
+<path d="M 1354 427 L 1365 425 L 1365 441 L 1354 441 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
+<path d="M 1340 444 L 1351 444 L 1351 458 L 1340 456 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
+<path d="M 1354 444 L 1365 444 L 1365 460 L 1354 458 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
+<path d="M 1323 456 L 1381 456 L 1374 461 L 1331 461 Z" stroke="#008c70" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
+<text x="1407" y="440" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">Windows</text>
+<rect x="1361.0" y="465" width="74" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
+<text x="1398.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Files</text>
+<rect x="1448.0" y="465" width="98" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
+<text x="1497.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Terminal</text>
+<rect x="1559.0" y="465" width="58" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
+<text x="1588.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Git</text>
+<rect x="1361.0" y="506" width="105" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
+<text x="1413.5" y="528" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Services</text>
+<rect x="1479.0" y="506" width="129" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
+<text x="1543.5" y="528" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Automation</text>
 </g>
-<g id="windows-tools" >
-<rect x="1298" y="401" width="317" height="151" rx="15" fill="url(#machineGreen)" stroke="#aaeedf" stroke-width="1.5" />
-<rect x="1329" y="419" width="46" height="33" rx="3" fill="none" stroke="#008c70" stroke-width="3.3" />
-<path d="M 1340 429 L 1351 427 L 1351 441 L 1340 441 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70" />
-<path d="M 1354 427 L 1365 425 L 1365 441 L 1354 441 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70" />
-<path d="M 1340 444 L 1351 444 L 1351 458 L 1340 456 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70" />
-<path d="M 1354 444 L 1365 444 L 1365 460 L 1354 458 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70" />
-<path d="M 1323 456 L 1381 456 L 1374 461 L 1331 461 Z" stroke="#008c70" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70" />
-<text x="1407" y="440" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0" >Windows</text>
-<rect x="1321" y="465" width="74" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5" />
-<text x="1358.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Files</text>
-<rect x="1408" y="465" width="98" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5" />
-<text x="1457.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Terminal</text>
-<rect x="1519" y="465" width="58" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5" />
-<text x="1548.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Git</text>
-<rect x="1321" y="506" width="105" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5" />
-<text x="1373.5" y="528" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Services</text>
-<rect x="1439" y="506" width="129" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5" />
-<text x="1503.5" y="528" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Automation</text>
+<g id="linux-tools" transform="translate(-64 0)">
+<rect x="1298" y="564" width="383" height="151" rx="15" fill="url(#machinePurple)" stroke="#d9c9ff" stroke-width="1.5"/>
+<rect x="1329" y="583" width="46" height="20" rx="4" fill="#4b3ebb" stroke="none" stroke-width="1.5"/>
+<rect x="1329" y="606" width="46" height="20" rx="4" fill="#4b3ebb" stroke="none" stroke-width="1.5"/>
+<circle cx="1339" cy="593" r="2" fill="#d8d5fb" stroke="none" stroke-width="1.5"/>
+<path d="M 1348 593 L 1366 593" stroke="#d8d5fb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<circle cx="1339" cy="616" r="2" fill="#d8d5fb" stroke="none" stroke-width="1.5"/>
+<path d="M 1348 616 L 1366 616" stroke="#d8d5fb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<text x="1407" y="603" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">Linux / Workstation</text>
+<rect x="1361.0" y="628" width="74" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
+<text x="1398.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Files</text>
+<rect x="1448.0" y="628" width="98" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
+<text x="1497.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Terminal</text>
+<rect x="1559.0" y="628" width="58" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
+<text x="1588.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Git</text>
+<rect x="1361.0" y="669" width="105" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
+<text x="1413.5" y="691" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Services</text>
+<rect x="1479.0" y="669" width="129" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
+<text x="1543.5" y="691" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Automation</text>
 </g>
-<g id="linux-tools" >
-<rect x="1298" y="564" width="317" height="151" rx="15" fill="url(#machinePurple)" stroke="#d9c9ff" stroke-width="1.5" />
-<rect x="1329" y="583" width="46" height="20" rx="4" fill="#4b3ebb" stroke="none" stroke-width="1.5" />
-<rect x="1329" y="606" width="46" height="20" rx="4" fill="#4b3ebb" stroke="none" stroke-width="1.5" />
-<circle cx="1339" cy="593" r="2" fill="#d8d5fb" stroke="none" stroke-width="1.5" />
-<path d="M 1348 593 L 1366 593" stroke="#d8d5fb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<circle cx="1339" cy="616" r="2" fill="#d8d5fb" stroke="none" stroke-width="1.5" />
-<path d="M 1348 616 L 1366 616" stroke="#d8d5fb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<text x="1407" y="603" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0" >Linux / Workstation</text>
-<rect x="1321" y="628" width="74" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5" />
-<text x="1358.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Files</text>
-<rect x="1408" y="628" width="98" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5" />
-<text x="1457.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Terminal</text>
-<rect x="1519" y="628" width="58" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5" />
-<text x="1548.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Git</text>
-<rect x="1321" y="669" width="105" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5" />
-<text x="1373.5" y="691" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Services</text>
-<rect x="1439" y="669" width="129" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5" />
-<text x="1503.5" y="691" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0" >Automation</text>
-</g>
-<g id="product-value-strip" >
-<rect x="29" y="746" width="1611" height="125" rx="16" fill="#ffffff" stroke="#e2eaf7" stroke-width="1.4" />
-<path d="M 528 773 L 528 847" stroke="#e3eaf4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<path d="M 1080 773 L 1080 847" stroke="#e3eaf4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<circle cx="97" cy="807" r="39" fill="#d7ebff" stroke="none" stroke-width="1.5" />
-<path d="M 97 784 L 114 791 L 114 807 C 114 820 104 827 97 830 C 90 827 80 820 80 807 L 80 791 Z" stroke="#0059cf" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<path d="M 97 790 L 108 794 L 108 807 C 108 815 103 820 97 824 C 91 820 86 815 86 807 L 86 794 Z" stroke="#d7ebff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<text x="153" y="802" fill="#0c1036" font-size="21" font-weight="750" text-anchor="start" letter-spacing="0" >Self-hosted control</text>
-<text x="153" y="830" fill="#647595" font-size="16" font-weight="440" text-anchor="start" letter-spacing="0" >Your gateways. Your machines. Your data.</text>
-<circle cx="610" cy="807" r="39" fill="#d4f9ed" stroke="none" stroke-width="1.5" />
+<g id="product-value-strip">
+<rect x="29" y="746" width="1611" height="125" rx="16" fill="#ffffff" stroke="#e2eaf7" stroke-width="1.4"/>
+<path d="M 528 773 L 528 847" stroke="#e3eaf4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M 1080 773 L 1080 847" stroke="#e3eaf4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<circle cx="97" cy="807" r="39" fill="#d7ebff" stroke="none" stroke-width="1.5"/>
+<path d="M 97 784 L 114 791 L 114 807 C 114 820 104 827 97 830 C 90 827 80 820 80 807 L 80 791 Z" stroke="#0059cf" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M 97 790 L 108 794 L 108 807 C 108 815 103 820 97 824 C 91 820 86 815 86 807 L 86 794 Z" stroke="#d7ebff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<text x="153" y="802" fill="#0c1036" font-size="21" font-weight="750" text-anchor="start" letter-spacing="0">Self-hosted control</text>
+<text x="153" y="830" fill="#647595" font-size="16" font-weight="440" text-anchor="start" letter-spacing="0">Your gateways. Your machines. Your data.</text>
+<circle cx="610" cy="807" r="39" fill="#d4f9ed" stroke="none" stroke-width="1.5"/>
 <polygon points="610.0,789.0 616.0,784.8 619.0,791.4 622.7,794.3 629.9,795.5 627.4,802.3 628.0,807.0 632.2,813.0 625.6,816.0 622.7,819.7 621.5,826.9 614.7,824.4 610.0,825.0 604.0,829.2 601.0,822.6 597.3,819.7 590.1,818.5 592.6,811.7 592.0,807.0 587.8,801.0 594.4,798.0 597.3,794.3 598.5,787.1 605.3,789.6" fill="none" stroke="#008e69" stroke-width="3" stroke-linejoin="round"/>
-<circle cx="610" cy="807" r="7" fill="none" stroke="#008e69" stroke-width="3" />
-<text x="666" y="790" fill="#0c1036" font-size="20" font-weight="735" text-anchor="start" letter-spacing="0" >Use your real environments</text>
-<text x="666" y="817" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0" >Work with your files, terminal, Git and services</text>
-<text x="666" y="841" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0" >on your own computers.</text>
-<circle cx="1169" cy="807" r="39" fill="#e8e0ff" stroke="none" stroke-width="1.5" />
-<rect x="1146" y="783" width="46" height="33" rx="3" fill="none" stroke="#4937c8" stroke-width="3.3" />
-<path d="M 1140 820 L 1198 820 L 1191 825 L 1148 825 Z" stroke="#4937c8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#4937c8" />
-<text x="1227" y="790" fill="#0c1036" font-size="20" font-weight="735" text-anchor="start" letter-spacing="0" >One Starmux per computer</text>
-<text x="1227" y="817" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0" >Deploy Starmux on each computer</text>
-<text x="1227" y="841" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0" >you want to access.</text>
-</g>
-<path d="M 30 888 L 1641 888" stroke="#eaf0f8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-<g id="technical-footnote" >
-<text x="836" y="914" fill="#637495" font-size="14.4" font-weight="400" text-anchor="middle" letter-spacing="0" >Direct HTTPS avoids a managed relay. Secure Tunnel uses OpenAI forwarding. Multi-computer orchestration is a deployment pattern, not a single built-in unified control plane.</text>
+<circle cx="610" cy="807" r="7" fill="none" stroke="#008e69" stroke-width="3"/>
+<text x="666" y="790" fill="#0c1036" font-size="20" font-weight="735" text-anchor="start" letter-spacing="0">Use your real environments</text>
+<text x="666" y="817" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0">Work with your files, terminal, Git and services</text>
+<text x="666" y="841" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0">on your own computers.</text>
+<circle cx="1169" cy="807" r="39" fill="#e8e0ff" stroke="none" stroke-width="1.5"/>
+<text x="1227" y="790" fill="#0c1036" font-size="20" font-weight="735" text-anchor="start" letter-spacing="0">Programmable middleware</text>
+<text x="1227" y="817" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0">Define policies, routing and tool adapters</text>
+<text x="1227" y="841" fill="#647595" font-size="16" font-weight="400" text-anchor="start" letter-spacing="0">for each host environment.</text>
+<g id="programmable-middleware-symbol"><path d="M 1154 790 L 1154 823" fill="none" stroke="#4937c8" stroke-width="3" stroke-linecap="round"/><circle cx="1154" cy="803" r="5.3" fill="#f2edff" stroke="#4937c8" stroke-width="2.8"/><path d="M 1169 790 L 1169 823" fill="none" stroke="#4937c8" stroke-width="3" stroke-linecap="round"/><circle cx="1169" cy="813" r="5.3" fill="#f2edff" stroke="#4937c8" stroke-width="2.8"/><path d="M 1184 790 L 1184 823" fill="none" stroke="#4937c8" stroke-width="3" stroke-linecap="round"/><circle cx="1184" cy="798" r="5.3" fill="#f2edff" stroke="#4937c8" stroke-width="2.8"/></g></g>
+<path d="M 30 888 L 1641 888" stroke="#eaf0f8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<g id="technical-footnote">
+<text x="836" y="914" fill="#637495" font-size="14.4" font-weight="400" text-anchor="middle" letter-spacing="0">Direct HTTPS avoids a managed relay. Secure Tunnel uses OpenAI forwarding. Multi-computer orchestration is a deployment pattern, not a single built-in unified control plane.</text>
 </g>
 </svg>
