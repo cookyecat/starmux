@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1672 941" width="1672" height="941" role="img" aria-labelledby="diagram-title diagram-desc">
-<title id="diagram-title">Starmux — Cloud AI clients. Real computers on earth.</title>
-<desc id="diagram-desc">Editable vector diagram: remote cloud AI clients connect through HTTPS or a secure tunnel to independent self-hosted Starmux instances. Each instance acts as programmable middleware for policies, routing and tool adapters before accessing real macOS, Windows and Linux computers. Programmable elements depict the architectural role rather than a claim of which features are implemented in a specific release.</desc>
+<title id="diagram-title">Starmux — Cloud MCP clients. Real computers on earth.</title>
+<desc id="diagram-desc">Editable vector diagram: cloud MCP clients connect through Direct HTTPS or a Secure Tunnel to independent self-hosted Starmux instances. Each instance acts as programmable MCP middleware for policies, routing and tool adapters before reaching MCP servers such as Desktop Commander on real macOS, Windows and Linux computers.</desc>
 <defs>
  <linearGradient id="brandText" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2765f4"/><stop offset="1" stop-color="#1c55e9"/></linearGradient>
  <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fcfdff"/><stop offset="1" stop-color="#f9fbff"/></linearGradient>
@@ -43,7 +43,7 @@
 <g id="heading">
 <text x="317" y="61" fill="#090d34" font-size="50" font-weight="790" text-anchor="start" letter-spacing="0">Cloud AI clients.</text>
 <text x="741" y="61" fill="url(#brandText)" font-size="50" font-weight="790" text-anchor="start" letter-spacing="0">Real computers on earth.</text>
-<text x="836" y="103" fill="#475778" font-size="22" font-weight="400" text-anchor="middle" letter-spacing="0">Use Direct HTTPS or Secure Tunnel to let cloud AI clients securely access and operate tools on your computers anywhere on earth.</text>
+<text x="836" y="103" fill="#475778" font-size="21.3" font-weight="400" text-anchor="middle" letter-spacing="0">Use Direct HTTPS or Secure Tunnel to let cloud MCP clients securely access MCP servers and tools on your computers anywhere on earth.</text>
 </g>
 <g id="four-column-panels">
 <rect x="28" y="137" width="366" height="591" rx="17" fill="url(#panel)" stroke="#e5edf8" stroke-width="1.5"/>
@@ -74,13 +74,13 @@
 <path d="M 1160 626 L 1228 626" stroke="#8059f5" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" fill="none" marker-end="url(#arrPurple)"/>
 </g>
 <g id="panel-headings">
-<text x="58" y="184" fill="#080d34" font-size="31" font-weight="760" text-anchor="start" letter-spacing="0">Cloud AI Clients</text>
-<text x="58" y="213" fill="#607193" font-size="20" font-weight="400" text-anchor="start" letter-spacing="0">Any MCP-capable client</text>
-<text x="447" y="190" fill="#080d34" font-size="26" font-weight="760" text-anchor="start" letter-spacing="0">Connection options</text>
+<text x="58" y="184" fill="#080d34" font-size="29.5" font-weight="760" text-anchor="start" letter-spacing="0">Cloud MCP Clients</text>
+<text x="58" y="213" fill="#607193" font-size="18.5" font-weight="400" text-anchor="start" letter-spacing="0">Any MCP-capable cloud AI client</text>
+<text x="447" y="190" fill="#080d34" font-size="24.8" font-weight="760" text-anchor="start" letter-spacing="0">MCP connection options</text>
 <text x="790" y="184" fill="#080d34" font-size="27" font-weight="760" text-anchor="start" letter-spacing="0">Self-hosted Starmux</text>
-<text x="790" y="211" fill="#607193" font-size="17.5" font-weight="400" text-anchor="start" letter-spacing="0">Programmable middleware on each computer</text>
+<text x="790" y="211" fill="#607193" font-size="16.2" font-weight="400" text-anchor="start" letter-spacing="0">Programmable MCP middleware on each computer</text>
 <text x="1238" y="183" fill="#080d34" font-size="28" font-weight="760" text-anchor="start" letter-spacing="0">Your computers on earth</text>
-<text x="1238" y="211" fill="#607193" font-size="18" font-weight="400" text-anchor="start" letter-spacing="0">The real tools on your machines</text>
+<text x="1238" y="211" fill="#607193" font-size="16.5" font-weight="400" text-anchor="start" letter-spacing="0">MCP servers running on your machines</text>
 </g>
 <g id="client-chatgpt">
 <rect x="52" y="232" width="283" height="67" rx="14" fill="#ffffff" stroke="#dde8f3" stroke-width="1.35" filter="url(#softShadow)"/>
@@ -263,61 +263,31 @@
 <text x="1047" y="666" fill="#008863" font-size="16" font-weight="540" text-anchor="start" letter-spacing="0">Online</text>
 <g id="programmable-middleware-C"><path d="M 1137 580 L 1137 668" fill="none" stroke="#c7dff8" stroke-width="1.3"/><rect x="1147" y="579" width="113" height="90" rx="11" fill="#ffffff" fill-opacity=".70" stroke="#c7dff8" stroke-width="1.1"/><text x="1203.5" y="598" fill="#2361a4" font-size="13.0" font-weight="730" text-anchor="middle">Programmable</text><rect x="1156" y="609" width="44" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1178.0" y="624.5" fill="#2363a3" font-size="11.5" font-weight="560" text-anchor="middle">Policy</text><rect x="1204" y="609" width="48" height="23" rx="11.5" fill="#e6f1ff" stroke="#d5e8fb" stroke-width=".8"/><text x="1228.0" y="624.5" fill="#2363a3" font-size="11.1" font-weight="560" text-anchor="middle">Routing</text><rect x="1156" y="637" width="96" height="23" rx="11.5" fill="#e7f7f4" stroke="#c8eee6" stroke-width=".8"/><text x="1204" y="652.5" fill="#087e72" font-size="11.7" font-weight="570" text-anchor="middle">Tool adapters</text></g></g>
 <g id="macos-tools" transform="translate(-64 0)">
-<rect x="1298" y="232" width="383" height="151" rx="15" fill="url(#machineBlue)" stroke="#c5e1ff" stroke-width="1.5"/>
+<rect x="1298" y="232" width="355" height="151" rx="15" fill="url(#machineBlue)" stroke="#c5e1ff" stroke-width="1.5"/>
 <rect x="1329" y="250" width="46" height="33" rx="3" fill="none" stroke="#1062cd" stroke-width="3.3"/>
 <path d="M 1323 287 L 1381 287 L 1374 292 L 1331 292 Z" stroke="#1062cd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#1062cd"/>
-<text x="1407" y="271" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">macOS</text>
-<rect x="1361.0" y="296" width="74" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
-<text x="1398.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Files</text>
-<rect x="1448.0" y="296" width="98" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
-<text x="1497.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Terminal</text>
-<rect x="1559.0" y="296" width="58" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
-<text x="1588.0" y="318" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Git</text>
-<rect x="1361.0" y="337" width="105" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
-<text x="1413.5" y="359" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Services</text>
-<rect x="1479.0" y="337" width="129" height="33" rx="18" fill="#daedff" stroke="none" stroke-width="1.5"/>
-<text x="1543.5" y="359" fill="#1062cd" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Automation</text>
-</g>
+<text x="1407" y="266" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">macOS</text>
+<g id="macos-tools-server-badge"><rect x="1407" y="279" width="170" height="25" rx="12.5" fill="#ffffff" fill-opacity=".90" stroke="#1062cd" stroke-width="1.0"/><text x="1492" y="296" fill="#1062cd" font-size="13.2" font-weight="620" text-anchor="middle" letter-spacing="0">Desktop Commander</text></g><g id="macos-tools-tool-capabilities" role="group"><line x1="1327" y1="326" x2="1624" y2="326" stroke="#bfdaf9" stroke-width="1.15" stroke-linecap="round"/><rect x="1327" y="338" width="74" height="29" rx="14.5" fill="#daedff" stroke="none"/><text x="1364.0" y="357" fill="#1062cd" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Files</text><rect x="1415" y="338" width="94" height="29" rx="14.5" fill="#daedff" stroke="none"/><text x="1462.0" y="357" fill="#1062cd" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Terminal</text><rect x="1523" y="338" width="101" height="29" rx="14.5" fill="#daedff" stroke="none"/><text x="1573.5" y="357" fill="#1062cd" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Services</text></g></g>
 <g id="windows-tools" transform="translate(-64 0)">
-<rect x="1298" y="401" width="383" height="151" rx="15" fill="url(#machineGreen)" stroke="#aaeedf" stroke-width="1.5"/>
+<rect x="1298" y="401" width="355" height="151" rx="15" fill="url(#machineGreen)" stroke="#aaeedf" stroke-width="1.5"/>
 <rect x="1329" y="419" width="46" height="33" rx="3" fill="none" stroke="#008c70" stroke-width="3.3"/>
 <path d="M 1340 429 L 1351 427 L 1351 441 L 1340 441 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
 <path d="M 1354 427 L 1365 425 L 1365 441 L 1354 441 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
 <path d="M 1340 444 L 1351 444 L 1351 458 L 1340 456 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
 <path d="M 1354 444 L 1365 444 L 1365 460 L 1354 458 Z" stroke="#008c70" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
 <path d="M 1323 456 L 1381 456 L 1374 461 L 1331 461 Z" stroke="#008c70" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="#008c70"/>
-<text x="1407" y="440" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">Windows</text>
-<rect x="1361.0" y="465" width="74" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
-<text x="1398.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Files</text>
-<rect x="1448.0" y="465" width="98" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
-<text x="1497.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Terminal</text>
-<rect x="1559.0" y="465" width="58" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
-<text x="1588.0" y="487" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Git</text>
-<rect x="1361.0" y="506" width="105" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
-<text x="1413.5" y="528" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Services</text>
-<rect x="1479.0" y="506" width="129" height="33" rx="18" fill="#d1f5f0" stroke="none" stroke-width="1.5"/>
-<text x="1543.5" y="528" fill="#008c70" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Automation</text>
-</g>
+<text x="1407" y="435" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">Windows</text>
+<g id="windows-tools-server-badge"><rect x="1407" y="448" width="170" height="25" rx="12.5" fill="#ffffff" fill-opacity=".90" stroke="#008c70" stroke-width="1.0"/><text x="1492" y="465" fill="#008c70" font-size="13.2" font-weight="620" text-anchor="middle" letter-spacing="0">Desktop Commander</text></g><g id="windows-tools-tool-capabilities" role="group"><line x1="1327" y1="495" x2="1624" y2="495" stroke="#b7e9df" stroke-width="1.15" stroke-linecap="round"/><rect x="1327" y="507" width="74" height="29" rx="14.5" fill="#d1f5f0" stroke="none"/><text x="1364.0" y="526" fill="#008c70" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Files</text><rect x="1415" y="507" width="94" height="29" rx="14.5" fill="#d1f5f0" stroke="none"/><text x="1462.0" y="526" fill="#008c70" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Terminal</text><rect x="1523" y="507" width="101" height="29" rx="14.5" fill="#d1f5f0" stroke="none"/><text x="1573.5" y="526" fill="#008c70" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Services</text></g></g>
 <g id="linux-tools" transform="translate(-64 0)">
-<rect x="1298" y="564" width="383" height="151" rx="15" fill="url(#machinePurple)" stroke="#d9c9ff" stroke-width="1.5"/>
+<rect x="1298" y="564" width="355" height="151" rx="15" fill="url(#machinePurple)" stroke="#d9c9ff" stroke-width="1.5"/>
 <rect x="1329" y="583" width="46" height="20" rx="4" fill="#4b3ebb" stroke="none" stroke-width="1.5"/>
 <rect x="1329" y="606" width="46" height="20" rx="4" fill="#4b3ebb" stroke="none" stroke-width="1.5"/>
 <circle cx="1339" cy="593" r="2" fill="#d8d5fb" stroke="none" stroke-width="1.5"/>
 <path d="M 1348 593 L 1366 593" stroke="#d8d5fb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 <circle cx="1339" cy="616" r="2" fill="#d8d5fb" stroke="none" stroke-width="1.5"/>
 <path d="M 1348 616 L 1366 616" stroke="#d8d5fb" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-<text x="1407" y="603" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">Linux / Workstation</text>
-<rect x="1361.0" y="628" width="74" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
-<text x="1398.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Files</text>
-<rect x="1448.0" y="628" width="98" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
-<text x="1497.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Terminal</text>
-<rect x="1559.0" y="628" width="58" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
-<text x="1588.0" y="650" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Git</text>
-<rect x="1361.0" y="669" width="105" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
-<text x="1413.5" y="691" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Services</text>
-<rect x="1479.0" y="669" width="129" height="33" rx="18" fill="#e7dfff" stroke="none" stroke-width="1.5"/>
-<text x="1543.5" y="691" fill="#4b3ebb" font-size="16" font-weight="455" text-anchor="middle" letter-spacing="0">Automation</text>
-</g>
+<text x="1407" y="598" fill="#0a1036" font-size="21" font-weight="725" text-anchor="start" letter-spacing="0">Linux / Workstation</text>
+<g id="linux-tools-server-badge"><rect x="1407" y="611" width="170" height="25" rx="12.5" fill="#ffffff" fill-opacity=".90" stroke="#4b3ebb" stroke-width="1.0"/><text x="1492" y="628" fill="#4b3ebb" font-size="13.2" font-weight="620" text-anchor="middle" letter-spacing="0">Desktop Commander</text></g><g id="linux-tools-tool-capabilities" role="group"><line x1="1327" y1="658" x2="1624" y2="658" stroke="#d5c9fa" stroke-width="1.15" stroke-linecap="round"/><rect x="1327" y="670" width="74" height="29" rx="14.5" fill="#e7dfff" stroke="none"/><text x="1364.0" y="689" fill="#4b3ebb" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Files</text><rect x="1415" y="670" width="94" height="29" rx="14.5" fill="#e7dfff" stroke="none"/><text x="1462.0" y="689" fill="#4b3ebb" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Terminal</text><rect x="1523" y="670" width="101" height="29" rx="14.5" fill="#e7dfff" stroke="none"/><text x="1573.5" y="689" fill="#4b3ebb" font-size="15.4" font-weight="500" text-anchor="middle" letter-spacing="0">Services</text></g></g>
 <g id="product-value-strip">
 <rect x="29" y="746" width="1611" height="125" rx="16" fill="#ffffff" stroke="#e2eaf7" stroke-width="1.4"/>
 <path d="M 528 773 L 528 847" stroke="#e3eaf4" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
