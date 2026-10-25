@@ -44,7 +44,7 @@ def require(condition,code):
 
 def source_commit():
     # Fresh community ZIP deliberately carries no private Git history.
-    return "community-source-v0.10.0"
+    return "community-source-v0.11.0"
 
 def signed(app):
     run("/usr/bin/codesign","--verify","--deep","--strict",str(app),timeout=120)

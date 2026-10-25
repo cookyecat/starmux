@@ -1,17 +1,24 @@
-# Starmux 0.10.0 preview
+# Starmux 0.11.0 preview
 
-This release introduces the Starmux name, background `up`, CWD-based first setup, `--code` / `--write`, unified authentication commands and explicit migration from Mac MCP Gateway.
+This release restores the product story, connection overview and native App showcase in the README, and includes the complete user documentation and a real screenshot of the restored status monitor in the npm package. It retains the CLI workflow introduced in 0.10.0: background `up`, CWD-based first setup, `--code` / `--write`, unified authentication and explicit migration.
 
-`starmux@0.10.0` is published on npm with the `latest` tag. The public package passed an isolated global install, startup, MCP verification, API-key creation, authenticated verification and shutdown. Its integrity matched the locally tested tarball.
+The macOS App source restores the status monitor as the main interface, with advanced instance management behind a secondary entry. It shows the selected instance’s active configuration, actual port and anonymous tool activity. UI acceptance covered stopping a CLI instance, starting it under App ownership, opening permissions and advanced settings, and quitting the App while an independent CLI instance kept running.
 
-The source tree also includes a subsequent macOS menu restoration and README presentation update. These presentation changes are not retroactively included in the already-published 0.10.0 archive. The restored monitor uses the selected instance’s active configuration, actual port and anonymous tool activity. UI acceptance covered stopping a CLI instance, starting it under App ownership, opening permissions and advanced settings, and quitting the App while an independent CLI instance kept running.
+The npm package includes the App screenshot and build guide; the native `.app` is distributed separately. Updating npm does not replace an installed macOS App.
 
 ## Included
 
 - TypeScript CLI/Core, automatic local initialization and supervised background processes.
 - Read-only and full OS-account coding modes, independent instances and JSONC configuration with apply/rollback.
 - Ingress, API-key and OAuth authentication; local Access console and persistent revocation.
-- macOS App source and development build tooling.
+- Complete user guides, connection diagrams and the native App screenshot.
+- macOS App source and development build tooling in the source repository.
+
+## Release validation
+
+The 0.11.0 release workflow checks the final tarball contents, installs it in an isolated prefix and exercises startup, MCP verification, API-key authentication and shutdown. After publication, the same workflow is repeated from the public registry and the package integrity is compared with the tested archive.
+
+The preceding public 0.10.0 package passed this install-and-run workflow on macOS. The restored App also passed its native build, self-tests and UI ownership checks.
 
 ## Tested deployment history
 

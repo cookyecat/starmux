@@ -39,7 +39,7 @@ def build(target:Path):
           "CFBundleDisplayName":"Starmux",
           "CFBundleExecutable":"MacMCPUnifiedMenu",
           "CFBundleVersion":"15",
-          "CFBundleShortVersionString":"0.10.0",
+          "CFBundleShortVersionString":"0.11.0",
           "CFBundlePackageType":"APPL",
           "LSUIElement":True,
           "LSMinimumSystemVersion":"13.0",

@@ -166,7 +166,7 @@ The longer-term direction is a gateway for more MCP servers and clients, with pr
 - [Client compatibility](docs/CLIENTS.md), [platform support](docs/PLATFORMS.md), and [release status](docs/RELEASE_STATUS.md)
 - [Contributing](CONTRIBUTING.md) and [architecture](docs/ARCHITECTURE.md)
 
-Starmux 0.10.0 is a preview. The CLI supports macOS, Linux and Windows; the native macOS App is available as a development build. See the linked compatibility pages for tested combinations.
+Starmux 0.11.0 is a preview. The CLI supports macOS, Linux and Windows; the native macOS App is available as a development build. See the linked compatibility pages for tested combinations.
 
 ## Built with Desktop Commander
 
