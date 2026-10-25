@@ -1,6 +1,6 @@
 <div align="center">
 
-# Starmux
+# Starmux MCP Gateway
 
 ### Give cloud AI clients secure access to your local machine.
 
@@ -19,7 +19,7 @@ Cloud AI assistants (like **ChatGPT Web**, **Claude**, **Codex**, or **WorkBuddy
 **Starmux** (`Star` topology + `Multiplexer`) is a self-hosted MCP gateway that connects remote AI clients to the real tools on your own computers over Direct HTTPS or a Secure Tunnel:
 
 <div align="center">
-  <img src="docs/assets/multi-client-gateway.jpg" width="100%" alt="Starmux architecture: Many AI clients connecting to self-hosted computers via Direct HTTPS or Secure MCP Tunnel" />
+  <img src="docs/assets/starmux-architecture.svg" width="100%" alt="Starmux architecture: Many AI clients connecting to self-hosted computers via Direct HTTPS or Secure MCP Tunnel" />
 </div>
 
 - **Batteries-Included Workspace Tools:** Powered by a built-in [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) engine (installed automatically via npm). Out of the box, your AI can read/write files, search code, run Shell commands, and manage Git.
@@ -91,10 +91,11 @@ Choose the setup guide matching your AI client:
 | AI Client | Recommended Connection & Auth | Status | Setup Guide |
 | :--- | :--- | :--- | :--- |
 | **ChatGPT Web** | Secure Tunnel + OAuth (Browser Login) | ✅ Tested | [ChatGPT OAuth Guide](docs/OAUTH.md) |
+| **Claude App** | Remote MCP Custom Connector | 🎯 Target | [Client Compatibility](docs/CLIENTS.md) |
 | **Codex** | Protected Tunnel (Ingress Auth) | ✅ Tested | [Remote Setup Guide](docs/REMOTE_SETUP.md) |
 | **WorkBuddy** | Direct HTTPS + Bearer API Key | ✅ Tested | [HTTPS + API Key Guide](docs/REMOTE_SETUP.md#2-https--bearer-api-key) |
 | **Doubao (豆包)** | HTTPS / Tunnel | ✅ Community Verified | [Client Compatibility](docs/CLIENTS.md) |
-| **Claude App** | Remote MCP Custom Connector | 🎯 Target | [Client Compatibility](docs/CLIENTS.md) |
+
 
 See [Client Compatibility](docs/CLIENTS.md) and [Remote Setup](docs/REMOTE_SETUP.md) for DNS, TLS, OAuth, and tunnel configuration details.
 
@@ -147,8 +148,8 @@ The App and CLI manage the same underlying instances. Quitting the App stops onl
 | Host Platform | Core & CLI | Native Menu Bar App |
 | :--- | :--- | :--- |
 | **macOS** | ✅ Tested | 🧪 Development Build ([App Build Guide](app/README.md)) |
-| **Linux** | 🧪 Preview (Tested on Ubuntu arm64) | — |
-| **Windows** | 🧪 Preview | — |
+| **Linux** | ✅ Tested | — |
+| **Windows** | ✅ Tested | — |
 
 ---
 
@@ -157,7 +158,6 @@ The App and CLI manage the same underlying instances. Quitting the App stops onl
 Starmux began with the [community request for a self-hosted Desktop Commander workbench](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/714) and is evolving into a universal MCP router and programmable middleware for multi-server environments.
 
 - 📖 **Core Guides:** [Documentation Index](docs/README.md) · [Installation](docs/INSTALL.md) · [Access Control](docs/ACCESS_CONTROL.md) · [Security Boundaries](docs/SECURITY.md)
-- 🔄 **Upgrading:** [Migrate from `mac-mcp-gateway`](docs/MIGRATION.md)
 - 🛠️ **Project & Dev:** [Architecture](docs/ARCHITECTURE.md) · [Platform Details](docs/PLATFORMS.md) · [Release Status](docs/RELEASE_STATUS.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
