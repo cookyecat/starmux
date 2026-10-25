@@ -1,9 +1,9 @@
 # Security and permissions
 
-Mac MCP Gateway is a self-hosted connection and routing layer around real upstream MCP tools. Treat exposure to remote clients as a powerful privilege.
+Starmux is a self-hosted connection and routing layer around real upstream MCP tools. Treat exposure to remote clients as a powerful privilege.
 
 - The default **restricted read-only** role enforces project-scoped access and disables arbitrary Shell/write operations.
-- The **trusted developer** role can run commands using your Mac account. In the owner-tested configuration, macOS process sandboxing restricts direct Desktop Commander writes to Home; it is **not** a universal filesystem or IPC sandbox.
+- The **trusted developer** role can run commands using your Mac account. In the owner-tested configuration, new `--code` / `--write` configurations use full OS-account permissions. Migrated Home-only configurations keep their previous sandbox until explicitly changed.
 - HTTP MCP listens on loopback by default. **Never expose the raw loopback port publicly.** Direct HTTPS requires a publicly reachable TLS endpoint **and real caller authentication, authorization and revocation**. DNS/TLS alone are insufficient.
 - OpenAI Tunnel is outbound and uses OpenAI's forwarding infrastructure. Tunnel readiness is **not** proof of independent caller authorization.
 - **OAuth** mode validates tokens and allowed accounts/clients, and supports local session revocation, including refreshed tokens in that session. A fresh authorized session can restore access; session revocation is not an account ban.

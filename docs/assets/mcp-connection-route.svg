@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="450" viewBox="0 0 1200 450" role="img" aria-labelledby="title description">
-  <title id="title">Mac MCP Gateway: two remote connection routes to one local MCP server</title>
+  <title id="title">Starmux: two remote connection routes to one local MCP server</title>
   <desc id="description">Two explicit routes are shown in parallel. Preferred Direct HTTPS: ChatGPT connects to the owner's DNS name, authenticated HTTPS reverse proxy and single Gateway Core. Alternative Secure MCP Tunnel: ChatGPT uses an OpenAI-hosted Tunnel with an outbound client on the Mac. Both routes reach the same Gateway, which forwards MCP calls to the real local Desktop Commander server. Architecture only; external authorization tests remain pending.</desc>
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">

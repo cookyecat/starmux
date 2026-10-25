@@ -1,11 +1,24 @@
-# Community preview status
+# Starmux 0.10.0 preview
 
-- **Available now as source:** strict TypeScript CLI/Core (compiled JavaScript distribution), local setup and doctor tools, English/Chinese menu bar App source, MIT license and pinned upstream dependencies. Private owner-tested Mac runtime: v0.9.0, 27 MCP tools, loopback Core health, trusted Home write scope.
-- **For developers:** `build/build_arm64_app.py` builds a **preview-only ad-hoc signed** self-contained Apple Silicon App from an official pinned Node arm64 archive. The signed/notarized GitHub Release ZIP is **not yet publicly available**.
-- **Remote options:** Direct HTTPS is recommended when public reachability and caller authentication are configured; OpenAI Tunnel is an outbound alternative. Neither has independently completed community-user external identity / read / deny / revoke acceptance.
-- **Authenticated acceptance:** real ChatGPT web OAuth over Tunnel passed login, coding, session revocation and fresh-login recovery. WorkBuddy HTTPS + Bearer API key passed remote file reads/writes. [Deployment steps](REMOTE_SETUP.md) and [client matrix](CLIENTS.md) separate tested paths from compatibility expectations.
-- **Stage 4:** deployment documentation and existing CLI/Dashboard management are available. One-click provider provisioning, a guided alias flow, separate native OAuth setup screens and independent first-user validation remain unfinished.
-- **Not yet shipped:** general user-defined MCP script hooks, unified multi-computer orchestration, independent clean-Mac onboarding and a production-grade one-click public OAuth setup.
-- **Publication:** community-preview documentation is available. Before publishing an artifact or repository, verify that it excludes private configuration, credentials and personal deployment identifiers; review any history being published, third-party notices and security reporting. Documentation review is not a completed artifact/history audit. Signed App distribution has separate signing/notarization gates.
+This release introduces the Starmux name, background `up`, CWD-based first setup, `--code` / `--write`, unified authentication commands and explicit migration from Mac MCP Gateway.
 
-[Install locally](INSTALL.md) · [Connect ChatGPT](CONNECT_CHATGPT.md) · [Security](SECURITY.md)
+`starmux@0.10.0` is published on npm with the `latest` tag. The public package passed an isolated global install, startup, MCP verification, API-key creation, authenticated verification and shutdown. Its integrity matched the locally tested tarball.
+
+The source tree also includes a subsequent macOS menu restoration and README presentation update. These presentation changes are not retroactively included in the already-published 0.10.0 archive. The restored monitor uses the selected instance’s active configuration, actual port and anonymous tool activity. UI acceptance covered stopping a CLI instance, starting it under App ownership, opening permissions and advanced settings, and quitting the App while an independent CLI instance kept running.
+
+## Included
+
+- TypeScript CLI/Core, automatic local initialization and supervised background processes.
+- Read-only and full OS-account coding modes, independent instances and JSONC configuration with apply/rollback.
+- Ingress, API-key and OAuth authentication; local Access console and persistent revocation.
+- macOS App source and development build tooling.
+
+## Tested deployment history
+
+ChatGPT web OAuth over Tunnel has passed login, coding, session revocation and fresh-login recovery on the earlier Core. WorkBuddy HTTPS + API key has passed remote file reads/writes. Those results describe the recorded deployments; this CLI rebrand does not rerun their external services automatically. See [clients](CLIENTS.md) and the [validation archives](README.md#validation-archives).
+
+## Preview limits
+
+Windows native installation and the new CLI's Linux release acceptance remain pending. The macOS App is not distributed as a signed, notarized public download. OAuth provider provisioning, general user-defined script hooks and multi-computer orchestration are future work.
+
+[Install](INSTALL.md) · [Remote setup](REMOTE_SETUP.md) · [Platforms](PLATFORMS.md)

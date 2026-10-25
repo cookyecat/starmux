@@ -1,6 +1,6 @@
 # Remote installation: HTTPS + API key, or ChatGPT OAuth
 
-This guide follows the paths exercised with the real Gateway and Desktop Commander. Start with [local installation](INSTALL.md). Commands use the installed `mac-mcp-gateway` CLI. Shell examples use POSIX syntax; on Windows set environment variables in PowerShell and use the corresponding `.bat` Keycloak commands.
+This guide follows the paths exercised with the real Gateway and Desktop Commander. Start with [local installation](INSTALL.md). Commands use the installed `starmux` CLI. Shell examples use POSIX syntax; on Windows set environment variables in PowerShell and use the corresponding `.bat` Keycloak commands.
 
 For help choosing between the three authentication modes, read [the access-control comparison](ACCESS_CONTROL.md#choose-an-authentication-mode). For other guides, use the [documentation index](README.md).
 
@@ -16,35 +16,34 @@ HTTPS and Tunnel are transport choices; API key and OAuth are authentication cho
 
 A Core has one active authentication mode. Switching to OAuth makes existing API keys unusable on that Core, and vice versa. This guide configures one Core at a time, not simultaneous API-key/OAuth listeners. The separate acceptance instances used during development are not a prerequisite for ordinary installation.
 
-## 1. Install locally and choose permissions
-
-Follow [Install](INSTALL.md), then confirm the port in `mac-mcp-gateway status`. Examples below use **18893**; replace it everywhere if your startup panel reports another port.
-
-For the full coding workflow on macOS, explicitly choose the trusted role:
+## 1. Start locally
 
 ```sh
-mac-mcp-gateway setup --access-role trusted --connection https --approve-trusted-developer
-mac-mcp-gateway doctor
+starmux up
+starmux status
 ```
 
-Use `--connection tunnel` for that preference instead. Setup saves a preference; it does not provision DNS, certificates, a proxy, a Tunnel or an authorization server. Existing profiles are not overwritten; follow the replacement instructions in [Install](INSTALL.md). Linux/Windows trusted mode also requires `--approve-unrestricted` and uses OS-account permissions, not the macOS Home-only sandbox.
+Use `starmux up --code` for file editing, Shell and Git. The first activation asks for confirmation. Examples below use port **18893**; use the actual port printed by `status`.
 
-Authentication grants access to the **existing owner-approved policy**. It does not assign separate workspaces or Shell sandboxes to different keys/accounts.
+The full route is:
 
-All commands and the running Core must use the same access store, normally `~/.config/mac-mcp-gateway/access-v1.json`. If using an isolated store, set `MAC_MCP_ACCESS_FILE` to the same absolute path in every management terminal and in the Core launcher. Otherwise you may configure or revoke credentials in a store the server is not using.
+```text
+AI client → HTTPS / protected Tunnel → authentication → 127.0.0.1:18893/mcp → tools
+```
+
+Starmux starts the local service. Choose one of the following routes to connect a remote client. Each key or login uses the instance's approved tool permissions.
 
 ## 2. HTTPS + Bearer API key
 
 ### Create the credential before exposing MCP
 
 ```sh
-mac-mcp-gateway access create "WorkBuddy"
-mac-mcp-gateway access mode api-key
-mac-mcp-gateway access status
-mac-mcp-gateway run
+starmux auth key "WorkBuddy"
+starmux auth
+starmux up
 ```
 
-Save the secret shown once in the client's private configuration. Gateway keeps its digest, not the secret. A credential ID from `access list` is not the Bearer secret.
+Save the secret shown once in the client's private configuration. Gateway keeps its digest, not the secret. A credential ID from `auth` is not the Bearer secret.
 
 ### Route HTTPS to the loopback Core
 
@@ -98,7 +97,7 @@ For a Codex HTTP MCP configuration, the official client supports an environment-
 ```toml
 [mcp_servers.my_gateway]
 url = "https://mcp.example.com/mcp"
-bearer_token_env_var = "MAC_MCP_API_KEY"
+bearer_token_env_var = "STARMUX_TOKEN"
 ```
 
 Set that variable securely in the environment of the actual Codex process; setting it in an unrelated terminal does not configure an already running desktop app. This is a documented configuration example, not a claim that this exact Codex API-key path has received project acceptance. See [official Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
@@ -107,11 +106,11 @@ Set that variable securely in the environment of the actual Codex process; setti
 
 1. From the remote client, explicitly select this Gateway and call `health_check`.
 2. Read an owner-approved test file. If trusted coding is enabled, create, read back and run a small script in a dedicated test directory. Do not substitute the client's own local tools.
-3. Run `mac-mcp-gateway access list`, identify that client's credential, then `mac-mcp-gateway access revoke CREDENTIAL_ID`.
+3. Run `starmux auth`, identify that client's credential, then `starmux auth revoke CREDENTIAL_ID`.
 4. The next MCP request with that key must fail with HTTP 401. A missing/wrong key must also fail. Already-running tools are not canceled.
 5. Create a new key to restore access; update the client's private configuration.
 
-Local `mac-mcp-gateway verify` in API-key mode reads `MAC_MCP_API_KEY` from its environment. Local PASS is not external acceptance. [WorkBuddy evidence and limits](VALIDATION_WORKBUDDY.md).
+Local `starmux verify` in API-key mode reads `STARMUX_TOKEN` from its environment. Local PASS is not external acceptance. [WorkBuddy evidence and limits](VALIDATION_WORKBUDDY.md).
 
 ## 3. OAuth: deploy the authorization server
 
@@ -132,7 +131,7 @@ Create your ChatGPT custom MCP definition and copy its **exact callback URL**. K
 2. Generate the realm import; use your hostname and callback:
 
 ```sh
-mac-mcp-gateway access oauth keycloak-realm \
+starmux auth oauth init-keycloak \
   --resource https://auth.example.com/mcp \
   --callback https://chatgpt.com/connector/oauth/YOUR_CALLBACK_ID > gateway-realm.json
 ```
@@ -203,18 +202,18 @@ Before enabling public MCP access, configure Core authentication as below. If th
 ## 4. Configure Core and ChatGPT
 
 ```sh
-mac-mcp-gateway access oauth configure \
+starmux auth oauth setup \
   --issuer https://auth.example.com/realms/gateway \
   --resource https://auth.example.com/mcp \
   --client-id gateway-chatgpt \
   --token-auth client_secret_basic \
-  --subjects OWNER_USER_ID
-mac-mcp-gateway access oauth doctor
-mac-mcp-gateway access mode oauth
-mac-mcp-gateway run
+  --subject OWNER_USER_ID
+starmux auth oauth doctor
+starmux auth mode oauth
+starmux up
 ```
 
-If the Core is already running with this same store, configuration changes apply to subsequent requests; do not start a duplicate Core. `doctor` verifies provider discovery, not a remote login. Confirm that unauthenticated `/mcp` requests return 401, while `https://auth.example.com/.well-known/oauth-protected-resource/mcp` is publicly readable.
+Authentication changes apply to subsequent requests immediately. Repeating `starmux up` is safe and reuses the running instance. `doctor` verifies provider discovery, not a remote login. Confirm that unauthenticated `/mcp` requests return 401, while `https://auth.example.com/.well-known/oauth-protected-resource/mcp` is publicly readable.
 
 In ChatGPT's custom MCP definition choose OAuth and **custom/provided client**, client ID `gateway-chatgpt`, its client secret, token authentication `client_secret_basic`, and base/default scope `gateway:access`. Keep OIDC/domain claim off for this setup. Let discovery populate endpoints. Do not select DCR or CIMD for this reference deployment. See the complete [field table](OAUTH.md#what-to-enter-in-chatgpt) and [OpenAI authentication documentation](https://developers.openai.com/plugins/build/auth).
 
@@ -236,20 +235,20 @@ Provision your own Tunnel and runtime credential using [OpenAI's guide](https://
 
 1. In Keycloak, register a dedicated bearer-only OpenID Connect resource client (e.g. `gateway-tunnel-resource`) with the attribute `resource_url` equal to that exact value; disable login/service-account flows for it.
 2. In client scope `gateway:access`, add an **Audience** mapper with Included Client Audience `gateway-tunnel-resource` and Add to access token enabled. Registering only the client is insufficient: Keycloak must grant the audience before it narrows the issued token to the requested resource URL.
-3. Re-run the Core configure command above with `--resource-aliases 'EXACT_DISCOVERED_RESOURCE_URL'` appended, then run `mac-mcp-gateway access oauth doctor`. Multiple exact aliases can be comma-separated (maximum eight). Reconfiguration without the option removes existing aliases, so include all intended aliases when updating. The canonical `--resource` remains unchanged.
+3. Re-run the Core configure command above with `--resource-aliases 'EXACT_DISCOVERED_RESOURCE_URL'` appended, then run `starmux auth oauth doctor`. Multiple exact aliases can be comma-separated (maximum eight). Reconfiguration without the option removes existing aliases, so include all intended aliases when updating. The canonical `--resource` remains unchanged.
 4. Save the ChatGPT settings, sign in as the allowed owner and consent to the owner-approved tools.
 
 Aliases are explicitly configured identifiers for this same Gateway, not trust in all Tunnel traffic. Core still verifies signature, issuer, client, subject, scope, lifetime and session revocation. No Core network-transport-specific identity inference is introduced.
 
-The browser must reach the HTTPS login page, and the local Tunnel/Core must reach the issuer. With this same-origin layout, turning off IPv6 on an IPv6-only host breaks those dependencies even though the outbound Tunnel control connection may remain alive. Fake-IP DNS/TUN interception can also break resolution: fix the intended hostname route, not certificate validation. Update DNS, proxy bind and any hosts override together when the address changes.
+The browser and the Starmux host must both reach the public issuer. See [network troubleshooting](#network-troubleshooting) if discovery or login fails.
 
 ## 5. Acceptance, management and recovery
 
 From a fresh ChatGPT conversation, select the OAuth plugin and request `health_check`, followed by a read/write/run test confined to an explicitly approved disposable directory. Compare the result with Core audit entries showing `verified-oauth`; a successful login or tool list alone does not prove coding works.
 
 ```sh
-mac-mcp-gateway access list
-mac-mcp-gateway access revoke-oauth CONNECTION_ID
+starmux auth
+starmux auth revoke CONNECTION_ID
 ```
 
 Revocation blocks that **session** on subsequent requests, including new tokens issued by refresh for the same session. It does not cancel already-running tools, undo files written earlier, revoke all clients, or globally disable that account. To deny an account completely, remove its subject from the configured allowlist. Reauthentication with a fresh authorized provider session can restore access; do not erase revocation records. If provider SSO keeps reusing the revoked session, end that provider session before logging in again.
@@ -270,3 +269,12 @@ Manage keys/sessions in the local **Dashboard → Access control**. The macOS Ap
 The local App, Core, proxy, database, provider and Tunnel have separate process lifecycles. Stopping Core stops new tool service; it does not automatically shut down the others. Persist private configuration and PostgreSQL/Caddy data, configure service startup deliberately, and repeat acceptance after reboot or deployment changes.
 
 [OAuth contracts and acceptance evidence](OAUTH.md) · [Access control](ACCESS_CONTROL.md) · [Install](INSTALL.md) · [README](../README.md)
+
+
+## Network troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Issuer discovery or login cannot connect | Resolve the hostname and test HTTPS from both the host and the browser network. |
+| IPv6-only endpoint is unreachable | Confirm IPv6 routing, current AAAA record, proxy bind and client network support. |
+| Fake-IP DNS or TUN interception breaks discovery | Correct the hostname route in the local network tool; retain TLS certificate verification. |

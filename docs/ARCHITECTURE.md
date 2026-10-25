@@ -7,7 +7,7 @@ Remote MCP Client(s)
        |                                                              |
        +--> Secure MCP Tunnel (outbound, OpenAI infrastructure) --------+
                                                                       |
-                                                      Mac MCP Gateway Core
+                                                      Starmux Core
                                                       localhost MCP + policy
                                                                       |
                                                Desktop Commander MCP (stdio)

@@ -1,4 +1,4 @@
-# Connect ChatGPT to Mac MCP Gateway
+# Connect ChatGPT to Starmux
 
 **Your Gateway is running on your Mac. How does ChatGPT reach it?**
 
@@ -18,8 +18,8 @@ This is a guide for **your own private ChatGPT connection**, not a claim that th
 
 ## Before either connection
 
-1. Install and start Mac MCP Gateway using [Local installation](INSTALL.md).
-2. Run `mac-mcp-gateway status` and confirm **Core: RUNNING / Healthy**. Note your **actual local port**. New source setups usually use **18893**; the maintainer's existing setup may use **8793**.
+1. Install and start Starmux using [Local installation](INSTALL.md).
+2. Run `starmux status` and confirm **Core: RUNNING / Healthy**. Note your **actual local port**. The initial default port is **18893**; use the actual value shown by `status`.
 3. The **local** MCP address is `http://127.0.0.1:<PORT>/mcp`. You don't paste that into ChatGPT: ChatGPT runs in the cloud and cannot dial your Mac's `localhost`.
 4. Start with a **restricted read-only** profile. Remote caller authentication and permission to use a tool are separate from simply discovering that tool.
 
@@ -35,7 +35,7 @@ ChatGPT → https://mcp.your-domain.example/mcp
         → HTTPS :443 + authentication
         → reverse proxy on your Mac
         → http://127.0.0.1:<PORT>/mcp
-        → Mac MCP Gateway → Desktop Commander
+        → Starmux → Desktop Commander
 ```
 
 The public domain points to **your** machine or home router, not to the Gateway's loopback port. Here are the steps.
@@ -100,7 +100,7 @@ Visit [OpenAI Platform Tunnel settings](https://platform.openai.com/settings/org
 
 Creating or editing a Tunnel requires **Tunnels Read + Manage** permission; running `tunnel-client` or choosing a Tunnel in ChatGPT requires **Tunnels Read + Use**. Ask your organization/workspace admin if these controls aren't available.
 
-Save your **own `tunnel_id`**. The Mac MCP Gateway release doesn't bundle the maintainer's Tunnel ID, organization identity or runtime credential.
+Save your **own `tunnel_id`**. The Starmux release doesn't bundle the maintainer's Tunnel ID, organization identity or runtime credential.
 
 ### Step 2 — Run the official tunnel-client on your Mac
 

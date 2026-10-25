@@ -1,114 +1,177 @@
 <div align="center">
 
-# Mac MCP Gateway
+# Starmux
 
-### A self-hosted remote workbench for Desktop Commander.
+### Your computer. Your tools. Connected to your AI.
 
-Connect your AI client to files, terminals and development tools on your own computer. **Choose what AI can access. Start, stop and revoke access on your terms.**
+Connect remote AI clients to files, terminals and development tools on your own computer. **Keep your development environment. Choose what AI can do. Start, stop and revoke access on your terms.**
 
-**ChatGPT web · Codex · WorkBuddy · Doubao**
+**Self-hosted MCP · Native macOS menu bar App · Cross-platform CLI preview · MIT**
 
-**Three authentication choices · Cross-platform CLI preview · Native macOS App · MIT**
-
-[**Get started**](#get-started) · [**Choose authentication**](#choose-authentication) · [**Documentation**](docs/README.md)
+[Quick Start](#quick-start) · [Connect a client](docs/REMOTE_SETUP.md) · [Documentation](docs/README.md)
 
 </div>
-
-> **Community preview — available from source.** ChatGPT OAuth over Tunnel and WorkBuddy HTTPS + API-key file access have been tested. See [client compatibility](docs/CLIENTS.md) for the exact combinations, including Claude App as a validation target.
 
 ## Your AI client here. Your tools there.
 
-Use your preferred AI client to read a project, edit files and run tests on the computer hosting Gateway. In owner-approved coding mode, Desktop Commander's native tools remain available, subject to your permission policy and upstream controls.
+Your repositories, runtimes and development tools already live on your computer. Starmux lets your AI client work with that environment through a self-hosted MCP connection: inspect a project in read-only mode, or enable coding to edit files, run tests and use Git.
 
-- **Keep your development environment.** Work with the repositories, runtimes and tools already on your computer.
-- **Host your own MCP connection.** No Desktop Commander hosted relay is required. Use HTTPS or a protected Tunnel for network access.
-- **Control the same Core from CLI or App.** The CLI/Core spans macOS, Linux and Windows previews; the native App currently supports macOS.
+- **Keep the tools you know.** Work with the files and software already installed on the host.
+- **Choose your AI client.** Use a compatible remote MCP client through HTTPS or a protected Tunnel.
+- **Stay in control.** Start safely with read-only access. Enable coding deliberately, give clients their own credentials and revoke access when needed.
 
-This is an independent project built around [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP). It provides its own MCP connection; it does not replace the backend inside the official Desktop Commander plugin. The first release focuses on the [community request for self-hosting](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/714).
+Install Starmux on the **computer whose files and tools you want to use**. Your AI client can run elsewhere.
+
+## Quick Start
+
+### 1. Install
+
+Requires Node.js **22.12 or newer**.
+
+```bash
+npm install -g starmux
+```
+
+### 2. Start in your project
+
+```bash
+cd /path/to/your/project
+
+# Safe read-only mode (default)
+starmux up
+
+# Full coding mode: file edits, Shell and Git
+starmux up --code
+```
+
+Starmux initializes itself and runs in the background. Coding mode asks for confirmation the first time; `--code` and `--write` are equivalent. Coding tools use your OS account's permissions, with the project as their default working directory.
+
+```text
+Starmux · default · running
+Workspace  /path/to/your/project
+Mode       Read-only
+Runtime    background
+MCP        http://127.0.0.1:18893/mcp
+Dashboard  http://127.0.0.1:18893/access
+Logs       starmux logs -f -i "default"
+```
+
+### 3. Create an API key (optional)
+
+For clients that support Bearer authentication:
+
+```bash
+starmux auth key "My AI Client"
+```
+
+This creates a key and enables API-key authentication immediately. Copy the key into your client's private configuration.
 
 ## How it connects
 
-![Remote AI clients connect through HTTPS or a protected Tunnel to Gateway Core and Desktop Commander.](docs/assets/mcp-gateway-simple.svg)
+![AI clients connect through HTTPS or a protected Tunnel to Starmux and workspace tools.](docs/assets/mcp-gateway-simple.svg)
 
-Install Gateway on the **computer whose files and tools you want to use**. Your AI client can run elsewhere. HTTPS or Tunnel carries the connection; the authentication choice below controls access; your permission profile determines what tools may do.
 
-## Choose authentication
-
-Start with the option your client and deployment support. You do not need to configure all three.
-
-| Your situation | Choose | What setup involves |
-| --- | --- | --- |
-| You already use a protected Tunnel or another ingress that restricts access | **Access managed by your connection** (`ingress`) | No Gateway key or OAuth server. Configure access in the ingress you already operate. |
-| Your client accepts a Bearer key, such as WorkBuddy | **API Key** | Create a key per client, add it to the client configuration and revoke it independently. |
-| Your client supports browser login and consent, such as ChatGPT web | **OAuth** | Users sign in and approve access; the client manages tokens. The host operator must first deploy an authorization server. |
-
-**The default is ingress-managed access, with no shared factory key.** For remote use, the ingress must actually restrict who can connect. HTTPS encryption alone is not authentication. One Core uses one active mode.
-
-All three choices retain the same owner-approved tool permissions. A key or OAuth login does not create a separate workspace or sandbox for each user. Manage Gateway keys and OAuth sessions through the CLI or **Dashboard → Access control**; ingress-managed access is revoked at the ingress.
-
-[Compare modes and manage access](docs/ACCESS_CONTROL.md) · [API Key deployment](docs/REMOTE_SETUP.md#2-https--bearer-api-key) · [OAuth deployment](docs/REMOTE_SETUP.md#3-oauth-deploy-the-authorization-server)
-
-## Get started
-
-1. **Install on your tool host.** Follow [local installation](docs/INSTALL.md) to install the CLI and choose a read-only or coding permission profile. Source installation requires Git and Node.js 22.12+.
-2. **Connect your AI client.** Follow [remote deployment](docs/REMOTE_SETUP.md) for HTTPS + API Key or ChatGPT OAuth, or the [protected Tunnel guide](docs/CONNECT_CHATGPT.md#2-secure-mcp-tunnel--no-inbound-port) for ingress-managed access.
-3. **Verify a real tool call.** Ask the connected client to check Gateway health and read an approved test file. Local health or a connected icon alone does not verify remote tool execution.
-
-After installation, everyday control is simple:
-
-```sh
-mac-mcp-gateway run
-mac-mcp-gateway status   # In another terminal while the Core runs
-mac-mcp-gateway stop
+```text
+AI client
+    → HTTPS / protected Tunnel
+    → authentication: ingress | API key | OAuth
+    → Starmux at 127.0.0.1:<port>/mcp
+    → your files and development tools
 ```
 
-Setup configures the local Gateway. It does not provision DNS, TLS, a Tunnel or an OAuth server. [Installation and configuration guides →](docs/README.md)
+HTTPS or a protected Tunnel carries the connection; authentication determines who can connect; the permission mode controls what tools can do. Start with the route your client supports:
+
+
+| Client or deployment | Next step |
+| --- | --- |
+| WorkBuddy or a client accepting Bearer headers | [HTTPS + API key](docs/REMOTE_SETUP.md#2-https--bearer-api-key) |
+| ChatGPT with browser login | [OAuth provider and connection setup](docs/OAUTH.md) |
+| An existing protected ingress or MCP Tunnel | [Remote connection guide](docs/REMOTE_SETUP.md) |
+
+The guide connects the pieces: DNS, HTTPS/proxy or Tunnel, authentication, and a real client tool call. These network services are configured separately from Starmux.
+
+## Everyday commands
+
+```bash
+starmux status
+starmux verify          # Local MCP handshake and directory read
+starmux doctor          # Environment and configuration checks
+starmux dashboard      # Open the local Access console
+starmux logs -f
+starmux down            # Alias: stop
+```
+
+After initialization, `up` reuses your saved workspace. Use `starmux up .` to switch it to your current directory, or pass another path. `--foreground` keeps the process in your terminal.
+
+## A quiet place to keep an eye on things
+
+The native macOS menu bar App puts service health, workspace permissions, connection topology and recent tool activity in one compact panel. Start or stop the selected workspace, open its Access console, and keep the details close without leaving a management window open.
+
+<div align="center">
+  <img src="docs/assets/starmux-app-en.png" width="430" alt="Starmux menu bar showing service status, controls, connection topology and recent tool activity" />
+  <p><sub>Native macOS menu bar App · English and Chinese · Development build</sub></p>
+</div>
+
+The App and CLI control the same instances. Quitting the App stops only instances it started; CLI background instances keep running. [App build instructions](app/README.md)
+
+## More than one workspace
+
+```bash
+starmux up ~/work/repo-a -i work --code
+starmux up ~/personal/blog -i blog --read
+starmux ls
+starmux down -i work
+
+starmux config edit -i blog
+starmux config apply -i blog
+```
+
+Instance names are your labels. Each instance has its own port, configuration, credentials, policies and logs. [Instances and configuration →](docs/INSTANCES.md)
 
 ## AI client compatibility
 
-| Client | Current validation |
-| --- | --- |
-| **ChatGPT web** | Tested: Tunnel + OAuth, including coding and session revocation |
-| **Codex** | Tested: installed Gateway plugin through protected Tunnel |
-| **WorkBuddy** | Tested: HTTPS + IPv6 + API-key file reads/writes |
-| **Doubao (豆包)** | Owner-reported successful use; connection details not yet recorded |
-| **Claude App** | Compatibility target; Gateway end-to-end validation pending |
+These are recorded project workflows, including those validated before the Starmux rename. They are not a claim that every client, authentication mode and platform combination has passed the new release.
 
-[Exact test scope, connection guides and pending combinations](docs/CLIENTS.md)
+| Client | Recorded validation |
+| --- | --- |
+| **ChatGPT web** | Tunnel + OAuth, including coding and session revocation |
+| **Codex** | Installed Gateway plugin through protected Tunnel |
+| **WorkBuddy** | HTTPS + IPv6 + API-key file reads and writes on macOS |
+| **Doubao (豆包)** | Owner-reported successful use; connection details not recorded |
+| **Claude App** | Compatibility target; end-to-end validation pending |
+
+[Exact test scope and client setup guides](docs/CLIENTS.md)
 
 ## Platform support
 
-| Gateway host | Core / CLI | Native App |
+| Tool host | Core / CLI | Native App |
 | --- | --- | --- |
-| **macOS** | Tested locally and in recorded remote workflows | SwiftUI source / development builds |
-| **Linux** | Preview; Ubuntu arm64 local integration tests passed | Not available |
+| **macOS** | Starmux 0.10.0 local and published-package workflow tested | SwiftUI development build |
+| **Linux** | Preview; earlier Core tests passed on Ubuntu arm64; new CLI release acceptance pending | Not available |
 | **Windows** | Preview implementation; native validation pending | Not available |
 
-[Platform setup and permission differences](docs/PLATFORMS.md). The project retains the `mac-mcp-gateway` name for now.
+[Platform details](docs/PLATFORMS.md) · [Release status](docs/RELEASE_STATUS.md). The macOS App is currently an ad-hoc developer build; a signed, notarized public download is not yet available.
 
-<div align="center">
-  <img src="docs/assets/mac-mcp-gateway-menu-en.png" width="365" alt="Native macOS menu bar App showing Gateway status, controls and tool activity" />
-  <p><sub>Native macOS App · English and Chinese supported</sub></p>
-</div>
+## Where this is going
 
-## Before deploying
+Starmux began with the [community request for a self-hosted Desktop Commander workbench](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/714). The first priority is a clear path from a local workspace to a real tool call in your preferred AI client.
 
-- **OAuth currently needs operator setup.** Automatic provider deployment and a native OAuth setup wizard are not shipped. A signed, notarized public macOS App download is also not yet available.
-- **Choose coding permissions deliberately.** Trusted mode enables native tools and Shell. The macOS Home-write sandbox is specific to the configured Desktop Commander process; Linux/Windows trusted mode uses OS-account permissions. Credentials do not isolate those tools from the owner's account.
-- **This is a community preview.** Independent first-user setup and sustained operation across deployment combinations still need validation. [Release status](docs/RELEASE_STATUS.md) · [Security boundaries](docs/SECURITY.md)
+The longer-term direction is a gateway for more MCP servers and clients, with programmable middleware. A public Middleware SDK and user-script plugins are not shipped. Contributions to first-user setup, client compatibility and platform testing are welcome.
 
-## Roadmap and contributing
+## Documentation and support
 
-The first release focuses on a self-hosted Desktop Commander workbench. The longer-term direction is a general-purpose Gateway for more MCP servers and clients, with programmable middleware. A public Middleware SDK and user-script plugins are not shipped.
+- [Installation](docs/INSTALL.md) and [documentation index](docs/README.md)
+- [Authentication](docs/ACCESS_CONTROL.md) and [permission boundaries](docs/SECURITY.md)
+- [Migrate from Mac MCP Gateway](docs/MIGRATION.md)
+- [Client compatibility](docs/CLIENTS.md), [platform support](docs/PLATFORMS.md), and [release status](docs/RELEASE_STATUS.md)
+- [Contributing](CONTRIBUTING.md) and [architecture](docs/ARCHITECTURE.md)
 
-Core and CLI use strict TypeScript; the macOS App uses SwiftUI. Contributions to setup, client compatibility and platform testing are welcome.
+Starmux 0.10.0 is a preview. The CLI supports macOS, Linux and Windows; the native macOS App is available as a development build. See the linked compatibility pages for tested combinations.
 
-[Contributing and development commands](CONTRIBUTING.md) · [Architecture](docs/ARCHITECTURE.md) · [Report a security issue](SECURITY.md)
+## Built with Desktop Commander
+
+Starmux includes a pinned [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) dependency, installed automatically with npm. You do not need to install it separately. Starmux supplies its own self-hosted MCP connection and lifecycle controls.
 
 ## License
 
-Gateway original code is **[MIT licensed](LICENSE)**. Desktop Commander is a separate upstream project with its own license and notices. Mac MCP Gateway is independent of, and not endorsed by, Desktop Commander, OpenAI, Anthropic or Tencent.
-
-### Named instances and configuration
-
-The App and CLI support named local instances with independent configuration, credentials, policies and logs. Start with `mac-mcp-gateway instance create dev --project /absolute/project`, then `mac-mcp-gateway run --instance dev`. Configuration can be edited in the App, imported, or linked to a JSONC file. Saving does not restart an instance; apply changes explicitly. Quitting the App stops only instances started by that App session. See [Instances and configuration](docs/INSTANCES.md) for the full workflow and migration preview.
+Starmux original code is [MIT licensed](LICENSE). Desktop Commander retains its own license and notices. This independent project is not endorsed by Desktop Commander or AI client vendors.
