@@ -12,7 +12,7 @@ import { parseJSON,record } from "../src/validation.js";
 const jsonRecord = (text: string) => record(parseJSON(text));
 
 const root=packageRoot;
-const bin=path.join(root,"bin/mac-mcp-gateway.mjs");
+const bin=path.join(root,"dist/src/cli/mac-mcp-gateway.js");
 const active: GatewayStatus={event:"GATEWAY_STATUS",profile:"live",installed:true,registered:false,
   label:"ai.home.mac-mcp-project-workspace",port:8793,health:"ok",workspaceMode:"read-write",
   executionMode:"foreground",listenerPid:1234,loginAutostart:"disabled",
@@ -20,7 +20,7 @@ const active: GatewayStatus={event:"GATEWAY_STATUS",profile:"live",installed:tru
 assert.deepEqual(parseArgs(["status"]),{action:"status",options:{}});
 assert.deepEqual(parseArgs(["run","--json"]),{action:"run",options:{json:true}});
 const identity=await runtimeIdentity();
-assert.match(identity.buildVersion,/0\.9\.0 \(sha256:[a-f0-9]{16}\)/);
+assert.match(identity.buildVersion,/0\.10\.0 \(sha256:[a-f0-9]{16}\)/);
 assert.equal(identity.coreProgram,path.join(root,"dist/src/dc-workspace-http.js"));
 const startup=formatStartup({...identity,configSource:"/example/onboarding-v1.json",port:18893});
 for(const label of ["Config source","Core program","Build version","Listening port"])
@@ -34,8 +34,8 @@ assert.deepEqual(parseArgs(["status","--json","--profile","setup"]),
   {action:"status",options:{json:true,profile:"setup"}});
 assert.throws(()=>parseArgs(["stop","--json"]),/MISSING_OPTION_VALUE|INVALID_OPTION/);
 assert.throws(()=>parseArgs(["status","--json","--json"]),/DUPLICATE_JSON_OPTION/);
-const text=formatGatewayStatus(active,{version:"0.9.0"});
-assert.match(text,/Mac MCP Gateway\s+v0\.9\.0/);
+const text=formatGatewayStatus(active,{version:"0.10.0"});
+assert.match(text,/Mac MCP Gateway\s+v0\.10\.0/);
 assert.match(text,/● RUNNING\s+Healthy/);
 assert.match(text,/http:\/\/127\.0\.0\.1:8793/);
 assert.match(text,/Dashboard\s+http:\/\/127\.0\.0\.1:8793\/dashboard/);

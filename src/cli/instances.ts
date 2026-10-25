@@ -66,7 +66,7 @@ export async function maybeHandleInstances(argv:string[]):Promise<boolean>{
   }
   return true;
 }
-async function handle(command:string,args:string[]){
+export async function handle(command:string,args:string[]){
   const {flags,positional}=options(args);const json=flags.has('--json');
   const known=new Set([...booleans,'--instance','--name','--project','--port','--access-role','--connection','--profile','--app-parent-pid','--revision','--patch','--file','--output','--lines','--expires','--issuer','--resource','--resource-aliases','--client-id','--subjects','--registration','--token-auth','--callback','--target','--mode']);
   for(const flag of flags.keys())if(!known.has(flag))throw Error('UNKNOWN_OPTION: '+flag);

@@ -1,6 +1,6 @@
 import {supportedHost} from "../platform.js";
 import { z } from "zod";
-import { cliEntry,packageRoot,desktopCommanderEntry } from "../runtime-paths.js";
+import { legacyCliEntry as cliEntry,packageRoot,desktopCommanderEntry } from "../runtime-paths.js";
 import { errorCode,errorMessage,isInteger,parseJSON } from "../validation.js";
 const packageSchema=z.object({version:z.string(),dependencies:z.record(z.string())});
 // Minimal, portable local Gateway entrypoint. No implicit public network binding.

@@ -27,7 +27,7 @@ async function discover(profile:'setup'|'live'){
   const unsupported=Object.keys(env).filter(k=>k.startsWith('MAC_MCP_')&&!known.has(k));
   if(unsupported.length)throw Error('LEGACY_SETTINGS_REQUIRE_MANUAL_IMPORT: '+unsupported.join(', '));
   await validateConfig(config);
-  const root=instancesRoot();
+  const root=path.join(homedir(),'.config','mac-mcp-gateway');
   const files={access:env.MAC_MCP_ACCESS_FILE??path.join(root,'access-v1.json'),grants:env.MAC_MCP_GRANTS_FILE??path.join(root,'workspace-grants-v1.json'),deny:env.MAC_MCP_DENY_FILE??path.join(root,'deny-rules-v1.json')};
   let accessMode:'ingress'|'api-key'|'oauth'='ingress';
   if(await exists(files.access)){const state=JSON.parse(await readTrusted(files.access)) as {mode:typeof accessMode};accessMode=state.mode;}

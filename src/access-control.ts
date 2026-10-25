@@ -15,7 +15,7 @@ const schema=z.object({version:z.literal(1),mode:z.enum(['ingress','api-key','oa
 type State=z.infer<typeof schema>;
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 const equal=(a:string,b:string)=>a.length===b.length&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
-export const defaultAccessFile=()=>process.env.MAC_MCP_ACCESS_FILE||path.join(homedir(),'.config','mac-mcp-gateway','access-v1.json');
+export const defaultAccessFile=()=>process.env.MAC_MCP_ACCESS_FILE||path.join(homedir(),'.config','starmux','access-v1.json');
 const active=(c:Pick<z.infer<typeof credential>,'revokedAt'|'expiresAt'>)=>!c.revokedAt&&(!c.expiresAt||Date.parse(c.expiresAt)>Date.now());
 export async function createAccessControl(file=defaultAccessFile()){
   if(!path.isAbsolute(file))throw Error('ACCESS_FILE_ABSOLUTE_REQUIRED');
@@ -79,12 +79,12 @@ export async function createAccessControl(file=defaultAccessFile()){
     const data=await load();return {mode:data.mode,permission:'owner-default' as const,oauth:data.oauth??null,oauthConnections:data.oauthConnections,
       credentials:data.credentials.map(({digest:_,...c})=>({...c,status:c.revokedAt?'revoked':active(c)?'active':'expired'}))};
   }
-  async function create(name:string,expiresAt:string|null=null){
-    const secret='mgw_'+randomBytes(32).toString('base64url');
+  async function create(name:string,expiresAt:string|null=null,activate=false){
+    const secret='smx_'+randomBytes(32).toString('base64url');
     const c=credential.parse({id:randomBytes(12).toString('hex'),name,digest:digest(secret),createdAt:new Date().toISOString(),
       expiresAt,revokedAt:null,lastUsedAt:null,permission:'owner-default'});
     if(!active(c))throw Error('ACCESS_EXPIRY_MUST_BE_FUTURE');
-    await locked(async()=>{const data=await load();data.credentials.push(c);await save(data);});
+    await locked(async()=>{const data=await load();data.credentials.push(c);if(activate)data.mode='api-key';await save(data);});
     return {id:c.id,name:c.name,key:secret,permission:c.permission};
   }
   async function setMode(mode:'ingress'|'api-key'|'oauth'){
@@ -131,7 +131,7 @@ export async function createAccessControl(file=defaultAccessFile()){
     const data=await load();
     if(data.mode==='ingress')return {kind:'unverified-local'};
     if(data.mode==='oauth')return authenticateOAuth(data.oauth!,header);
-    if(!header||!/^Bearer mgw_[A-Za-z0-9_-]{43}$/i.test(header))throw Error('ACCESS_UNAUTHORIZED');
+    if(!header||!/^Bearer (?:mgw_|smx_)[A-Za-z0-9_-]{43}$/i.test(header))throw Error('ACCESS_UNAUTHORIZED');
     const hash=digest(header.slice(7));const c=data.credentials.find(c=>equal(c.digest,hash)&&active(c));
     if(!c)throw Error('ACCESS_UNAUTHORIZED');
     // Recheck under the mutation lock: revocation cannot be lost to a usage update.

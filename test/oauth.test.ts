@@ -69,7 +69,7 @@ test('OAuth discovery, JWT validation, live revocation and preserved MCP policy'
   for(const invalid of ['http://remote.example/mcp','https://tunnel.example/mcp#fragment','https://user:pass@tunnel.example/mcp'])
    assert.throws(()=>validateOAuthConfig({...config,resourceAliases:[invalid]}),/HTTPS/);
   await access.configureOAuth({...config,resourceAliases:[alias]});
-  const cli=fileURLToPath(new URL('../../bin/mac-mcp-gateway.mjs',import.meta.url));
+  const cli=fileURLToPath(new URL('../src/cli/mac-mcp-gateway.js',import.meta.url));
   const invoke=(args:string[])=>promisify(execFile)(process.execPath,[cli,'access','oauth',...args],
     {env:{...process.env,MAC_MCP_ACCESS_FILE:file}});
   assert.match((await invoke(['doctor'])).stdout,/"PASS"/);

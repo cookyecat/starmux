@@ -1,11 +1,11 @@
 {
-  "name": "mac-mcp-gateway",
-  "version": "0.9.0",
-  "description": "Self-hosted Mac MCP Gateway for remote AI clients and Desktop Commander MCP tools",
+  "name": "starmux",
+  "version": "0.10.0",
+  "description": "Connect AI clients to files, terminals and development tools on your own computer.",
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "os": [
     "darwin",
@@ -13,14 +13,14 @@
     "win32"
   ],
   "bin": {
-    "mac-mcp-gateway": "bin/mac-mcp-gateway.mjs"
+    "starmux": "bin/starmux.mjs"
   },
   "scripts": {
-    "setup": "node bin/setup-wizard.mjs",
-    "doctor:setup": "node bin/mac-mcp-gateway.mjs doctor-setup",
-    "start:setup": "node bin/mac-mcp-gateway.mjs run --profile setup",
-    "verify:setup": "node bin/verify-setup.mjs",
-    "status": "node bin/mac-mcp-gateway.mjs status",
+    "setup": "node bin/starmux.mjs init",
+    "doctor:setup": "node bin/starmux.mjs doctor",
+    "start:setup": "node bin/starmux.mjs up",
+    "verify:setup": "node bin/starmux.mjs verify",
+    "status": "node bin/starmux.mjs status",
     "remote:revoke": "node bin/community-remote-revoke.mjs",
     "test": "npm run build && node dist/test/run.js",
     "build": "node scripts/build.mjs",
@@ -44,29 +44,17 @@
   },
   "files": [
     "dist/src",
-    "bin/*.mjs",
     "src/dc-workspace-http.mjs",
     "scripts/prepare.mjs",
     "test/fixtures/p1-fixture.txt",
     "LICENSE",
     "README.md",
-    "docs/ACCESS_CONTROL.md",
-    "docs/OAUTH.md",
-    "docs/REMOTE_SETUP.md",
-    "docs/INSTALL.md",
-    "docs/INSTANCES.md",
-    "docs/CONNECT_CHATGPT.md",
-    "docs/PLATFORMS.md",
-    "docs/VALIDATION_WORKBUDDY.md",
-    "docs/VALIDATION_TUNNEL.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
-    "docs/README.md",
-    "docs/CLIENTS.md",
-    "docs/SECURITY.md",
-    "docs/RELEASE_STATUS.md",
-    "docs/ARCHITECTURE.md",
-    "docs/assets/mcp-gateway-simple.svg",
-    "docs/assets/mac-mcp-gateway-menu-en.png"
+    "bin/starmux.mjs",
+    "docs/*.md",
+    "docs/assets/*.svg",
+    "docs/assets/starmux-app-en.png",
+    "app/README.md"
   ]
 }

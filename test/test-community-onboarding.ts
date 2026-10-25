@@ -17,7 +17,7 @@ assert.equal(record(record(lock.packages)["node_modules/@wonderwhy-er/desktop-co
 console.log("RELEASE_LOCK_METADATA_PASS");
 const root=await mkdtemp(path.join(repo,"test","fixtures",".community-"));
 const home=await mkdtemp(path.join(tmpdir(),"gateway-doctor-home-"));
-const entry=path.join(repo,"bin","mac-mcp-gateway.mjs");
+const entry=path.join(repo,"dist","src","cli","mac-mcp-gateway.js");
 const env={HOME:home,PATH:process.env.PATH,LANG:"C",MAC_MCP_PROJECT_PORT:"0"};
 const spawnCli=(args: string[],changes: NodeJS.ProcessEnv={})=>spawn(process.execPath,[entry,...args],{
  cwd:repo,env:{...env,...changes},stdio:["ignore","pipe","pipe"]});

@@ -44,6 +44,6 @@ export async function oauthCommand(args:string[]){
   if(c.resourceAliases?.length)process.stdout.write(`  Resource aliases: ${c.resourceAliases.join(', ')}\n`);
   process.stdout.write(`  Mode          ${state.mode}\n  Issuer        ${c.issuer}\n  Resource      ${c.resource}\n  Discovery     ${metadataUrl(c)}\n  Registration  ${c.clientRegistration}\n  Client ID     ${c.clientId}\n  Token auth    ${c.tokenEndpointAuthMethod}\n  Scope         ${c.scope}\n  Permission    Owner default\n  Transport     ${c.allowLoopbackHttp?'Development: loopback HTTP allowed':'HTTPS required'}\n\n`);
   for(const connection of state.oauthConnections)process.stdout.write(`  ${connection.revokedAt?'Revoked':'Active'} · ${connection.clientId}\n    ID: ${connection.id}\n    Last used: ${connection.lastUsedAt}\n`);
-  if(action==='configure')process.stdout.write('  Configuration saved. Enable explicitly: mac-mcp-gateway access mode oauth\n');
+  if(action==='configure')process.stdout.write('  Configuration saved. Enable explicitly: starmux auth mode oauth\n');
   process.stdout.write('  Remote ChatGPT authorization is not verified by this command.\n\n');
 }

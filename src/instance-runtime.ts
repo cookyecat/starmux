@@ -14,7 +14,7 @@ import {atomicPrivate,changeRegistry,availablePort,ensureAccessReady,exists,inst
 const metadataSchema=z.object({instanceId:z.string().uuid(),runId:z.string().regex(/^[a-f0-9]{32}$/),pid:z.number().int().min(2),token:z.string().regex(/^[a-f0-9]{64}$/),launcher:z.enum(['cli','app']),appParentPid:z.number().int().nullable()}).strict();
 type Owner=z.infer<typeof metadataSchema>;
 export type ActiveConfig={config:InstanceConfig;revision:string;effectiveRevision:string;sourcePath:string};
-export type RuntimeState={instanceId:string;runId:string;pid:number;launcher:'cli'|'app';appParentPid:number|null;
+export type RuntimeState={instanceId:string;runId:string;pid:number;launcher:'cli'|'app';appParentPid:number|null;executionMode?:'foreground'|'background';
   phase:'starting'|'running'|'stopping'|'stopped'|'error';port:number|null;active:ActiveConfig|null;problem:string|null;coreProgram:string;buildVersion:string};
 function runtimePaths(id:string){
   const root=path.join(controlRoot(),'i-'+id);const socket=windows?'\\\\.\\pipe\\gateway-instance-'+createHash('sha256').update(root).digest('hex').slice(0,28):path.join(root,'control.sock');
@@ -74,10 +74,10 @@ export async function instanceStatus(instance:Instance,home=homedir()){
     label:instance.name,workspaceMode:runtime?.active?.config.mode??saved?.config.mode??null,
     writeScope:runtime?.active?.config.writeScope??saved?.config.writeScope??null,coreControl:runtime?.phase==='running'?'RUNNING':'unavailable',
     coreLauncher:runtime?.launcher??'unknown',coreOwnerPid:runtime?.pid??null,listenerPid:runtime?.pid??null,
-    executionMode:runtime?.phase==='running'?'foreground-owned':'stopped',loginAutostart:'disabled',
+    executionMode:runtime?.phase==='running'?(runtime.executionMode==='background'?'background':'foreground-owned'):'stopped',loginAutostart:'disabled',
     connectionState:health==='ok'?(lastToolCallAt?'local-ready-activity-recorded':'local-ready-remote-unverified'):health,requiredAccess:instance.requiredAccess};
 }
-export async function runInstance(instance:Instance,options:{home?:string;appParentPid?:number;json?:boolean;workerModule?:URL}={}){
+export async function runInstance(instance:Instance,options:{home?:string;appParentPid?:number;json?:boolean;background?:boolean;workerModule?:URL}={}){
   const home=options.home??homedir();const parent=options.appParentPid;
   if(parent!==undefined&&(!Number.isSafeInteger(parent)||parent<2||process.ppid!==parent))throw Error('APP_PARENT_IDENTITY_MISMATCH');
   if(instance.archived)throw Error('INSTANCE_ARCHIVED');
@@ -99,7 +99,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
   await atomicPrivate(p.meta,JSON.stringify(owner));
   },home);
   const identity=await runtimeIdentity();
-  const state:RuntimeState={instanceId:instance.id,runId:owner.runId,pid:process.pid,launcher:owner.launcher,appParentPid:parent??null,phase:'starting',port:null,active:null,problem:null,...identity};
+  const state:RuntimeState={instanceId:instance.id,runId:owner.runId,pid:process.pid,launcher:owner.launcher,appParentPid:parent??null,executionMode:options.background?'background':'foreground',phase:'starting',port:null,active:null,problem:null,...identity};
   let worker:ChildProcess|null=null;let portLease:Awaited<ReturnType<typeof acquireControl>>|null=null;let server:Server|null=null;
   let ending=false;let expectedWorkerExit=false;let sequence:Promise<unknown>=Promise.resolve();
   let finish!:()=>void;const finished=new Promise<void>(r=>{finish=r;});

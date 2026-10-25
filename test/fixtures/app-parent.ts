@@ -1,5 +1,5 @@
 import {spawn} from 'node:child_process';
-import {cliEntry} from '../../src/runtime-paths.js';
+import {legacyCliEntry as cliEntry} from '../../src/runtime-paths.js';
 const child=spawn(process.execPath,[cliEntry(),'run','--profile','setup','--app-parent-pid',String(process.pid)],{
   stdio:['ignore','inherit','inherit']
 });

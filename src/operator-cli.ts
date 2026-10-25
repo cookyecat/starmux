@@ -1,7 +1,7 @@
 import {ownedByUser,supportedHost,windows,childEnvKeys} from "./platform.js";
 import { privateAgentSchema,type PrivateAgent } from "./config-schemas.js";
 import type { GatewayStatus } from "./contracts.js";
-import { cliEntry,packageRoot } from "./runtime-paths.js";
+import { legacyCliEntry as cliEntry,packageRoot } from "./runtime-paths.js";
 import { runtimeIdentity,formatStartup } from "./runtime-identity.js";
 import { GatewayError,errorCode,errorMessage,errorStderr,isInteger,isSafeInteger,parseJSON,record } from "./validation.js";
 export interface CliOptions {home?:string;profile?:string;entry?:string;port?:number;controlRoot?:string;appParentPid?:number;json?:boolean;all?:boolean;target?:string;lines?:number}

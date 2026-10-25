@@ -1,7 +1,11 @@
 import {discoverOAuth,metadataUrl} from './oauth-resource.js';
 import type {IncomingMessage} from 'node:http';
 import type {AccessControl} from './access-control.js';
-export {permissionHeaders as accessHeaders} from './permissions-dashboard.js';
+import {permissionHeaders} from './permissions-dashboard.js';
+import {createHash} from 'node:crypto';
+const loginScript=`(()=>{const k='starmux-owner-token';const q=new URLSearchParams(location.hash.slice(1));const t=q.get('token');if(t){history.replaceState(null,'',location.pathname);sessionStorage.setItem(k,t);}const token=sessionStorage.getItem(k);if(token)for(const input of document.querySelectorAll('input[name="token"]'))input.value=token;})();`;
+const scriptHash=createHash('sha256').update(loginScript).digest('base64');
+export const accessHeaders=Object.freeze({...permissionHeaders,'content-security-policy':permissionHeaders['content-security-policy']+`; script-src 'sha256-${scriptHash}'`});
 const e=(s:unknown)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
 export function accessPage(state:Awaited<ReturnType<AccessControl['snapshot']>>,created?:{key:string}){
   const form=(op:string,fields:string,label:string)=>`<form method="post" action="/access"><input type="hidden" name="op" value="${op}">${fields}<label>Owner management token <input type="password" name="token" required autocomplete="off"></label><button>${label}</button></form>`;
@@ -20,7 +24,7 @@ export function accessPage(state:Awaited<ReturnType<AccessControl['snapshot']>>,
   <table><tr><th>Connection ID / Client</th><th>Status</th><th>Last used</th></tr>${state.oauthConnections.map(c=>`<tr><td><code>${e(c.id)}</code><br>${e(c.clientId)}</td><td>${c.revokedAt?'Revoked':'Active'}</td><td>${e(c.lastUsedAt)}</td></tr>`).join('')||'<tr><td colspan="3">No OAuth connections</td></tr>'}</table>
   ${form('oauth-revoke','<label>Connection ID <input name="id" required></label>','Revoke OAuth connection')}</section>
   <section><h2>Revoke credential</h2>${form('revoke','<label>Credential ID <input name="id" required></label>','Revoke')}<p>Revocation blocks subsequent requests; it does not cancel an already executing tool.</p></section>
-  <p>Get the separate owner management token locally: <code>mac-mcp-gateway access owner-token</code>. Do not give this token to AI clients.</p></html>`;
+  <p>Get the separate owner management token locally: <code>starmux dashboard --token</code>. Do not give this token to AI clients.</p><script>${loginScript}</script></html>`;
 }
 export async function accessPost(req:IncomingMessage,access:AccessControl){
   if(req.headers.origin!=='http://'+req.headers.host||(req.headers['content-type']||'').split(';')[0]!=='application/x-www-form-urlencoded')return {status:403};

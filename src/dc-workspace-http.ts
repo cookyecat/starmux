@@ -162,6 +162,13 @@ http=createServer(async(req,res)=>{
         res.writeHead(200,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(page(accessPage(await access.snapshot())));
       }else if(req.method==="POST"){
         const result=await accessPost(req,access);
+        if(result.status===200&&env.MAC_MCP_INSTANCE_ID){
+          const {changeRegistry,instancePaths}=await import('./instance-store.js');
+          await changeRegistry(async registry=>{
+            const instance=registry.instances.find(i=>i.id===env.MAC_MCP_INSTANCE_ID);
+            if(instance&&instancePaths(instance).access===access.file)instance.requiredAccess=(await access.snapshot()).mode;
+          });
+        }
         res.writeHead(result.status,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(page(result.html||"Access update rejected"));
       }else res.writeHead(405).end();
     }catch{res.writeHead(503,{...accessHeaders}).end("Access configuration unavailable");}

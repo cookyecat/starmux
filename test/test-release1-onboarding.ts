@@ -18,7 +18,7 @@ await writeFile(path.join(project,"README.md"),"ONBOARDING_REAL_DC_FIXTURE\n");
 const configFile=defaultSetupPath(home);
 const baseEnv={PATH:process.env.PATH||"/usr/bin:/bin",HOME:home,LANG:"C",
   MAC_MCP_SETUP_FILE:configFile};
-const binary=path.join(repo,"bin","mac-mcp-gateway.mjs");
+const binary=path.join(repo,"dist","src","cli","mac-mcp-gateway.js");
 const wizard=path.join(repo,"bin","setup-wizard.mjs");
 function command(file: string,args: string[],change: NodeJS.ProcessEnv={}){
   const p=spawn(process.execPath,[file,...args],{
@@ -218,7 +218,7 @@ try{
   assert.match(completed.stdout,/Config source\s+/);
   assert.ok(completed.stdout.includes(configFile));
   assert.ok(completed.stdout.includes(path.join(await realpath(repo),"dist/src/dc-workspace-http.js")));
-  assert.match(completed.stdout,/Build version\s+0\.9\.0 \(sha256:/);
+  assert.match(completed.stdout,/Build version\s+0\.10\.0 \(sha256:/);
   const stoppedProof=await command(path.join(repo,"bin","verify-setup.mjs"),[]).done;
   assert.equal(stoppedProof.code,1);
   assert.match(stoppedProof.stderr,/mac-mcp-gateway run/);
@@ -252,7 +252,7 @@ try{
   assert.equal(start.configSource,legacyFile);
   assert.equal(start.coreProgram,path.join(await realpath(repo),"dist/src/dc-workspace-http.js"));
   assert.equal(start.port,port);
-  assert.match(String(start.buildVersion),/^0\.9\.0 \(sha256:/);
+  assert.match(String(start.buildVersion),/^0\.10\.0 \(sha256:/);
   console.log("LEGACY_CONFIGURATION_RUNS_CURRENT_CORE_WITH_VISIBLE_IDENTITY_PASS");
 }finally{
   if(service){

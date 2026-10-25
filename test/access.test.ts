@@ -88,8 +88,8 @@ test('HTTP enforcement precedes MCP dispatch; Dashboard owner controls and hot m
   }
   assert.equal((await post(key.key)).status,403);
   const owner=await access.ownerToken();assert.equal((await post(owner,'https://attacker.example')).status,403);
-  const created=await post(owner,url,'create');assert.equal(created.status,200);assert.match(await created.text(),/mgw_[A-Za-z0-9_-]{43}/);
-  assert.ok(!(await (await fetch(url+'/access')).text()).includes('mgw_'));
+  const created=await post(owner,url,'create');assert.equal(created.status,200);assert.match(await created.text(),/smx_[A-Za-z0-9_-]{43}/);
+  assert.ok(!(await (await fetch(url+'/access')).text()).includes('smx_'));
   await access.revoke(key.id);assert.equal((await rpc('tools/list',key.key)).status,401);
   assert.equal((await post(owner)).status,200);assert.equal((await rpc('tools/list')).status,200);
   await writeFile(file,'broken');assert.equal((await rpc('tools/list')).status,503);
@@ -104,7 +104,7 @@ test('compiled CLI entry manages the same store without printing secrets in list
  const run=(...args:string[])=>spawnSync(process.execPath,[entry,'access',...args],{encoding:'utf8',env:{...process.env,MAC_MCP_ACCESS_FILE:file}});
  try{
   const created=run('create','CLI client','--json');assert.equal(created.status,0,created.stderr);
-  const c=JSON.parse(created.stdout) as {id:string;key:string};assert.match(c.key,/^mgw_/);
+  const c=JSON.parse(created.stdout) as {id:string;key:string};assert.match(c.key,/^smx_/);
   assert.equal(run('mode','api-key').status,0);
   const listed=run('list');assert.match(listed.stdout,/Gateway API key required/);assert.ok(!listed.stdout.includes(c.key));
   assert.equal(run('revoke',c.id).status,0);

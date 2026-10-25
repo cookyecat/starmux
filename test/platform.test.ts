@@ -11,7 +11,7 @@ import {windows,ownedByUser,createPrivateDirectory,within,diskUsageCommand,comma
 import {lstatSync} from 'node:fs';
 import {loadSetupConfig} from '../src/release1-onboarding.js';
 const exec=promisify(execFile);
-const cli=fileURLToPath(new URL('../../bin/mac-mcp-gateway.mjs',import.meta.url));
+const cli=fileURLToPath(new URL('../src/cli/mac-mcp-gateway.js',import.meta.url));
 async function freePort(){
   const server=net.createServer();
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));

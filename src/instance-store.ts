@@ -17,7 +17,7 @@ const nameSchema=z.string().trim().min(1).max(80).regex(/^[^\x00-\x1f\x7f/\\]+$/
 const sourceSchema=z.object({kind:z.enum(['managed','linked']),path:z.string()}).strict();
 export const instanceSchema=z.object({id:z.string().uuid(),name:nameSchema,source:sourceSchema,archived:z.boolean().default(false),
   requiredAccess:z.enum(['ingress','api-key','oauth']).default('ingress'),legacy:z.enum(['setup','live']).optional()}).strict();
-const registrySchema=z.object({schemaVersion:z.literal(1),defaultInstanceId:z.string().uuid().nullable(),instances:z.array(instanceSchema)}).strict();
+export const registrySchema=z.object({schemaVersion:z.literal(1),defaultInstanceId:z.string().uuid().nullable(),instances:z.array(instanceSchema)}).strict();
 export type Instance=z.infer<typeof instanceSchema>;
 type Registry=z.infer<typeof registrySchema>;
 const upstream=z.object({id:z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),transport:z.literal('stdio'),command:z.string().min(1),args:z.array(z.string()),
@@ -29,7 +29,7 @@ export const instanceConfigSchema=z.object({$schema:z.string().optional(),schema
   worktreeMode:z.enum(['off','linked']).default('off'),upstreams:z.array(upstream).default([])}).strict();
 export type InstanceConfig=z.infer<typeof instanceConfigSchema>;
 export const fingerprint=(value:string)=>createHash('sha256').update(value).digest('hex');
-export const instancesRoot=(home=homedir())=>path.join(home,'.config','mac-mcp-gateway');
+export const instancesRoot=(home=homedir())=>path.join(home,'.config','starmux');
 export function instancePaths(instance:Instance,home=homedir()){
   const root=path.join(instancesRoot(home),'instances',instance.id);
   return {root,config:instance.source.path,state:path.join(root,'state'),logs:path.join(root,'logs'),snapshots:path.join(root,'snapshots'),
