@@ -19,10 +19,14 @@ import tarfile
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-APP = "Mac MCP Gateway.app"
+APP = "Starmux.app"
 ID = "dev.macmcpgateway.ownerapp"
 NODE_VERSION = "v26.10.0"
-NODE_ARCHIVE_SHA = "f222f7e85cc1d5a3d84786aa86836ec3d41c4dcdf59a40e4a9d719b6b0ae28af"
+# Official v26.10.0 SHASUMS256.txt: accept the documented gzip and xz archives.
+NODE_ARCHIVE_SHAS = {
+    "751fdf7439f115d87ee2a8f3f18c065b6151852068e3e666ac60ac2996f75ac9",
+    "f222f7e85cc1d5a3d84786aa86836ec3d41c4dcdf59a40e4a9d719b6b0ae28af",
+}
 NODE_MEMBER = "node-v26.10.0-darwin-arm64/bin/node"
 
 def sha(path):
@@ -40,7 +44,7 @@ def require(condition,code):
 
 def source_commit():
     # Fresh community ZIP deliberately carries no private Git history.
-    return "community-source-v0.9.0"
+    return "community-source-v0.10.0"
 
 def signed(app):
     run("/usr/bin/codesign","--verify","--deep","--strict",str(app),timeout=120)
@@ -52,7 +56,7 @@ def build(out,archive,offline=False):
     require(not out.exists() or (out.is_dir() and not any(out.iterdir())),
             "NONEMPTY_OUTPUT_REFUSED")
     require(archive.is_file() and not archive.is_symlink() and
-            sha(archive)==NODE_ARCHIVE_SHA,"OFFICIAL_ARM64_NODE_HASH_MISMATCH")
+            sha(archive) in NODE_ARCHIVE_SHAS,"OFFICIAL_ARM64_NODE_HASH_MISMATCH")
     require((ROOT/"package-lock.json").is_file(),"SOURCE_LOCKFILE_REQUIRED")
     # The public source snapshot uses explicit source filenames and forbids
     # private .git/history in the build input instead of requiring private git.
@@ -118,7 +122,8 @@ def build(out,archive,offline=False):
         shutil.copy2(ROOT/relative,dest)
     for filename in ("LICENSE","README.md","package.json","package-lock.json"):
         shutil.copy2(ROOT/filename,core/filename)
-    with tarfile.open(archive,"r:xz") as tar:
+    shutil.copytree(ROOT/"docs",core/"docs")
+    with tarfile.open(archive,"r:*") as tar:
         member=tar.getmember(NODE_MEMBER)
         require(member.isfile() and member.size<180000000,"NODE_ARCHIVE_MEMBER_UNSAFE")
         with tar.extractfile(member) as source,node.open("xb") as dest:
@@ -146,12 +151,12 @@ def build(out,archive,offline=False):
     # Executable script is located inside the app; no global npm/Homebrew
     # installation is required by this App. The actual installed CLI can
     # be a user-local wrapper which forwards to this same bundle.
-    launcher=cli/"mac-mcp-gateway"
+    launcher=cli/"starmux"
     launcher.write_text('''#!/bin/sh
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
 root=$(CDPATH= cd -- "$here/.." && pwd -P)
-exec "$root/bin/node" "$root/core/bin/mac-mcp-gateway.mjs" "$@"
+exec "$root/bin/node" "$root/core/bin/starmux.mjs" "$@"
 ''')
     launcher.chmod(0o755)
     third=resources/"THIRD_PARTY_NOTICES"
@@ -171,11 +176,11 @@ exec "$root/bin/node" "$root/core/bin/mac-mcp-gateway.mjs" "$@"
     (third/"dependency-license-inventory.json").write_text(
         json.dumps(items,indent=2,sort_keys=True)+"\n")
     (third/"NOTICE.txt").write_text(
-        "Mac MCP Gateway includes Desktop Commander as a separate upstream "
+        "Starmux includes Desktop Commander as a separate upstream "
         "implementation, under the MIT license. The unchanged copyright and "
         "permission notice is in DesktopCommander-MIT.txt. Other bundled "
         "dependencies are listed in dependency-license-inventory.json. "
-        "Original Mac MCP Gateway code is MIT licensed: see the bundled "
+        "Original Starmux code is MIT licensed: see the bundled "
         "root LICENSE. Third-party notices and independent publication gates "
         "must still be checked before public distribution.\n")
     # Sign every bundled Mach-O item before sealing the outer App.
@@ -188,7 +193,7 @@ exec "$root/bin/node" "$root/core/bin/mac-mcp-gateway.mjs" "$@"
     # signed by canonical UI builder; only outer seal needs renewal.
     commit=source_commit()
     manifest={
-      "schema":1,"product":"Mac MCP Gateway","version":version,"build":"15",
+      "schema":1,"product":"Starmux","version":version,"build":"15",
       "architecture":"arm64","bundleIdentifier":ID,
       "commit":commit,"sourcePackageLockSHA256":sha(ROOT/"package-lock.json"),
       "bundledPackageLockSHA256":sha(core/"package-lock.json"),
@@ -210,7 +215,7 @@ exec "$root/bin/node" "$root/core/bin/mac-mcp-gateway.mjs" "$@"
     signed(app)
     # CLI bundle smoke without any installed npm/Node.
     result=run(str(launcher),"--help",timeout=15)
-    require(("Mac MCP Gateway "+version) in result.stdout,
+    require(("Starmux "+version) in result.stdout,
             "BUNDLED_STANDALONE_CLI_FAIL")
     result=run(str(node),"--input-type=module","-e",
         "import('file://"+str(core/"dist/src/local-desktop-read-probe.js")+

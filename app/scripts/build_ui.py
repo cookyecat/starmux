@@ -15,7 +15,7 @@ ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT
 SRC=ROOT/"src"
 IDENTITY="dev.macmcpgateway.ownerapp"
-NAME="Mac MCP Gateway.app"
+NAME="Starmux.app"
 
 def run(*cmd, timeout=180):
     return subprocess.run(cmd,check=True,capture_output=True,text=True,timeout=timeout)
@@ -35,11 +35,11 @@ def build(target:Path):
     with (contents/"Info.plist").open("wb") as f:
         plistlib.dump({
           "CFBundleIdentifier":IDENTITY,
-          "CFBundleName":"Mac MCP Gateway",
-          "CFBundleDisplayName":"Mac MCP Gateway",
+          "CFBundleName":"Starmux",
+          "CFBundleDisplayName":"Starmux",
           "CFBundleExecutable":"MacMCPUnifiedMenu",
           "CFBundleVersion":"15",
-          "CFBundleShortVersionString":"0.9.0",
+          "CFBundleShortVersionString":"0.10.0",
           "CFBundlePackageType":"APPL",
           "LSUIElement":True,
           "LSMinimumSystemVersion":"13.0",

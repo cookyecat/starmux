@@ -56,7 +56,7 @@ struct RecentActivityDisclosure: View {
     }
 
     private var lastSummary: String {
-        guard isAvailable else { return tx("本机匿名调用记录未启用") }
+        guard isAvailable else { return (uiLanguage.code == "en" ? "Activity unavailable" : "暂无调用观测") }
         guard let last = items.first else { return tx("最近 15 分钟暂无工具调用") }
         return localTime(last.at) + " · " + upstreamName(last.route) +
             " · " + outcomeLabel(last.outcome)
@@ -123,7 +123,7 @@ struct RecentActivityDisclosure: View {
                     if items.isEmpty {
                         Label(isAvailable
                               ? tx("最近 15 分钟没有记录到工具调用。")
-                              : tx("现役 Gateway 尚未启用匿名调用观测。"),
+                              : (uiLanguage.code == "en" ? "No activity snapshot is available for this workspace." : "当前工作区暂无可用的调用记录。"),
                               systemImage: "info.circle")
                             .font(.system(size: 10.2))
                             .foregroundStyle(.secondary)

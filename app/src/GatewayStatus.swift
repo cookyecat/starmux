@@ -65,9 +65,11 @@ enum GatewayClassifier {
         guard s.event == "GATEWAY_STATUS", valid else { return .unavailable }
         let registered = s.registered == true
         switch s.executionMode {
-        case "foreground":
+        case "foreground", "foreground-owned":
             return !registered && s.health == "ok" && s.listenerPid != nil
                 ? .externalForeground : .unknownListener
+        case "background":
+            return s.health == "ok" && s.listenerPid != nil ? .serviceRunning : .unknownListener
         case "service-healthy":
             return registered && s.health == "ok"
                 ? .serviceRunning : .unknownListener
@@ -91,16 +93,16 @@ enum GatewayClassifier {
 enum StatusProbe {
     enum Failure: Error { case cliUnavailable, timeout, invalidResult, failed }
     static func read() throws -> SafeSnapshot {
-        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/runtime/cli/mac-mcp-gateway").path
-        let choices = [bundled, "/opt/homebrew/bin/mac-mcp-gateway",
-                       "/usr/local/bin/mac-mcp-gateway"]
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/runtime/cli/starmux").path
+        let choices = [bundled, "/opt/homebrew/bin/starmux",
+                       "/usr/local/bin/starmux"]
         guard let cli = choices.first(where: FileManager.default.isExecutableFile(atPath:))
             else { throw Failure.cliUnavailable }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: cli)
         // CLI defaults to a human-readable status. The native observer needs the
         // explicit machine-readable contract, not formatted terminal output.
-        process.arguments = ["status", "--json", "--profile", "auto"]
+        process.arguments = ["status", "--json"]
         process.environment = ["HOME": NSHomeDirectory(),
             "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin", "LANG": "C"]
         let out = Pipe()

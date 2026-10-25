@@ -89,104 +89,35 @@ private struct FlowNode: View {
 }
 
 struct ConnectionFlowDiagram: View {
-    let snapshot: GatewayConnectionSnapshot?
-    @ObservedObject private var uiLanguage = AppLanguage.shared
-
-    private var tunnelReady: Bool {
-        snapshot?.tunnelRunning == true &&
-        snapshot?.tunnelPointsToLiveGateway == true
-    }
-    private var upstreamReady: Bool {
-        snapshot?.upstreamState == "ready"
-    }
-    private var directDescription: String {
-        if snapshot?.directHttpsStatus == "disabled" ||
-           snapshot?.directHttpsStatus == "stopped" {
-            return tx("HTTPS 直连未启用")
-        }
-        if snapshot?.directHttpsStatus == "running" {
-            return tx("HTTPS 入口进程运行（外部连通性未验证）")
-        }
-        return tx("HTTPS 直连状态待核验")
-    }
+    let port: Int?
+    let localReady: Bool
+    let activity: RecentToolActivity?
+    @ObservedObject private var language = AppLanguage.shared
+    private func text(_ zh: String, _ en: String) -> String { language.code == "en" ? en : zh }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center) {
-                Text(tx("MCP 连接拓扑"))
-                    .font(.system(size: 13, weight: .semibold))
+            HStack {
+                Text(text("MCP 连接拓扑", "MCP connection")).font(.system(size: 13, weight: .semibold))
                 Spacer()
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(tunnelReady ? Color.green : Color.orange)
-                        .frame(width: 6, height: 6)
-                    Text(tunnelReady ? tx("Tunnel 路径可用") : tx("连接路径待确认"))
-                        .font(.system(size: 9.5, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
+                Circle().fill(localReady ? Color.green : .secondary).frame(width: 6, height: 6)
+                Text(localReady ? text("本机已就绪", "Local ready") : text("本机未连接", "Local offline")).font(.system(size: 9.5)).foregroundStyle(.secondary)
             }
             HStack(spacing: 2) {
-                FlowNode(title: snapshot?.configuredClient == "ChatGPT"
-                    ? "ChatGPT" : tx("AI 客户端"), detail: tx("已配置"),
-                    symbol: "bubble.left.and.bubble.right",
-                    tint: FlowPalette.violet, highlighted: tunnelReady)
-                RouteParticles(ready: tunnelReady)
-                FlowNode(title: "OpenAI", detail: "Tunnel",
-                    symbol: "arrow.left.arrow.right",
-                    tint: FlowPalette.blue, highlighted: tunnelReady)
-                RouteParticles(ready: tunnelReady)
-                FlowNode(title: "Mac MCP", detail: "Gateway",
-                    symbol: "point.3.connected.trianglepath.dotted",
-                    tint: FlowPalette.blue, highlighted: tunnelReady)
-                RouteParticles(ready: upstreamReady)
-                FlowNode(title: "Desktop", detail: "Commander",
-                    symbol: "server.rack",
-                    tint: FlowPalette.cyan, highlighted: upstreamReady)
-            }
-            HStack(spacing: 5) {
-                Image(systemName: "point.3.filled.connected.trianglepath.dotted")
-                    .font(.system(size: 11))
-                    .foregroundStyle(FlowPalette.blue)
-                Text(tx("当前通道：Secure MCP Tunnel → 本机 8793"))
-                    .font(.system(size: 10.5, weight: .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                Spacer(minLength: 2)
-            }
-            HStack(spacing: 5) {
-                Image(systemName: "globe")
-                    .foregroundStyle(.secondary)
-                Text(tx("HTTPS 直连"))
-                    .font(.system(size: 9.8, weight: .medium))
+                FlowNode(title: text("AI 客户端", "AI client"), detail: text("远程", "Remote"), symbol: "bubble.left.and.bubble.right", tint: FlowPalette.violet, highlighted: false)
                 RouteParticles(ready: false)
-                    .frame(width: 22)
-                Text(snapshot?.directHttpsStatus == "disabled"
-                    ? tx("未启用") : directDescription)
-                    .font(.system(size: 9.8))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if let count = snapshot?.upstreamToolCount, upstreamReady {
-                    Text(uiLanguage.code == "en" ? "\(count) tools" : "\(count) 项工具")
-                        .font(.system(size: 9.8, weight: .medium))
-                        .foregroundStyle(FlowPalette.blue)
-                }
+                FlowNode(title: "HTTPS", detail: "/ Tunnel", symbol: "arrow.left.arrow.right", tint: FlowPalette.blue, highlighted: false)
+                RouteParticles(ready: false)
+                FlowNode(title: "Starmux", detail: text("本机", "Local"), symbol: "point.3.connected.trianglepath.dotted", tint: FlowPalette.blue, highlighted: localReady)
+                RouteParticles(ready: localReady)
+                FlowNode(title: text("工作区", "Workspace"), detail: text("工具", "Tools"), symbol: "server.rack", tint: FlowPalette.cyan, highlighted: localReady)
             }
-            Rectangle().fill(FlowPalette.blue.opacity(0.12)).frame(height: 0.5)
-            RecentActivityDisclosure(activity: snapshot?.recentToolActivity)
-            Text(tx("流动光点表示已配置且可用的路线，不代表真实数据包；客户端身份尚未验证。"))
-                .font(.system(size: 9.3))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(10)
-        .background(
-            RoundedRectangle(cornerRadius: 15)
-                .fill(LinearGradient(colors: [
-                    FlowPalette.violet.opacity(0.075),
-                    FlowPalette.blue.opacity(0.07),
-                    FlowPalette.cyan.opacity(0.07)
-                ], startPoint: .topLeading, endPoint: .bottomTrailing))
-                .overlay(RoundedRectangle(cornerRadius: 15)
-                    .strokeBorder(FlowPalette.blue.opacity(0.18), lineWidth: 1))
-        )
+            Label(port.map { "127.0.0.1:\($0)/mcp" } ?? text("启动后显示本机地址", "Start to see your local endpoint"), systemImage: "link")
+                .font(.system(size: 10.5, weight: .medium)).textSelection(.enabled)
+            Text(text("远程入口单独配置；本机就绪不代表远程客户端已连接。", "Configure your remote route separately; local readiness does not confirm a remote client connection."))
+                .font(.system(size: 9.5)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Divider()
+            RecentActivityDisclosure(activity: activity)
+        }.padding(10)
+        .background(RoundedRectangle(cornerRadius: 15).fill(LinearGradient(colors: [FlowPalette.violet.opacity(0.075), FlowPalette.blue.opacity(0.07), FlowPalette.cyan.opacity(0.07)], startPoint: .topLeading, endPoint: .bottomTrailing)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(FlowPalette.blue.opacity(0.18), lineWidth: 1)))
     }
 }

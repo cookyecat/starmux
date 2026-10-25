@@ -126,6 +126,11 @@ enum ConnectionDiagnostics {
         }
         return ("ready", tools, extra)
     }
+    // The instance menu observes anonymous events without issuing MCP tool calls.
+    static func readActivity(port: Int) async -> RecentToolActivity? {
+        guard (1024...65535).contains(port) else { return nil }
+        return classifyActivity(await readData(path: "/activity.json", port: port))
+    }
     static func read(port: Int = 8793) async -> GatewayConnectionSnapshot {
         let stamp = ISO8601DateFormatter().string(from: Date())
         var state = "unknown"

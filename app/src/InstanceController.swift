@@ -2,6 +2,10 @@ import Foundation
 import SwiftUI
 
 struct ManagedInstance: Decodable, Identifiable {
+    struct Configuration: Decodable {
+        let projectRoot: String; let mode: String; let accessRole: String; let writeScope: String
+    }
+    struct Active: Decodable { let config: Configuration }
     struct Source: Decodable { let kind: String; let path: String }
     struct Runtime: Decodable {
         let runId: String; let pid: Int; let launcher: String; let appParentPid: Int?
@@ -11,8 +15,10 @@ struct ManagedInstance: Decodable, Identifiable {
     let name: String; let archived: Bool; let source: Source
     let phase: String; let configState: String; let configProblem: String?; let runtimeProblem: String?
     let runtime: Runtime?; let port: Int?; let configuredPort: Int?; let revision: String?
+    let health: String?; let executionMode: String?; let active: Active?
     let connectionState: String; let requiredAccess: String; let lastToolCallAt: String?
     var running: Bool { phase == "running" || phase == "starting" }
+    var ready: Bool { phase == "running" && health == "ok" }
     var endpoint: String? { guard running, let port else { return nil }; return "http://127.0.0.1:\(port)/mcp" }
 }
 struct InstanceList: Decodable {
@@ -37,8 +43,8 @@ final class InstanceController: ObservableObject {
     private var refreshing = false
 
     nonisolated static func cliURL() throws -> URL {
-        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/runtime/cli/mac-mcp-gateway").path
-        for file in [bundled, "/opt/homebrew/bin/mac-mcp-gateway", "/usr/local/bin/mac-mcp-gateway"] {
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/runtime/cli/starmux").path
+        for file in [bundled, "/opt/homebrew/bin/starmux", "/usr/local/bin/starmux"] {
             if FileManager.default.isExecutableFile(atPath: file) { return URL(fileURLWithPath: file) }
         }
         throw NSError(domain: "Gateway", code: 1, userInfo: [NSLocalizedDescriptionKey: "Gateway CLI is missing. Install the CLI or use the bundled App."])
@@ -72,10 +78,13 @@ final class InstanceController: ObservableObject {
     func refresh() async {
         guard !refreshing else { return }; refreshing = true; defer { refreshing = false }
         do {
-            let data = try await Task.detached { try Self.execute(["instance", "list", "--archived"]) }.value
+            let data = try await Task.detached { try Self.execute(["ls", "--archived"]) }.value
             let listing = try InstanceList.decode(data)
             instances = listing.instances; defaultInstanceId = listing.defaultInstanceId
-            if selectedId == nil { selectedId = listing.defaultInstanceId ?? instances.first?.id }
+            if !instances.contains(where: { $0.id == selectedId && !$0.archived }) {
+                selectedId = instances.first(where: { $0.id == listing.defaultInstanceId && !$0.archived })?.id
+                    ?? instances.first(where: { !$0.archived })?.id
+            }
         } catch { issue = error.localizedDescription }
     }
     @discardableResult func perform(_ args: [String], input: Data? = nil) async -> Data? {
@@ -87,9 +96,10 @@ final class InstanceController: ObservableObject {
     }
     func start(_ instance: ManagedInstance) async {
         guard !busy, children[instance.id] == nil else { return }
+        busy = true; defer { busy = false }
         do {
             let child = Process(); child.executableURL = try Self.cliURL()
-            child.arguments = ["run", "--instance", instance.id, "--app-parent-pid", String(getpid()), "--json"]
+            child.arguments = ["up", "--foreground", "--instance", instance.id, "--app-parent-pid", String(getpid()), "--json"]
             child.environment = Self.environment(); child.standardInput = FileHandle.nullDevice
             let pipe = Pipe(); child.standardOutput = pipe; child.standardError = pipe
             // Drain lifecycle output throughout the run; Core logs have their own instance file.
@@ -122,6 +132,12 @@ final class InstanceController: ObservableObject {
     static func selfTest() throws {
         let raw = Data(#"{"schemaVersion":1,"defaultInstanceId":null,"instances":[]}"#.utf8)
         guard try InstanceList.decode(raw).instances.isEmpty else { throw NSError(domain: "InstanceSelfTest", code: 1) }
+        // A live process is not enough: menu readiness requires the verified health identity.
+        let status = Data(#"{"instanceId":"sample","name":"default","archived":false,"source":{"kind":"managed","path":"/sample/config.jsonc"},"phase":"running","configState":"pending","connectionState":"local-ready-remote-unverified","requiredAccess":"api-key","health":"ok","executionMode":"background","active":{"config":{"projectRoot":"/sample/work","mode":"read-only","accessRole":"restricted","writeScope":"unrestricted"}}}"#.utf8)
+        let live = try JSONDecoder().decode(ManagedInstance.self, from: status)
+        guard live.ready, live.active?.config.mode == "read-only", live.executionMode == "background" else { throw NSError(domain: "InstanceSelfTest", code: 3) }
+        let unavailable = Data(String(decoding: status, as: UTF8.self).replacingOccurrences(of: "\"health\":\"ok\"", with: "\"health\":\"unreachable\"").utf8)
+        guard try !JSONDecoder().decode(ManagedInstance.self, from: unavailable).ready else { throw NSError(domain: "InstanceSelfTest", code: 4) }
         let invalid = Data(#"{"schemaVersion":2,"defaultInstanceId":null,"instances":[]}"#.utf8)
         do { _ = try InstanceList.decode(invalid); throw NSError(domain: "InstanceSelfTest", code: 2) }
         catch let error as NSError where error.domain == "Gateway" { }

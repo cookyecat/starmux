@@ -1,7 +1,9 @@
 # App source (Apple Silicon)
 
-The menu bar App is written in Swift and controls the same local Gateway Core
-as the CLI. The individual Swift sources and build script are included here,
+The Starmux menu bar App is written in Swift and controls the same local Core
+as the CLI. Its main panel shows the selected workspace, service health, permissions,
+connection topology and recent tool activity. Advanced instance management opens
+from **Workspaces & settings**; launch does not open a management window. The individual Swift sources and build script are included here,
 without historical internal research reports.
 
 **Build a UI-only preview (not a self-contained public App)**:
@@ -23,3 +25,5 @@ The builder creates a separate temporary TypeScript build directory, runs a lock
 Ad-hoc signing is for developers. **No Developer ID / Apple notarization is
 provided**. Do not advertise this candidate as a notarized public binary;
 the App ZIP for GitHub Releases needs separate signing and end-user validation.
+
+For visual acceptance, launch the built executable with `--show-monitor` to open the same menu view in a window. Normal launch stays in the menu bar; reopening the App also shows the monitor.

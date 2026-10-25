@@ -23,8 +23,8 @@ final class AppGatewayRunner: ObservableObject {
     }
 
     private func installedCLI() -> URL? {
-        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/runtime/cli/mac-mcp-gateway").path
-        for path in [bundled, "/opt/homebrew/bin/mac-mcp-gateway", "/usr/local/bin/mac-mcp-gateway"] {
+        let bundled = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/runtime/cli/starmux").path
+        for path in [bundled, "/opt/homebrew/bin/starmux", "/usr/local/bin/starmux"] {
             if FileManager.default.isExecutableFile(atPath: path) {
                 return URL(fileURLWithPath: path)
             }
@@ -64,7 +64,7 @@ final class AppGatewayRunner: ObservableObject {
             guard let url = cliOverride ?? installedCLI() else {
                 throw NSError(domain: "F3", code: 2,
                     userInfo: [NSLocalizedDescriptionKey:
-                        "未安装 mac-mcp-gateway CLI；请先完成 CLI 安装"])
+                        "未安装 starmux CLI；请先完成 CLI 安装"])
             }
             let folder = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Application Support/Mac-MCP-Gateway")
@@ -89,7 +89,7 @@ final class AppGatewayRunner: ObservableObject {
             try output.seekToEnd()
             let runner = Process()
             runner.executableURL = url
-            runner.arguments = ["run", "--profile", "auto",
+            runner.arguments = ["up", "--foreground",
                 "--app-parent-pid", String(getpid())]
             if let isolatedPort {
                 runner.arguments! += ["--port", String(isolatedPort)]
@@ -181,7 +181,7 @@ final class AppGatewayRunner: ObservableObject {
         let outcome = await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = cli
-            process.arguments = ["stop", "--profile", "auto", "--port", String(resolvedPort)]
+            process.arguments = ["down"]
             process.environment = [
                 "HOME": NSHomeDirectory(), "USER": NSUserName(),
                 "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",

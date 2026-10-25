@@ -10,44 +10,10 @@ final class InstanceManagerWindow {
     func show() {
         if window == nil {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 980, height: 700), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-            w.title = "Mac MCP Gateway"; w.contentView = NSHostingView(rootView: InstanceManagerView())
+            w.title = "Starmux"; w.contentView = NSHostingView(rootView: InstanceManagerView())
             w.minSize = NSSize(width: 820, height: 580); w.isReleasedWhenClosed = false; w.center(); window = w
         }
         NSApp.activate(ignoringOtherApps: true); window?.makeKeyAndOrderFront(nil)
-    }
-}
-struct InstanceMenu: View {
-    @ObservedObject private var model = InstanceController.shared
-    @ObservedObject private var language = AppLanguage.shared
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Mac MCP Gateway").font(.headline); Spacer()
-                Text("\(model.instances.filter { $0.running }.count) " + it("运行中", "running")).foregroundStyle(.secondary)
-            }
-            ForEach(model.instances.filter { !$0.archived }) { instance in
-                HStack {
-                    Circle().fill(instance.running ? Color.green : Color.gray).frame(width: 7, height: 7)
-                    VStack(alignment: .leading) {
-                        Text(instance.name)
-                        Text(instance.configState == "pending" ? it("有待应用变更", "Changes pending") : instance.phase).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(instance.running ? it("停止", "Stop") : it("启动", "Start")) {
-                        Task { if instance.running { await model.perform(["stop", "--instance", instance.id]) } else { await model.start(instance) } }
-                    }.disabled(model.busy)
-                }
-            }
-            if let issue = model.issue { Text(issue).font(.caption).foregroundStyle(.red).lineLimit(3) }
-            Button(it("管理实例…", "Manage instances…")) { InstanceManagerWindow.shared.show() }.buttonStyle(.borderedProminent)
-            Divider()
-            Text(it("退出仅停止本次 App 启动的实例", "Quitting stops only instances started by this App session")).font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Picker("Language", selection: $language.code) { Text("English").tag("en"); Text("中文").tag("zh") }.labelsHidden().frame(width: 110)
-                Spacer(); Button(it("退出", "Quit")) { NSApp.terminate(nil) }
-            }
-        }.padding(16).frame(width: 380)
-        .task { while !Task.isCancelled { await model.refresh(); try? await Task.sleep(nanoseconds: 2_000_000_000) } }
     }
 }
 struct InstanceManagerView: View {
@@ -57,7 +23,7 @@ struct InstanceManagerView: View {
     @State private var showArchived = false
     @State private var computer = false
     @State private var migration = ""
-    @State private var migrationSource = "setup"
+    @State private var migrationSource = "registry"
     var body: some View {
         HSplitView {
             VStack(alignment: .leading, spacing: 12) {
@@ -72,7 +38,7 @@ struct InstanceManagerView: View {
                 }
                 Toggle(it("显示归档", "Show archived"), isOn: $showArchived).font(.caption)
                 Button(it("＋ 新建 / 导入", "+ Create / Import")) { create = true }
-                Button(it("发现旧配置", "Discover legacy configuration")) { Task { if let data = await model.perform(["instance", "migrate"]) { migration = String(decoding: data, as: UTF8.self) } } }
+                Button(it("发现旧配置", "Discover legacy configuration")) { Task { if let data = await model.perform(["migrate"]) { migration = String(decoding: data, as: UTF8.self) } } }
                 Button(it("此电脑", "This computer")) { computer = true }
             }.padding().frame(minWidth: 200, idealWidth: 230, maxWidth: 280)
             VStack(alignment: .leading, spacing: 12) {
@@ -94,11 +60,11 @@ struct InstanceManagerView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text(it("迁移预览", "Migration preview")).font(.title2)
                 ScrollView { Text(migration).font(.system(.caption, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-                Picker(it("来源", "Source"), selection: $migrationSource) { Text("setup").tag("setup"); Text("live").tag("live") }
+                Picker(it("来源", "Source"), selection: $migrationSource) { Text("registry").tag("registry"); Text("setup").tag("setup"); Text("live").tag("live") }
                 Text(it("切换将停止使用旧状态的实例，并停用对应旧自启动。原文件保留。", "Switching stops legacy instances using these stores and disables their old automatic starts. Original files are retained."))
                 HStack {
                     Button(it("取消", "Cancel")) { migration = "" }
-                    Button(it("确认迁移", "Migrate")) { Task { if await model.perform(["instance", "migrate", migrationSource, "--confirm"]) != nil { migration = "" } } }.disabled(model.busy)
+                    Button(it("确认迁移", "Migrate")) { Task { if await model.perform(["migrate", migrationSource, "-y"]) != nil { migration = "" } } }.disabled(model.busy)
                 }
             }.padding(24).frame(width: 650, height: 470)
         }
@@ -141,8 +107,8 @@ private struct InstanceCreateSheet: View {
                 Spacer(); Button(it("取消", "Cancel")) { dismiss() }
                 Button(it("保存实例", "Save instance")) {
                     Task {
-                        var args = file.isEmpty ? ["instance", "create", name, "--project", project, "--access-role", role] : ["instance", "import", file, "--name", name] + (linked ? ["--link"] : [])
-                        if approved { args += ["--approve-trusted-developer"] }
+                        var args = file.isEmpty ? ["init", project, "-i", name, role == "trusted" ? "--code" : "--read"] : ["config", "import", file, "-i", name] + (linked ? ["--link"] : [])
+                        if approved { args += ["-y"] }
                         if await model.perform(args) != nil { dismiss() }
                     }
                 }.buttonStyle(.borderedProminent).disabled(model.busy || name.isEmpty || (file.isEmpty && project.isEmpty) || (role == "trusted" && !approved))
@@ -192,7 +158,7 @@ private struct InstanceDetail: View {
                     Text(instance.name).font(.largeTitle.bold())
                     Text(instance.phase + " · " + instance.configState).foregroundStyle(.secondary)
                     if let runtime = instance.runtime {
-                        Text(runtime.launcher == "app" ? it("由 App 启动 · 退出所属 App 时停止", "Started by App · stops when its App quits") : it("由 CLI 启动 · 终端退出时停止", "Started by CLI · stops with its terminal")).font(.caption)
+                        Text(runtime.launcher == "app" ? it("由 App 启动 · 退出所属 App 时停止", "Started by App · stops when its App quits") : it("由 CLI 启动 · 使用 starmux down 停止", "Started by CLI · stop with starmux down")).font(.caption)
                     }
                 }
                 Spacer()
@@ -220,7 +186,7 @@ private struct InstanceDetail: View {
             }.padding(24).frame(width: 620, height: 420)
         }
         .confirmationDialog(it("停止并归档此实例？外部源文件将保留。", "Stop and archive this instance? External source files are retained."), isPresented: $confirmArchive) {
-            Button(it("归档", "Archive")) { Task { await model.perform(["instance", "archive", instance.id]) } }
+            Button(it("归档", "Archive")) { Task { await model.perform(["config", "archive", "-i", instance.id]) } }
         }
     }
     private var overview: some View {
@@ -237,10 +203,10 @@ private struct InstanceDetail: View {
             if let at = instance.lastToolCallAt { Text(it("最近工具调用：", "Last tool call: ") + at).font(.caption) }
             if let runtime = instance.runtime { Text(runtime.buildVersion + "\n" + runtime.coreProgram).font(.caption).textSelection(.enabled) }
             Divider()
-            HStack { TextField(it("名称", "Name"), text: $newName); Button(it("改名", "Rename")) { Task { await model.perform(["instance", "rename", instance.id, newName]) } }; Button(it("复制实例", "Duplicate")) { Task { await model.perform(["instance", "copy", instance.id, newName + " copy"]) } } }
+            HStack { TextField(it("名称", "Name"), text: $newName); Button(it("改名", "Rename")) { Task { await model.perform(["config", "rename", newName, "-i", instance.id]) } }; Button(it("复制实例", "Duplicate")) { Task { await model.perform(["config", "copy", newName + " copy", "-i", instance.id]) } } }
             HStack {
-                Button(it("设为 CLI 默认实例", "Set as CLI default")) { Task { await model.perform(["instance", "default", instance.id]) } }
-                Button(instance.archived ? it("恢复实例", "Restore") : it("归档实例", "Archive")) { if instance.archived { Task { await model.perform(["instance", "restore", instance.id]) } } else { confirmArchive = true } }
+                Button(it("设为 CLI 默认实例", "Set as CLI default")) { Task { await model.perform(["config", "default", instance.id]) } }
+                Button(instance.archived ? it("恢复实例", "Restore") : it("归档实例", "Archive")) { if instance.archived { Task { await model.perform(["config", "restore", "-i", instance.id]) } } else { confirmArchive = true } }
             }.disabled(model.busy)
         }
     }
@@ -254,8 +220,8 @@ private struct InstanceDetail: View {
             HStack {
                 Button(it("保存配置", "Save configuration")) {
                     guard let number = Int(port) else { model.issue = "port: enter a valid integer"; return }
-                    let patch: [String: Any] = ["projectRoot": project, "port": number, "accessRole": role, "mode": role == originalRole ? originalMode : (role == "trusted" ? "read-write" : "read-only"), "writeScope": role == originalRole ? originalWriteScope : (role == "trusted" ? "home-only" : "unrestricted"), "connection": connection]
-                    Task { if let data = try? JSONSerialization.data(withJSONObject: patch), await model.perform(["config", "patch"] + target + ["--revision", revision] + (approved ? ["--approve-trusted-developer"] : []), input: data) != nil { await load() } }
+                    let patch: [String: Any] = ["projectRoot": project, "port": number, "accessRole": role, "mode": role == originalRole ? originalMode : (role == "trusted" ? "read-write" : "read-only"), "writeScope": role == originalRole ? originalWriteScope : "unrestricted", "connection": connection]
+                    Task { if let data = try? JSONSerialization.data(withJSONObject: patch), await model.perform(["config", "patch"] + target + ["--revision", revision] + (approved ? ["-y"] : []), input: data) != nil { await load() } }
                 }.disabled(model.busy || (role == "trusted" && originalRole != role && !approved))
                 Button(it("查看差异并应用…", "Review and apply…")) { Task { if let data = await model.perform(["config", "diff"] + target) { diff = String(decoding: data, as: UTF8.self); if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] { revision = object["revision"] as? String ?? revision } } } }.disabled(model.busy)
                 Button(it("重新载入", "Reload")) { Task { await load() } }
@@ -277,13 +243,13 @@ private struct InstanceDetail: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(it("认证与网络路径分别配置。HTTPS/Tunnel 偏好不会自动部署远程服务。", "Authentication and network paths are configured separately. HTTPS/Tunnel preferences do not deploy remote services."))
             HStack {
-                Button(it("查看访问状态", "Inspect access")) { Task { if let data = await model.perform(["access", "status"] + target) { access = String(decoding: data, as: UTF8.self) } } }
+                Button(it("查看访问状态", "Inspect access")) { Task { if let data = await model.perform(["auth"] + target) { access = String(decoding: data, as: UTF8.self) } } }
                 if let endpoint = instance.endpoint, let url = URL(string: endpoint.replacingOccurrences(of: "/mcp", with: "/access")) { Link(it("打开访问管理", "Open access dashboard"), destination: url) }
             }
-            HStack { TextField(it("客户端密钥名称", "Client key name"), text: $keyName); Button(it("创建密钥", "Create key")) { Task { if let data = await model.perform(["access", "create", keyName] + target) { access = String(decoding: data, as: UTF8.self) } } }.disabled(keyName.isEmpty) }
+            HStack { TextField(it("客户端密钥名称", "Client key name"), text: $keyName); Button(it("创建密钥", "Create key")) { Task { if let data = await model.perform(["auth", "key", keyName] + target) { access = String(decoding: data, as: UTF8.self) } } }.disabled(keyName.isEmpty) }
             Text(it("新密钥仅显示一次；撤销对后续请求立即生效。", "New keys are shown once. Revocation affects subsequent requests immediately.")).font(.caption)
-            HStack { Picker(it("认证", "Authentication"), selection: $accessMode) { Text("Ingress").tag("ingress"); Text("API Key").tag("api-key"); Text("OAuth").tag("oauth") }; Button(it("应用认证方式", "Set authentication")) { Task { if let data = await model.perform(["access", "mode", accessMode] + target) { access = String(decoding: data, as: UTF8.self) } } } }
-            HStack { TextField(it("待撤销的密钥 ID", "Key ID to revoke"), text: $revokeId); Button(it("撤销", "Revoke")) { Task { if let data = await model.perform(["access", "revoke", revokeId] + target) { access = String(decoding: data, as: UTF8.self) } } }.disabled(revokeId.isEmpty) }
+            HStack { Picker(it("认证", "Authentication"), selection: $accessMode) { Text("Ingress").tag("ingress"); Text("API Key").tag("api-key"); Text("OAuth").tag("oauth") }; Button(it("应用认证方式", "Set authentication")) { Task { if let data = await model.perform(["auth", "mode", accessMode] + target) { access = String(decoding: data, as: UTF8.self) } } } }
+            HStack { TextField(it("待撤销的密钥 ID", "Key ID to revoke"), text: $revokeId); Button(it("撤销", "Revoke")) { Task { if let data = await model.perform(["auth", "revoke", revokeId] + target) { access = String(decoding: data, as: UTF8.self) } } }.disabled(revokeId.isEmpty) }
             Text(access).font(.system(.caption, design: .monospaced)).textSelection(.enabled)
         }.disabled(model.busy)
     }
