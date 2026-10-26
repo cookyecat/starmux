@@ -16,7 +16,7 @@ import {desktopCommanderEntry} from '../runtime-paths.js';
 import {shellQuote} from '../platform.js';
 import {formatStarmuxStatus} from './starmux-status.js';
 
-const version='0.11.0';
+const version='0.12.0';
 const strings=['instance','port','lines','expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','revision','patch','file','output','name','target','mode','app-parent-pid'];
 const booleans=['help','version','json','write','code','read','yes','foreground','follow','archived','all','effective','link','allow-loopback-http','token-stdin','no-open','token'];
 const options:Record<string,{type:'string'|'boolean';short?:string}>={};
