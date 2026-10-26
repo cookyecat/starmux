@@ -6,11 +6,11 @@ Authentication decides who can connect. Your instance configuration decides what
 
 | Mode | Use when | Configure |
 | --- | --- | --- |
-| `ingress` | An existing protected ingress controls callers | Protect ingress, then `starmux auth mode ingress` |
-| `api-key` | Your client accepts a Bearer key | `starmux auth key "My client"` |
-| `oauth` | Your client uses browser login and consent | [Configure a provider](OAUTH.md), then `starmux auth mode oauth` |
+| `none` *(default)* | Connecting on the same computer, or your tunnel/reverse proxy already restricts callers | `starmux auth mode none` |
+| `api-key` | Your client accepts a Bearer API key header | `starmux auth key "My AI Client"` |
+| `oauth` | Your client uses browser login and consent (e.g., ChatGPT Web) | [Configure a provider](OAUTH.md), then `starmux auth mode oauth` |
 
-A new local instance uses `ingress`. For remote access in this mode, the ingress must restrict access; HTTPS encrypts traffic but does not authenticate callers. One instance has one active mode. All its authorized clients use the same approved tool permissions.
+A new local instance defaults to `none` (also accepted as `ingress`). For remote access in this mode, your tunnel or reverse proxy must restrict access; HTTPS encrypts traffic but does not authenticate callers. Each instance has one active authentication mode at a time, and all authorized clients share the instance's approved workspace permissions.
 
 ## API keys
 
@@ -20,7 +20,7 @@ starmux auth
 starmux auth revoke CREDENTIAL_ID
 ```
 
-Creating a key also enables API-key mode. Copy the key when printed; Starmux stores only its digest. New keys begin with `smx_`; migrated `mgw_` keys continue to work. Expiration accepts positive durations (`30m`, `12h`, `30d`, `4w`) or a future ISO timestamp. Omit it for no expiry.
+Creating a key automatically enables `api-key` mode and prints both Form UI fields and a ready-to-paste `mcpServers` JSON snippet. Copy the key when printed; Starmux stores only its digest. New keys begin with `smx_` (migrated `mgw_` keys continue to work). Expiration accepts positive durations (`30m`, `12h`, `30d`, `4w`) or a future ISO timestamp. Omit it for no expiry.
 
 Configure your client with `Authorization: Bearer YOUR_KEY`. See the [complete HTTPS example](REMOTE_SETUP.md#2-https--bearer-api-key).
 

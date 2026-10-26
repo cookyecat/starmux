@@ -242,7 +242,7 @@ Explore the `docs/` guides by topic:
   - [Security & Workspace Permissions](docs/SECURITY.md) — Understanding Read-Only vs. Coding Mode, directory grants, tool deny rules, and macOS privacy boundaries.
   - [Client Compatibility](docs/CLIENTS.md) & [Platform Details](docs/PLATFORMS.md) — Tested AI client matrix and macOS / Linux / Windows runtime specifics.
 - **🛠️ Reference & Project**
-  - [Documentation Index](docs/README.md) · [Installation](docs/INSTALL.md) · [Architecture](docs/ARCHITECTURE.md) · [Contributing](CONTRIBUTING.md)
+  - [Documentation Index](docs/README.md) · [Installation](docs/INSTALL.md) · [Contributing](CONTRIBUTING.md)
 
 ## License
 

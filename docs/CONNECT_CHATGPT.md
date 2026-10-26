@@ -19,9 +19,9 @@ This is a guide for **your own private ChatGPT connection**, not a claim that th
 ## Before either connection
 
 1. Install and start Starmux using [Local installation](INSTALL.md).
-2. Run `starmux status` and confirm **Core: RUNNING / Healthy**. Note your **actual local port**. The initial default port is **18893**; use the actual value shown by `status`.
-3. The **local** MCP address is `http://127.0.0.1:<PORT>/mcp`. You don't paste that into ChatGPT: ChatGPT runs in the cloud and cannot dial your Mac's `localhost`.
-4. Start with a **restricted read-only** profile. Remote caller authentication and permission to use a tool are separate from simply discovering that tool.
+2. Run `starmux status` and confirm **`● Starmux is running`**. Note your **actual local port**. The default port is **18893**; use the actual value shown by `status`.
+3. The **local** MCP address is `http://127.0.0.1:<PORT>/mcp`. You don't paste that into ChatGPT Web: ChatGPT runs in the cloud and cannot dial your machine's `localhost` directly.
+4. Start with the default **Read-only** mode (`starmux up`). Switch to **Coding mode** (`starmux up --code`) when you want ChatGPT to edit files or run Shell commands.
 
 ## 1. Direct HTTPS — your domain, your Gateway
 
@@ -118,7 +118,7 @@ tunnel-client doctor --profile <YOUR_PROFILE> --explain
 tunnel-client run --profile <YOUR_PROFILE>
 ```
 
-Keep both Gateway and `tunnel-client` running. **Choosing Tunnel in the Gateway App does not itself create or start this connection.**
+Keep both Starmux and `tunnel-client` running.
 
 ### Step 3 — Choose the Tunnel in ChatGPT
 
@@ -144,7 +144,5 @@ Neither route replaces Desktop Commander or changes your local file permissions.
 - **DNS resolves, but HTTPS fails:** DNS alone doesn't open TCP 443. Recheck router port-forward/IPv6 firewall, ISP blocks, proxy and certificate.
 - **Tools appear, but write is denied:** This may be correct. Check remote caller authorization and local restricted/developer mode. Don't disable security just to make discovery green.
 - **No “Add custom MCP server” option:** ChatGPT's available custom MCP features depend on plan and workspace permissions. See [OpenAI's current connection instructions](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt).
-
-**Community release gate:** Neither route is independently accepted as a public one-click workflow yet; ChatGPT OAuth Tunnel coding and revocation tests passed, while direct-HTTPS OAuth and independent onboarding remain open. No public endpoint should be deployed without verified caller identity and revocation.
 
 [Main README](../README.md) · [Local installation](INSTALL.md) · [Security](SECURITY.md)

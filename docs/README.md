@@ -13,4 +13,4 @@ Start locally, connect your client, then explore advanced configuration as neede
 - [Instances and JSONC configuration](INSTANCES.md)
 - [Permissions and security](SECURITY.md)
 - [Client compatibility](CLIENTS.md) and [platform support](PLATFORMS.md)
-- [Architecture](ARCHITECTURE.md) and [contributing](../CONTRIBUTING.md)
+- [Contributing](../CONTRIBUTING.md)

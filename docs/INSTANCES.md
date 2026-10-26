@@ -9,6 +9,7 @@ starmux ls
 starmux status -i work
 starmux logs -f -i blog
 starmux down -i work
+starmux rm blog
 ```
 
 Names such as `work` and `blog` are arbitrary labels. Names and stable IDs both work with `-i` / `--instance`, before or after the command. Instances share the OS account; coding mode uses that account's permissions.
@@ -57,7 +58,7 @@ Import makes a private copy. `--link` keeps the external file authoritative. `ma
 starmux config copy experiment -i work
 starmux config rename development -i work
 starmux config default development
-starmux config archive -i experiment
+starmux rm experiment              # Alias for: starmux config archive -i experiment
 starmux ls --archived
 starmux config restore -i experiment
 ```

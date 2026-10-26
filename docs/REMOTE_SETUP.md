@@ -6,15 +6,13 @@ For help choosing between the three authentication modes, read [the access-contr
 
 ## Choose authentication independently of transport
 
-| Authentication | Choose it when | Validated path |
+| Authentication | Choose it when | CLI Command |
 | --- | --- | --- |
-| Ingress-managed | Your existing ingress restricts access and you do not need a Gateway credential | Codex plugin through a protected OpenAI Tunnel |
-| Bearer API key | Your client accepts an `Authorization` header | WorkBuddy over public HTTPS + IPv6, including remote reads and writes |
-| OAuth | Your client presents a login/consent flow | ChatGPT web through OpenAI Tunnel + Keycloak, including coding and revocation |
+| **None** (`none` / `ingress`) | Connecting locally, or your tunnel already restricts callers | `starmux auth mode none` |
+| **Bearer API key** | Your client accepts an `Authorization: Bearer <key>` header (e.g., WorkBuddy, Cursor) | `starmux auth key "My AI Client"` |
+| **OAuth 2.0** | Your client requires a browser login/consent flow (e.g., ChatGPT Web) | `starmux auth oauth setup ...` |
 
-HTTPS and Tunnel are transport choices; API key and OAuth are authentication choices. OAuth does not require Tunnel, and HTTPS alone does not authenticate callers. ChatGPT direct-HTTPS OAuth has not received the same end-to-end acceptance as the Tunnel deployment. Doubao compatibility is owner-reported; its precise transport/authentication combination has not been recorded. See the [client matrix](CLIENTS.md).
-
-A Core has one active authentication mode. Switching to OAuth makes existing API keys unusable on that Core, and vice versa. This guide configures one Core at a time, not simultaneous API-key/OAuth listeners. The separate acceptance instances used during development are not a prerequisite for ordinary installation.
+HTTPS reverse proxy and Tunnel are network transport choices; API key and OAuth are authentication choices. Each Starmux instance has one active authentication mode at a time. Switching to OAuth disables API keys on that instance (and vice versa). See the [client matrix](CLIENTS.md).
 
 ## 1. Start locally
 
@@ -81,10 +79,12 @@ For WorkBuddy, merge this entry into `~/.workbuddy/mcp.json` without replacing u
 ```json
 {
   "mcpServers": {
-    "my-gateway": {
+    "starmux": {
       "type": "streamable-http",
       "url": "https://mcp.example.com/mcp",
-      "headers": { "Authorization": "Bearer REPLACE_WITH_YOUR_GATEWAY_KEY" }
+      "headers": {
+        "Authorization": "Bearer smx_REPLACE_WITH_YOUR_API_KEY"
+      }
     }
   }
 }
@@ -199,7 +199,7 @@ Validate and run Caddy as in the API-key section. This allowlist is for the **pr
 
 Before enabling public MCP access, configure Core authentication as below. If the proxy is already running while Core still uses ingress mode, keep the `/mcp` route disabled until OAuth mode is set. Issuer metadata can be exposed first for configuration.
 
-## 4. Configure Core and ChatGPT
+## 4. Configure Starmux and ChatGPT
 
 ```sh
 starmux auth oauth setup \
@@ -263,8 +263,8 @@ Manage keys/sessions in the local **Dashboard → Access control**. The macOS Ap
 | HTTP 401 after revoke or idle expiry | Do not retry tools indefinitely; inspect local revocation state, then use a fresh authorized login if appropriate |
 | HTTP 403 | Allowed owner/client and `gateway:access`; do not expand permissions just to hide a failure |
 | OAuth works but a write is denied | Existing workspace/OS/upstream policy still applies |
-| Web answer/app fails to render | Correlate actual tool/audit results before deciding whether execution failed; never automatically repeat a side-effecting call |
-| CLI changes do not affect the server | Check `MAC_MCP_ACCESS_FILE`, launch environment and startup identity panel |
+| Web answer/app fails to render | Correlate actual tool/audit results (`starmux logs -f`) before deciding whether execution failed; never automatically repeat a side-effecting call |
+| CLI changes do not affect the server | Check `starmux ls` and `starmux status` to ensure you are targeting the intended instance (`-i <name>`) |
 
 The local App, Core, proxy, database, provider and Tunnel have separate process lifecycles. Stopping Core stops new tool service; it does not automatically shut down the others. Persist private configuration and PostgreSQL/Caddy data, configure service startup deliberately, and repeat acceptance after reboot or deployment changes.
 

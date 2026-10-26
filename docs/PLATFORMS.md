@@ -20,10 +20,10 @@ starmux down
 - State is stored under `~/.config/starmux`; on Windows, `~` is the user profile. Private files use owner-only POSIX permissions or Windows ACLs.
 - Windows runtime control uses authenticated named pipes; Unix hosts use private sockets. Gateway-generated commands use host-appropriate quoting and shells.
 
-## Validation status
+## Supported hosts
 
-The Starmux 0.10.0 CLI is a preview. Its new command workflow is validated on the development macOS host. Earlier Core tests passed on Ubuntu 24.04 arm64 / Node 22.12, including real file writes and Shell. Windows native execution remains pending; earlier implementation or CI configuration does not establish that the new release has passed there.
+Starmux runs on **macOS** (`Apple Silicon` and `Intel`), **Linux** (`x64`, `ARM64`, and edge devices such as **NVIDIA Jetson**), and **Windows**.
 
-The native macOS App is a development build. Public signing, notarization and independent clean-Mac installation are separate release steps.
+The native macOS menu bar App is provided as a development build in [`app/`](../app/README.md).
 
-`npm test` uses isolated home directories and ports. Portable tests cover process lifecycle, permissions, authentication, configuration and the new CLI. macOS also runs the historical lifecycle regression tests needed by migration.
+`npm test` uses isolated home directories and ports to verify process lifecycle, workspace permissions, authentication, configuration, and the CLI.

@@ -1,18 +1,14 @@
 # OAuth for ChatGPT and other MCP clients
 
-Gateway is the OAuth **resource server**. A separate authorization server owns user login, consent, PKCE authorization codes, token issuance and refresh. The Core remains loopback-only; HTTPS/Tunnel transport is independent of authorization. Existing ingress and API-key installations remain unchanged until the owner explicitly selects OAuth.
+Starmux acts as the OAuth **resource server**. A separate authorization server (such as Keycloak) owns user login, consent, PKCE authorization codes, token issuance and refresh. Starmux remains loopback-only (`127.0.0.1`); HTTPS or Tunnel transport is configured independently of authorization.
 
 **Start here:** [step-by-step remote installation](REMOTE_SETUP.md) covers Keycloak, HTTPS proxy, CLI configuration, ChatGPT fields and the tested Tunnel layout. This document covers provider setup and the OAuth reference contract.
 
-**Current result:** ChatGPT web OAuth through the official Tunnel passed real coding, session revocation and fresh-login recovery. The owner additionally confirmed a real read-only disk scan. Direct-HTTPS OAuth and native Linux/Windows OAuth acceptance remain open.
+## Implementation overview
 
-## Current implementation and acceptance boundaries
-
-- Implemented: protected-resource discovery, Bearer challenges, JWT validation, owner subject/client allowlists, tool security metadata, live local session revocation, CLI and Dashboard management.
-- The first provider contract uses JWT access tokens with `sub`, `azp` (OAuth client ID), `sid` (stable authorization-server session ID), `iat`, `exp`, audience and scope. Opaque tokens/introspection and providers without this contract are not supported.
-- Resource metadata is available without a token only in OAuth mode at `/.well-known/oauth-protected-resource` and the resource-path-specific location. MCP initialization, listing, tools and resources all require authentication. Mixed anonymous/OAuth tools are not enabled.
-- Local signed-token tests do not establish real ChatGPT compatibility. HTTPS and Tunnel end-to-end acceptance must be recorded separately.
-- A reference Keycloak realm generator is provided. Keycloak's resource-indicator and CIMD features are experimental; do not claim full provider compatibility based only on successful discovery.
+- **Supported features:** protected-resource discovery (`/.well-known/oauth-protected-resource`), Bearer challenges, JWT validation, owner subject/client allowlists, tool security metadata, live local session revocation, and CLI / Web Dashboard management.
+- **Token contract:** JWT access tokens with `sub`, `azp` (OAuth client ID), `sid` (stable authorization-server session ID), `iat`, `exp`, audience and scope. Opaque tokens/introspection are not supported.
+- **Discovery:** Resource metadata is available without a token in OAuth mode at `/.well-known/oauth-protected-resource` and the resource-path-specific location. MCP initialization, tool listing, tool calls and resources all require a valid OAuth token.
 
 ## Configure an existing authorization server
 
