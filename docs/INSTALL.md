@@ -44,11 +44,7 @@ With API-key or OAuth authentication enabled, give `verify` a valid Bearer crede
 
 ## Connect remotely
 
-Continue with [remote setup](REMOTE_SETUP.md): HTTPS + API key, ChatGPT OAuth, or an existing protected ingress. A local verification pass confirms the local service; the last step of each remote route is a real tool call from your client.
-
-## Existing installations
-
-Use [migration](MIGRATION.md) to retain your existing workspaces and credentials. New installations store state in `~/.config/starmux` on all platforms.
+Continue with [remote setup](REMOTE_SETUP.md): HTTPS + API key, ChatGPT OAuth, or an existing protected tunnel. A local verification pass confirms the local service; the last step of each remote route is a real tool call from your client.
 
 ## Install from a checkout
 

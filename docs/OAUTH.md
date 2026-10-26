@@ -99,11 +99,7 @@ A maximum of 512 remembered OAuth sessions is enforced without evicting revocati
 
 JWT verification checks signatures, issuer, audience, expiry/not-before, issued-at, client, owner subject, session and scope. A wrong scope/owner is denied before MCP dispatch. The Core does not retry tools when authentication fails. Locally trusted Shell tools remain capable of accessing owner files; OAuth admission does not isolate them from the owner account.
 
-Existing Tunnel coding acceptance in ingress mode is recorded separately in [the Tunnel validation report](VALIDATION_TUNNEL.md); it is not OAuth acceptance.
-
-## Validation history
-
-See [client compatibility](CLIENTS.md) and the [OAuth validation archive](VALIDATION_OAUTH.md).
+See [client compatibility](CLIENTS.md) and [remote setup](REMOTE_SETUP.md) for deployment details.
 
 ## Reproduce the local provider test
 

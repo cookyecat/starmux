@@ -1,7 +1,7 @@
 # Security policy
 
-**Status:** Community preview, version 0.9.0. Optional Gateway API key authentication and revocation are tested locally. Broad external-client compatibility and public Shell deployment acceptance remain unverified.
+**Status:** Community preview, version 0.11.0. Optional Bearer API key and OAuth authentication with revocation are supported.
 
-Please **do not post security vulnerabilities, credentials or user data in public GitHub issues**. Before opening the new community repository, its owner should enable **GitHub Private Vulnerability Reporting** or provide another vetted confidential reporting contact. Until that private route is published, avoid sending exploit details publicly.
+Please **do not post security vulnerabilities, credentials or user data in public GitHub issues**. Use **GitHub Private Vulnerability Reporting** to report security issues privately.
 
-Do not expose the raw Gateway HTTP port to the public internet. Read [security and trust boundaries](docs/SECURITY.md).
+Do not expose the raw Gateway HTTP port (`127.0.0.1`) to the public internet without an authenticated reverse proxy or tunnel. Read [security and trust boundaries](docs/SECURITY.md).

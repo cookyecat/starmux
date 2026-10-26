@@ -12,4 +12,4 @@ Starmux is a self-hosted connection and routing layer around real upstream MCP t
 - Do not commit API keys, tunnel runtime profiles, passwords or protected files; use personal private configuration and report vulnerabilities privately.
 - Multi-user/multi-host orchestration and user-defined policy scripts are **not shipped** in this preview.
 
-See [connection steps](CONNECT_CHATGPT.md) and [release status](RELEASE_STATUS.md).
+See [connection steps](CONNECT_CHATGPT.md) and [platform support](PLATFORMS.md).

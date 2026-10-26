@@ -7,7 +7,7 @@ Thank you for helping build an independent, self-hosted MCP Gateway.
 - Fixes must preserve upstream Desktop Commander tool schemas and accurately separate local health from remote caller identity.
 - Feature ideas for programmable hooks, broader multi-upstream routing or multi-computer operation are welcome, but should be labeled **proposals** until independently implemented and tested.
 
-See [security](SECURITY.md) and [current preview status](docs/RELEASE_STATUS.md).
+See [security](SECURITY.md) and [platform coverage](docs/PLATFORMS.md).
 
 ## TypeScript development
 

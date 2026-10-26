@@ -9,17 +9,8 @@ Start locally, connect your client, then explore advanced configuration as neede
 ## Go further
 
 - [OAuth and ChatGPT](OAUTH.md)
+- [Connect ChatGPT (HTTPS & Tunnel)](CONNECT_CHATGPT.md)
 - [Instances and JSONC configuration](INSTANCES.md)
-- [Migration from Mac MCP Gateway](MIGRATION.md)
 - [Permissions and security](SECURITY.md)
 - [Client compatibility](CLIENTS.md) and [platform support](PLATFORMS.md)
-- [Release status](RELEASE_STATUS.md)
 - [Architecture](ARCHITECTURE.md) and [contributing](../CONTRIBUTING.md)
-
-## Validation archives
-
-These records describe specific tested deployments, not installation instructions:
-
-- [WorkBuddy](VALIDATION_WORKBUDDY.md)
-- [Tunnel](VALIDATION_TUNNEL.md)
-- [OAuth](VALIDATION_OAUTH.md)

@@ -13,7 +13,7 @@ Choose a client you already use, then check its tested connection below. Transpo
 | **WorkBuddy** | Tested: remote HTTPS + IPv6 + API-key file reads/writes to macOS | [API Key setup](REMOTE_SETUP.md#2-https--bearer-api-key) |
 | **Doubao (豆包)** | Owner-reported successful use; exact connection combination not recorded | [Deployment options](REMOTE_SETUP.md) |
 
-A client listing does not imply every authentication or transport combination has passed. In particular, Claude App is a compatibility target, and ChatGPT direct-HTTPS OAuth remains unverified. [OAuth evidence](OAUTH.md) · [WorkBuddy evidence](VALIDATION_WORKBUDDY.md) · [Protected Tunnel evidence](VALIDATION_TUNNEL.md)
+A client listing does not imply every authentication or transport combination has passed. In particular, Claude App is a compatibility target, and ChatGPT direct-HTTPS OAuth remains unverified. See [OAuth setup](OAUTH.md) and [remote setup](REMOTE_SETUP.md).
 
 ## Use WorkBuddy with a Linux workspace
 
@@ -22,7 +22,7 @@ A client listing does not imply every authentication or transport combination ha
 
 For example, ask WorkBuddy to inspect a Linux project's configuration, update an approved file, and run its tests on that Linux host. WorkBuddy itself does not need to be installed there. This is remote MCP tool access, not remote desktop control or automatic file synchronization.
 
-**Validation:** remote WorkBuddy file reads/writes on a Mac have passed; the Linux Core has independently passed real Desktop Commander file-write and Shell tests. The combined **WorkBuddy → Linux** deployment is an intended use case, with end-to-end acceptance still pending. [WorkBuddy evidence](VALIDATION_WORKBUDDY.md) · [Linux setup and permissions](PLATFORMS.md)
+**Validation:** remote WorkBuddy file reads/writes on a Mac have passed; the Linux Core has independently passed real Desktop Commander file-write and Shell tests. The combined **WorkBuddy → Linux** deployment is an intended use case, with end-to-end acceptance still pending. See [Linux setup and permissions](PLATFORMS.md).
 
 WorkBuddy's [official desktop downloads](https://www.codebuddy.cn/docs/workbuddy/Download-History) currently list macOS and Windows. This deployment separates the client installation from the machine that executes tools.
 

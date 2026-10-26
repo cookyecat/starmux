@@ -110,7 +110,7 @@ Set that variable securely in the environment of the actual Codex process; setti
 4. The next MCP request with that key must fail with HTTP 401. A missing/wrong key must also fail. Already-running tools are not canceled.
 5. Create a new key to restore access; update the client's private configuration.
 
-Local `starmux verify` in API-key mode reads `STARMUX_TOKEN` from its environment. Local PASS is not external acceptance. [WorkBuddy evidence and limits](VALIDATION_WORKBUDDY.md).
+Local `starmux verify` in API-key mode reads `STARMUX_TOKEN` from its environment. Local PASS confirms the local endpoint; verify remote access with a real tool call from your client.
 
 ## 3. OAuth: deploy the authorization server
 
