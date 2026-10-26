@@ -1,8 +1,8 @@
 import {supportedHost} from "../platform.js";
 import { z } from "zod";
-import { legacyCliEntry as cliEntry,packageRoot,desktopCommanderEntry } from "../runtime-paths.js";
+import { legacyCliEntry as cliEntry,packageRoot,desktopCommanderEntry,desktopCommanderPackageJson } from "../runtime-paths.js";
 import { errorCode,errorMessage,isInteger,parseJSON } from "../validation.js";
-const packageSchema=z.object({version:z.string(),dependencies:z.record(z.string())});
+const packageSchema=z.object({version:z.string(),dependencies:z.record(z.string()),devDependencies:z.record(z.string()).optional()});
 // Minimal, portable local Gateway entrypoint. No implicit public network binding.
 import { access,readFile } from "node:fs/promises";
 import path from "node:path";
@@ -73,11 +73,12 @@ Gateway key authentication is optional; access defaults to managed by ingress.
 `);
 }
 async function doctor(){
+  const vendorPkg=await readFile(desktopCommanderPackageJson,"utf8").then(t=>z.object({version:z.string()}).parse(parseJSON(t))).catch(()=>null);
   const facts: {event:string;node:string;platform:string;workspaceConfigured:boolean;mode:string;devCommands:string;upstreamVersion:string|null;workspaceValidated?:boolean;workspaceMode?:string;gitMode?:string;worktreeMode?:string;desktopCommanderTools?:number;result?:string;reason?:string}={event:"GATEWAY_DOCTOR",node:process.version,platform:process.platform,
     workspaceConfigured:Boolean(process.env.MAC_MCP_PROJECT_ROOT),
     mode:process.env.MAC_MCP_WORKSPACE_MODE||"read-only",
     devCommands:process.env.MAC_MCP_DEV_COMMANDS||"presets",
-    upstreamVersion:pkg.dependencies?.["@wonderwhy-er/desktop-commander"]||null};
+    upstreamVersion:vendorPkg?.version||pkg.dependencies?.["@wonderwhy-er/desktop-commander"]||pkg.devDependencies?.["@wonderwhy-er/desktop-commander"]||null};
   let code=0;
   try{
     const {createProjectPolicy}=await import("../project-workspace-policy.js");

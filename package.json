@@ -1,6 +1,6 @@
 {
   "name": "starmux",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "Connect AI clients to files, terminals and development tools on your own computer.",
   "license": "MIT",
   "type": "module",
@@ -28,22 +28,34 @@
     "build:test": "npm run build",
     "prepare": "node scripts/prepare.mjs",
     "prepack": "npm run build",
+    "sync:upstream": "npm install --save-dev --save-exact @wonderwhy-er/desktop-commander@latest --ignore-scripts && npm run build",
     "test:oauth:keycloak": "npm run build && node --test dist/test/keycloak.integration.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
-    "@wonderwhy-er/desktop-commander": "0.3.0",
+    "@opendocsg/pdf2md": "0.3.4",
+    "@vscode/ripgrep": "1.18.0",
+    "exceljs": "4.4.0",
+    "fastest-levenshtein": "1.0.16",
+    "isbinaryfile": "5.0.7",
     "jose": "6.2.12",
     "jsonc-parser": "3.3.1",
+    "pdf-lib": "1.17.1",
+    "pizzip": "3.3.0",
+    "proper-lockfile": "4.1.2",
+    "sharp": "0.35.5",
+    "unpdf": "1.8.0",
     "zod": "3.25.76",
     "zod-to-json-schema": "3.25.2"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
+    "@wonderwhy-er/desktop-commander": "0.3.1",
     "typescript": "5.9.3"
   },
   "files": [
     "dist/src",
+    "dist/vendor",
     "src/dc-workspace-http.mjs",
     "scripts/prepare.mjs",
     "test/fixtures/p1-fixture.txt",

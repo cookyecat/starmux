@@ -5,4 +5,8 @@ import {fileURLToPath} from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 rmSync(new URL('../dist/', import.meta.url), {recursive:true, force:true});
 const result = spawnSync(process.execPath, [root + '/node_modules/typescript/bin/tsc', '-p', root + '/tsconfig.json'], {stdio:'inherit', cwd:root});
-process.exitCode = result.status ?? 1;
+if ((result.status ?? 1) !== 0) {
+  process.exitCode = result.status ?? 1;
+} else {
+  await import('./vendor-desktop-commander.mjs');
+}
