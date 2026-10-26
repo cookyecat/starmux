@@ -10,6 +10,14 @@ starmux up
 
 The first start creates a private configuration and starts a background process on `127.0.0.1:18893`. The terminal returns when the service is ready.
 
+Read the **Connect an AI client (MCP settings)** section printed by `up` (also available with `status`):
+
+- **None (no token required):** a local client uses Streamable HTTP with authentication set to None. For a web or remote client, connect through a protected HTTPS proxy or tunnel that forwards to `127.0.0.1:18893`.
+- **API key:** configure Bearer token authentication (`Authorization: Bearer <YOUR_API_KEY>`) with the key you saved when creating it. The output shows how many keys are active and the command to create one if needed.
+- **OAuth:** use the configured **URL (Remote)** and complete browser sign-in with an allowed account.
+
+`starmux dashboard` opens the local Web Access Console with its owner login so you can view and copy settings in your browser. `--json` retains structured status for scripts.
+
 ```sh
 starmux verify
 starmux status

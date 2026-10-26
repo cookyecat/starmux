@@ -17,9 +17,9 @@ const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 const equal=(a:string,b:string)=>a.length===b.length&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 export const defaultAccessFile=()=>process.env.MAC_MCP_ACCESS_FILE||path.join(homedir(),'.config','starmux','access-v1.json');
 const active=(c:Pick<z.infer<typeof credential>,'revokedAt'|'expiresAt'>)=>!c.revokedAt&&(!c.expiresAt||Date.parse(c.expiresAt)>Date.now());
-export async function createAccessControl(file=defaultAccessFile()){
+export async function createAccessControl(file=defaultAccessFile(),options:{initialize?:boolean}={}){
   if(!path.isAbsolute(file))throw Error('ACCESS_FILE_ABSOLUTE_REQUIRED');
-  const folder=path.dirname(file);createPrivateDirectory(folder);
+  const folder=path.dirname(file);if(options.initialize!==false)createPrivateDirectory(folder);
   async function readPrivate(target:string){
     const st=await lstat(target);
     if(!st.isFile()||st.nlink!==1||!ownedByUser(target,st,true)||st.size>262144)throw Error('ACCESS_FILE_UNSAFE');
@@ -48,7 +48,8 @@ export async function createAccessControl(file=defaultAccessFile()){
     if(data.mode==='oauth'&&!data.oauth)throw Error('OAUTH_CONFIGURATION_REQUIRED');
     return data;
   }
-  await locked(async()=>{
+  // Status readers validate existing state without creating stores or lock files.
+  if(options.initialize!==false)await locked(async()=>{
     try{await load();}catch(e){
       if(!(e instanceof Error&&'code' in e&&e.code==='ENOENT'))throw e;
       // A persistent marker prevents a deleted store from silently resetting

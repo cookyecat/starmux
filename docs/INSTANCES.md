@@ -37,7 +37,7 @@ Set `VISUAL` or `EDITOR` to your editor executable for `config edit`. JSONC supp
     snapshots/
 ```
 
-Configuration holds workspace, port, permissions and optional upstream settings. Credentials and secrets live in private state. `config validate` and `config schema` provide diagnostics and the full schema.
+Configuration holds workspace, port, permissions and optional upstream settings. Credentials and secrets live in private state. `config validate` and `config schema` provide diagnostics and the full schema. `starmux config schema` also works before creating an instance.
 
 ## Import, bind and export
 
@@ -63,6 +63,8 @@ starmux config restore -i experiment
 ```
 
 Copies receive a new identity and port, without credentials or private secrets. An authenticated copy needs its authentication configured before startup. Archive stops the instance and retains recoverable data. The first created instance is the CLI default; `config default` changes it explicitly.
+
+With no instances, `starmux ls` points to `starmux up` to get started. If all instances are archived, use `starmux ls --archived` and restore one with `starmux config restore -i NAME`. Instance operations reject missing or extra arguments; use `-i NAME` to select the instance to archive or restore.
 
 ## Snapshots, secrets and automation
 

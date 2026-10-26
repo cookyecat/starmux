@@ -27,13 +27,13 @@ export function renderPermissionDashboard({project,home,config,warning="",native
     '<button type="submit">撤销</button></form></td></tr>').join("");
   return '<!doctype html><html lang="zh-CN"><head>'+
     '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>Mac MCP Gateway · Workspace Permissions</title>'+
+    '<title>Starmux · Workspace Permissions</title>'+
     '<style>body{font:15px system-ui,-apple-system,sans-serif;max-width:940px;margin:30px auto;padding:0 20px;color:#233045;background:#f6f7fa}'+
     'section{background:white;border:1px solid #ddd;padding:20px;margin:15px 0;border-radius:12px}'+
     'table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}'+
     'input,select,button{font:inherit;padding:6px;margin:4px}input[name=target]{width:90%;max-width:550px}'+
     'small{display:block;color:#657083}code{overflow-wrap:anywhere}button{cursor:pointer}</style></head><body>'+
-    '<h1>Mac MCP Gateway · 目录授权</h1>'+
+    '<h1>Starmux · 目录授权</h1>'+
     '<p>本页在 Mac 本机管理 Gateway 权限。远程 AI 不可自行增加权限。'+
     '增加或撤销授权后，下一次工具调用立即使用新权限。</p>'+
     (warning?'<section role="alert">'+e(warning)+'</section>':"")+

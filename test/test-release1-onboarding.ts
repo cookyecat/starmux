@@ -11,6 +11,8 @@ import { parseJSON,record } from "../src/validation.js";
 const jsonRecord = (text: string) => record(parseJSON(text));
 
 const repo=process.env.GATEWAY_TEST_PACKAGE_ROOT||packageRoot;
+const packageVersion=jsonRecord(await readFile(path.join(repo,"package.json"),"utf8")).version;
+assert.equal(typeof packageVersion,"string");
 const home=await realpath(await mkdtemp(path.join(tmpdir(),"mac-mcp-release1-newuser-")));
 const project=path.join(home,"Projects","safe-work");
 await mkdir(project,{recursive:true});
@@ -218,7 +220,8 @@ try{
   assert.match(completed.stdout,/Config source\s+/);
   assert.ok(completed.stdout.includes(configFile));
   assert.ok(completed.stdout.includes(path.join(await realpath(repo),"dist/src/dc-workspace-http.js")));
-  assert.match(completed.stdout,/Build version\s+0\.10\.0 \(sha256:/);
+  const displayedBuild=completed.stdout.match(/Build version\s+(\S+) \(sha256:[a-f0-9]{16}\)/);
+  assert.ok(displayedBuild);assert.equal(displayedBuild[1],packageVersion);
   const stoppedProof=await command(path.join(repo,"bin","verify-setup.mjs"),[]).done;
   assert.equal(stoppedProof.code,1);
   assert.match(stoppedProof.stderr,/mac-mcp-gateway run/);
@@ -252,7 +255,8 @@ try{
   assert.equal(start.configSource,legacyFile);
   assert.equal(start.coreProgram,path.join(await realpath(repo),"dist/src/dc-workspace-http.js"));
   assert.equal(start.port,port);
-  assert.match(String(start.buildVersion),/^0\.10\.0 \(sha256:/);
+  const legacyBuild=String(start.buildVersion).match(/^(\S+) \(sha256:[a-f0-9]{16}\)$/);
+  assert.ok(legacyBuild);assert.equal(legacyBuild[1],packageVersion);
   console.log("LEGACY_CONFIGURATION_RUNS_CURRENT_CORE_WITH_VISIBLE_IDENTITY_PASS");
 }finally{
   if(service){

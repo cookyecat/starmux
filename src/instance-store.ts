@@ -80,7 +80,9 @@ export async function changeRegistry<T>(action:(registry:Registry)=>Promise<T>,h
 export async function resolveInstance(selector?:string,home=homedir(),includeArchived=false){
   const registry=await readRegistry(home);const rows=registry.instances.filter(i=>includeArchived||!i.archived);
   const result=selector?rows.find(i=>i.id===selector||i.name===selector):rows.find(i=>i.id===registry.defaultInstanceId)??(rows.length===1?rows[0]:undefined);
-  if(!result)throw Error(selector?'INSTANCE_NOT_FOUND: '+selector:'INSTANCE_REQUIRED: use --instance NAME or instance default NAME');
+  if(!result)throw Error(selector?'INSTANCE_NOT_FOUND: '+selector:registry.instances.length
+    ?'INSTANCE_REQUIRED: select an instance with -i NAME or set a default with starmux config default NAME'
+    :'INSTANCE_REQUIRED: no instances. Run starmux up in your project.');
   return result;
 }
 export function parseConfig(text:string):InstanceConfig{

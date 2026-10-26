@@ -73,13 +73,39 @@ export async function handle(command:string,args:string[]){
   if(command==='instance'){
     const op=positional[0]??'list';
     if(op==='list'){
-      const registry=await readRegistry();const instances=await Promise.all(registry.instances.filter(i=>flags.has('--archived')||!i.archived).map(i=>instanceStatus(i)));
+      const registry=await readRegistry();const filtered=registry.instances.filter(i=>flags.has('--archived')||!i.archived);
+      const instances=await Promise.all(filtered.map(i=>instanceStatus(i)));
       if(json)output({schemaVersion:1,defaultInstanceId:registry.defaultInstanceId,instances});
-      else {for(const i of instances)process.stdout.write(`${i.instanceId===registry.defaultInstanceId?'*':' '} ${i.name}\t${i.phase}\t${i.configState}\t${i.port??'—'}\t${i.source.path}\n`);if(!instances.length)process.stdout.write('No instances. Run: mac-mcp-gateway instance create default\n');}return;
+      else {
+        if(!instances.length){
+          process.stdout.write(registry.instances.length
+            ?'No active instances. Run: starmux ls --archived\nRestore an instance with: starmux config restore -i NAME\n'
+            :'No instances. Run: starmux up\n');
+          return;
+        }
+        const rows=await Promise.all(instances.map(async(s,idx)=>{
+          const raw=filtered[idx]!;
+          const cfg=s.active?.config??(await loadInstanceConfig(raw).catch(()=>null))?.config;
+          const mark=s.instanceId===registry.defaultInstanceId?'*':' ';
+          const state=s.archived?'archived':s.configState==='pending'?`${s.phase} (pending)`:s.phase;
+          const mode=cfg?.accessRole==='trusted'?'coding':(s.workspaceMode??'read-only');
+          const port=String(s.port??'—');
+          const workspace=cfg?.projectRoot??s.source.path;
+          return {mark,name:s.name,state,mode,port,workspace};
+        }));
+        const wName=Math.max(4,...rows.map(r=>r.name.length));
+        const wState=Math.max(6,...rows.map(r=>r.state.length));
+        const wMode=Math.max(4,...rows.map(r=>r.mode.length));
+        const wPort=Math.max(4,...rows.map(r=>r.port.length));
+        process.stdout.write(`  ${'NAME'.padEnd(wName)}  ${'STATUS'.padEnd(wState)}  ${'MODE'.padEnd(wMode)}  ${'PORT'.padEnd(wPort)}  WORKSPACE\n`);
+        for(const r of rows){
+          process.stdout.write(`${r.mark} ${r.name.padEnd(wName)}  ${r.state.padEnd(wState)}  ${r.mode.padEnd(wMode)}  ${r.port.padEnd(wPort)}  ${r.workspace}\n`);
+        }
+      }return;
     }
     if(op==='create'){
       const config=await wizard(flags);const instance=await createInstance(positional[1]??flags.get('--name')??'default',{config});
-      output({instance,message:'Saved. Start with: mac-mcp-gateway run --instance '+JSON.stringify(instance.name)});return;
+      output({instance,message:'Saved. Start with: starmux up -i '+JSON.stringify(instance.name)});return;
     }
     if(op==='import'){
       const file=positional[1];if(!file)throw Error('IMPORT_FILE_REQUIRED');
@@ -94,7 +120,10 @@ export async function handle(command:string,args:string[]){
     if(op==='copy'){
       const config={...(await loadInstanceConfig(instance)).config,port:await suggestPort()};
       const access=await createAccessControl(instancePaths(instance).access);const mode=(await access.snapshot()).mode;
-      output({instance:await createInstance(positional[2]??flags.get('--name')??instance.name+' copy',{config,requiredAccess:instance.requiredAccess!=='ingress'?instance.requiredAccess:mode}),message:'Copied settings only. Credentials and sessions were not copied.'});return;
+      const created=await createInstance(positional[2]??flags.get('--name')??instance.name+' copy',{config,requiredAccess:instance.requiredAccess!=='ingress'?instance.requiredAccess:mode});
+      if(json)output({instance:created,message:'Copied settings only. Credentials and sessions were not copied.'});
+      else process.stdout.write(`Copied '${instance.name}' to '${created.name}' (port ${config.port}). Credentials and sessions were not copied.\n`);
+      return;
     }
     await changeRegistry(async registry=>{
       const item=registry.instances.find(i=>i.id===instance.id)!;
@@ -104,7 +133,13 @@ export async function handle(command:string,args:string[]){
       else if(op==='archive'||op==='remove'){const stopped=await instanceRequest(instance,'stop');if(stopped&&stopped.phase!=='stopped')throw Error('INSTANCE_STILL_RUNNING');item.archived=true;if(registry.defaultInstanceId===item.id)registry.defaultInstanceId=null;}
       else if(op==='restore')item.archived=false;
       else throw Error('INSTANCE_ACTION_INVALID');
-    });output({result:'OK',instanceId:instance.id});return;
+    });
+    if(json)output({result:'OK',instanceId:instance.id});
+    else if(op==='rename')process.stdout.write(`Renamed '${instance.name}' to '${positional[2]}'.\n`);
+    else if(op==='default')process.stdout.write(`Default instance set to '${instance.name}'.\n`);
+    else if(op==='archive'||op==='remove')process.stdout.write(`Archived instance '${instance.name}'.\n`);
+    else if(op==='restore')process.stdout.write(`Restored instance '${instance.name}'.\n`);
+    return;
   }
   if(command==='status'&&!flags.has('--instance')&&(!json||flags.has('--all')))return handle('instance',['list',...(json?['--json']:[])]);
   const profile=flags.get('--profile');
@@ -130,12 +165,36 @@ export async function handle(command:string,args:string[]){
     if(op==='path'){if(json)output({instanceId:instance.id,...p,source:instance.source});else process.stdout.write(instance.source.path+'\n');return;}
     if(op==='schema'){output(configJSONSchema());return;}
     if(op==='show'){
-      if(flags.has('--effective'))output((await instanceStatus(instance)).active);
-      else {
+      if(flags.has('--effective')){
+        const active=(await instanceStatus(instance)).active;
+        if(json)output(active);
+        else if(!active)process.stdout.write(`Instance ${instance.name} has no active running configuration.\n`);
+        else process.stdout.write(
+          `Instance       ${instance.name} (effective running config)\n`+
+          `Workspace      ${active.config.projectRoot}\n`+
+          `Port           ${active.config.port}\n`+
+          `Mode           ${active.config.accessRole==='trusted'?'Coding (read-write, shell & git)':active.config.mode}\n`+
+          `Git workflow   ${active.config.gitMode}\n`+
+          `Extra MCPs     ${active.config.upstreams.length}\n`
+        );
+      }else{
         const text=await readTrusted(instance.source.path,instance.source.kind==='managed');
         let config:InstanceConfig|null=null;let problem:string|null=null;
         try{config=await validateConfig(parseConfig(text));}catch(e){problem=message(e);}
-        output({instanceId:instance.id,text,config,problem,revision:sourceRevision(instance.source.path,text),source:instance.source});
+        if(json)output({instanceId:instance.id,text,config,problem,revision:sourceRevision(instance.source.path,text),source:instance.source});
+        else if(problem||!config)process.stdout.write(`Instance       ${instance.name}\nConfig file    ${instance.source.path}\nProblem        ${problem??'Invalid configuration'}\n`);
+        else process.stdout.write(
+          `Instance       ${instance.name}\n`+
+          `Config file    ${instance.source.path} (${instance.source.kind})\n`+
+          `Workspace      ${config.projectRoot}\n`+
+          `Port           ${config.port}\n`+
+          `Mode           ${config.accessRole==='trusted'?'Coding (read-write, shell & git)':config.mode}\n`+
+          `Git workflow   ${config.gitMode}\n`+
+          `Extra MCPs     ${config.upstreams.length}\n\n`+
+          `Commands\n`+
+          `  Edit config  starmux config edit${instance.name==='default'?'':` -i ${instance.name}`}\n`+
+          `  Apply        starmux config apply${instance.name==='default'?'':` -i ${instance.name}`}\n`
+        );
       }return;
     }
     if(op==='recover'){
@@ -179,15 +238,26 @@ export async function handle(command:string,args:string[]){
       output({result:'SAVED',revision:(await patchInstanceConfig(instance,patch,flags.get('--revision')??'')).revision});return;
     }
     const loaded=await loadInstanceConfig(instance);
-    if(op==='validate'){output({result:'VALID',revision:loaded.revision,source:instance.source});return;}
+    if(op==='validate'){
+      if(json)output({result:'VALID',revision:loaded.revision,source:instance.source});
+      else process.stdout.write(`✓ Configuration is valid (${instance.source.path})\n`);
+      return;
+    }
     if(op==='diff'){
       const active=(await instanceStatus(instance)).active?.config??null;
       const changes=Object.entries(loaded.config).filter(([key,value])=>JSON.stringify(value)!==JSON.stringify(active?.[key as keyof InstanceConfig])).map(([field,value])=>({field,before:active?.[field as keyof InstanceConfig]??null,after:value}));
-      output({instanceId:instance.id,revision:loaded.revision,changes});return;
+      if(json)output({instanceId:instance.id,revision:loaded.revision,changes});
+      else if(!changes.length)process.stdout.write('No pending configuration changes.\n');
+      else{
+        for(const c of changes)process.stdout.write(`${c.field}: ${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}\n`);
+      }
+      return;
     }
     if(op==='apply'){
       const state=await instanceRequest(instance,'apply',flags.get('--revision')??loaded.revision);
-      output({result:state?'APPLIED':'VALID_ON_NEXT_START',instanceId:instance.id,runtime:state});return;
+      if(json)output({result:state?'APPLIED':'VALID_ON_NEXT_START',instanceId:instance.id,runtime:state});
+      else process.stdout.write(state?`Applied configuration to '${instance.name}'.\n`:`Configuration validated; will take effect on next 'starmux up'.\n`);
+      return;
     }
     if(op==='export'){
       const file=flags.get('--output');const text=configTemplate(loaded.config);

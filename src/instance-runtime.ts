@@ -77,7 +77,7 @@ export async function instanceStatus(instance:Instance,home=homedir()){
     executionMode:runtime?.phase==='running'?(runtime.executionMode==='background'?'background':'foreground-owned'):'stopped',loginAutostart:'disabled',
     connectionState:health==='ok'?(lastToolCallAt?'local-ready-activity-recorded':'local-ready-remote-unverified'):health,requiredAccess:instance.requiredAccess};
 }
-export async function runInstance(instance:Instance,options:{home?:string;appParentPid?:number;json?:boolean;background?:boolean;workerModule?:URL}={}){
+export async function runInstance(instance:Instance,options:{home?:string;appParentPid?:number;json?:boolean;background?:boolean;workerModule?:URL;onReady?:()=>Promise<void>}={}){
   const home=options.home??homedir();const parent=options.appParentPid;
   if(parent!==undefined&&(!Number.isSafeInteger(parent)||parent<2||process.ppid!==parent))throw Error('APP_PARENT_IDENTITY_MISMATCH');
   if(instance.archived)throw Error('INSTANCE_ARCHIVED');
@@ -104,7 +104,11 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
   let ending=false;let expectedWorkerExit=false;let sequence:Promise<unknown>=Promise.resolve();
   let finish!:()=>void;const finished=new Promise<void>(r=>{finish=r;});
   const serialize=<T>(fn:()=>Promise<T>):Promise<T>=>{const next=sequence.then(fn);sequence=next.catch(()=>{});return next;};
-  function emit(event:string){process.stdout.write(JSON.stringify({event,...state})+'\n');}
+  function emit(event:string){
+    if(options.json||!options.onReady)process.stdout.write(JSON.stringify({event,...state})+'\n');
+    else if(event==='INSTANCE_ERROR'||event==='INSTANCE_APPLY_FAILED')process.stderr.write(`\n${instance.name}: ${state.problem}\nInspect logs: starmux logs -i ${instance.id}\n`);
+    else if(event==='INSTANCE_STOPPED')process.stdout.write(`\nStopped ${instance.name}.\n`);
+  }
   async function stopWorker(){
     const child=worker;if(!child)return;expectedWorkerExit=true;
     await new Promise<void>(resolve=>{
@@ -191,7 +195,8 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     portLease=await acquireControl(initial.config.port,{launcher:owner.launcher});
     portLease.onStop(async()=>{void serialize(shutdown);return 'STOPPED';});
     await serialize(()=>startWorker(active(initial),portLease!));
-    if(!options.json)process.stderr.write(`\n${instance.name}: http://127.0.0.1:${state.port}/mcp\nConfig: ${instance.source.path}\nCtrl+C stops this instance.\n`);
+    if(options.onReady)await options.onReady();
+    else if(!options.json)process.stderr.write(`\n${instance.name}: http://127.0.0.1:${state.port}/mcp\nConfig: ${instance.source.path}\nCtrl+C stops this instance.\n`);
     await finished;
   }catch(error){state.phase='error';state.problem=(error as Error).message;throw error;}finally{
     if(parentTimer)clearInterval(parentTimer);process.off('SIGTERM',signal);process.off('SIGINT',signal);

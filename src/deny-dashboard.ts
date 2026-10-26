@@ -30,7 +30,7 @@ export function renderDenyDashboard({rules,toolCatalog=[]}: {rules:DenyConfig;to
     controls("allow-directory",n,"移除过滤")+'</td></tr>').join("");
   return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
-    '<title>Mac MCP Gateway · Explicit Deny</title>'+
+    '<title>Starmux · Tool Filters</title>'+
     '<style>body{font:15px system-ui,-apple-system,sans-serif;max-width:1000px;'+
     'margin:28px auto;padding:0 20px;background:#f6f7fa;color:#233045}'+
     'section{background:white;border:1px solid #ddd;border-radius:12px;'+
@@ -39,7 +39,7 @@ export function renderDenyDashboard({rules,toolCatalog=[]}: {rules:DenyConfig;to
     'input,button{padding:7px;margin:3px;font:inherit}'+
     'input[name=value]{width:80%;max-width:600px}'+
     'code{overflow-wrap:anywhere}small{display:block;color:#657083}</style></head><body>'+
-    '<h1>Mac MCP Gateway · Tool Filters</h1>'+
+    '<h1>Starmux · Tool Filters</h1>'+
     '<p><strong>Default Allow / Explicit Deny</strong>：上游工具默认全部可用。'+
     '只有设备所有者明确禁用的工具会从 AI 的 tools/list 消失；'+
     '旧客户端直接调用时也会被拒绝。新工具默认自动可用。</p>'+

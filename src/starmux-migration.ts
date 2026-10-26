@@ -91,7 +91,7 @@ async function migrateRegistry(){
 export async function migrate(source:string|undefined,yes=false,json=false){
   if(!source){
     const registry=await exists(path.join(oldRoot(),'registry.json'));
-    const legacy=await migrateLegacy();
+    const legacy={...await migrateLegacy(),message:'Choose a source, then run starmux migrate setup or starmux migrate live. Use -y for non-interactive confirmation. Running legacy instances using these stores will be stopped; original files are retained.'};
     process.stdout.write(JSON.stringify({registry:registry?path.join(oldRoot(),'registry.json'):null,legacy,next:'starmux migrate registry|setup|live [-y]'},null,2)+'\n');return;
   }
   if(!['registry','setup','live'].includes(source))throw Error('Choose registry, setup or live.');

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdir,mkdtemp,rm,writeFile } from "node:fs/promises";
+import { mkdir,mkdtemp,readFile,rm,writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { GatewayStatus } from "../src/contracts.js";
@@ -12,6 +12,8 @@ import { parseJSON,record } from "../src/validation.js";
 const jsonRecord = (text: string) => record(parseJSON(text));
 
 const root=packageRoot;
+const packageVersion=jsonRecord(await readFile(path.join(root,"package.json"),"utf8")).version;
+assert.equal(typeof packageVersion,"string");
 const bin=path.join(root,"dist/src/cli/mac-mcp-gateway.js");
 const active: GatewayStatus={event:"GATEWAY_STATUS",profile:"live",installed:true,registered:false,
   label:"ai.home.mac-mcp-project-workspace",port:8793,health:"ok",workspaceMode:"read-write",
@@ -20,7 +22,8 @@ const active: GatewayStatus={event:"GATEWAY_STATUS",profile:"live",installed:tru
 assert.deepEqual(parseArgs(["status"]),{action:"status",options:{}});
 assert.deepEqual(parseArgs(["run","--json"]),{action:"run",options:{json:true}});
 const identity=await runtimeIdentity();
-assert.match(identity.buildVersion,/0\.10\.0 \(sha256:[a-f0-9]{16}\)/);
+const build=identity.buildVersion.match(/^(\S+) \(sha256:[a-f0-9]{16}\)$/);
+assert.ok(build);assert.equal(build[1],packageVersion);
 assert.equal(identity.coreProgram,path.join(root,"dist/src/dc-workspace-http.js"));
 const startup=formatStartup({...identity,configSource:"/example/onboarding-v1.json",port:18893});
 for(const label of ["Config source","Core program","Build version","Listening port"])
