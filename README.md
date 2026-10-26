@@ -19,7 +19,7 @@ Cloud AI assistants (like **ChatGPT Web**, **Claude**, **Codex**, or **WorkBuddy
 **Starmux** (`Star` topology + `Multiplexer`) is a self-hosted MCP gateway that connects remote AI clients to the real tools on your own computers over Direct HTTPS or a Secure Tunnel:
 
 <div align="center">
-  <img src="docs/assets/starmux-architecture.svg" width="100%" alt="Starmux architecture: Many AI clients connecting to self-hosted computers via Direct HTTPS or Secure MCP Tunnel" />
+  <img src="https://raw.githubusercontent.com/cookyecat/starmux/main/docs/assets/starmux-architecture.svg" width="100%" alt="Starmux architecture: Many AI clients connecting to self-hosted computers via Direct HTTPS or Secure MCP Tunnel" />
 </div>
 
 - **Batteries-Included Workspace Tools:** Powered by a built-in [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) engine (installed automatically via npm). Out of the box, your AI can read/write files, search code, run Shell commands, and manage Git.
@@ -213,7 +213,7 @@ See [Instances and Configuration](docs/INSTANCES.md) for advanced JSONC configur
 Prefer a visual interface? The native SwiftUI menu bar App puts service health, workspace permissions, live MCP connection topology, and recent tool calls in one compact panel.
 
 <div align="center">
-  <img src="docs/assets/starmux-app-en.png" width="380" alt="Starmux native macOS menu bar app showing service status, MCP connection topology, and recent tool calls" />
+  <img src="https://raw.githubusercontent.com/cookyecat/starmux/main/docs/assets/starmux-app-en.png" width="380" alt="Starmux native macOS menu bar app showing service status, MCP connection topology, and recent tool calls" />
   <p><sub>Native macOS Menu Bar App (English & Chinese) · Controls the same instances as the CLI</sub></p>
 </div>
 
