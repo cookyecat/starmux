@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Signed, one-entry macOS menu bar product prototype (build only).
+"""Signed, one-entry macOS menu bar application (build only).
 
-Merges observer + diagnostics without touching 8793, TCC, LaunchAgents,
-installed B4/B5 research Apps or their code-signing identities.
+Builds the menu UI in an isolated output directory.
 """
 import argparse
+import json
+import struct
 from pathlib import Path
 import plistlib
 import shutil
@@ -14,11 +15,15 @@ import sys
 ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT
 SRC=ROOT/"src"
-IDENTITY="dev.macmcpgateway.ownerapp"
+IDENTITY="dev.starmux.ownerapp"
 NAME="Starmux.app"
 
 def run(*cmd, timeout=180):
-    return subprocess.run(cmd,check=True,capture_output=True,text=True,timeout=timeout)
+    try:
+        return subprocess.run(cmd,check=True,capture_output=True,text=True,timeout=timeout)
+    except subprocess.CalledProcessError as error:
+        print(error.stderr,file=sys.stderr)
+        raise
 
 def build(target:Path):
     if sys.platform!="darwin":
@@ -32,14 +37,15 @@ def build(target:Path):
     resources=contents/"Resources"
     binary.mkdir(parents=True)
     resources.mkdir(parents=True)
+    version=json.loads((ROOT.parent/"package.json").read_text())["version"]
     with (contents/"Info.plist").open("wb") as f:
         plistlib.dump({
           "CFBundleIdentifier":IDENTITY,
           "CFBundleName":"Starmux",
           "CFBundleDisplayName":"Starmux",
-          "CFBundleExecutable":"MacMCPUnifiedMenu",
-          "CFBundleVersion":"15",
-          "CFBundleShortVersionString":"0.11.0",
+          "CFBundleExecutable":"StarmuxMenu",
+          "CFBundleVersion":version,
+          "CFBundleShortVersionString":version,
           "CFBundlePackageType":"APPL",
           "LSUIElement":True,
           "LSMinimumSystemVersion":"13.0",
@@ -58,38 +64,30 @@ def build(target:Path):
     for size,file in sizes:
         run("/usr/bin/sips","-z",str(size),str(size),str(resources/"AppLogo.png"),
             "--out",str(iconset/file))
-    run("/usr/bin/iconutil","-c","icns","-o",str(resources/"AppIcon.icns"),str(iconset))
+    chunks=[]
+    for kind,file in ((b"icp4","icon_16x16.png"),(b"icp5","icon_32x32.png"),
+                      (b"icp6","icon_32x32@2x.png"),(b"ic07","icon_128x128.png"),
+                      (b"ic08","icon_256x256.png"),(b"ic09","icon_512x512.png"),
+                      (b"ic10","icon_512x512@2x.png")):
+        png=(iconset/file).read_bytes()
+        chunks.append(kind+struct.pack(">I",len(png)+8)+png)
+    payload=b"".join(chunks)
+    (resources/"AppIcon.icns").write_bytes(b"icns"+struct.pack(">I",len(payload)+8)+payload)
     shutil.rmtree(iconset)
     run("/usr/bin/xcrun","swiftc","-O",
-        "-framework","SwiftUI","-framework","AppKit","-framework","ServiceManagement",
-        str(SRC/"GatewayStatus.swift"),
-        str(SRC/"NativeDiagnostics.swift"),
+        "-framework","SwiftUI","-framework","AppKit",
         str(SRC/"ConnectionDiagnostics.swift"),
         str(SRC/"ConnectionFlowDiagram.swift"),
         str(SRC/"RecentActivityDisclosure.swift"),
         str(SRC/"AppLanguage.swift"),
         str(SRC/"InstanceController.swift"),
-        str(SRC/"AppGatewayRunner.swift"),
-        str(SRC/"FirstRunCoordinator.swift"),
-        str(SRC/"CanonicalServiceControl.swift"),
+        str(SRC/"AppForegroundExitDelegate.swift"),
         str(SRC/"InstanceManager.swift"),
-        str(SRC/"UnifiedMenu.swift"),"-o",str(binary/"MacMCPUnifiedMenu"))
-    run("/usr/bin/xcrun","swiftc","-O",
-        str(SRC/"GatewayStatus.swift"),
-        str(SRC/"NativeDiagnostics.swift"),
-        str(SRC/"ConnectionDiagnostics.swift"),
-        str(SRC/"InstanceController.swift"),
-        str(SRC/"AppGatewayRunner.swift"),
-        str(SRC/"FirstRunCoordinator.swift"),
-        str(SRC/"UnifiedSnapshotCLI.swift"),
-        "-o",str(binary/"UnifiedSnapshotCLI"))
-    run("/usr/bin/codesign","--force","--sign","-","--timestamp=none",
-        "--identifier",IDENTITY+".cli",str(binary/"UnifiedSnapshotCLI"))
+        str(SRC/"UnifiedMenu.swift"),"-o",str(binary/"StarmuxMenu"))
     run("/usr/bin/codesign","--force","--sign","-","--timestamp=none",
         "--identifier",IDENTITY,str(app))
     run("/usr/bin/codesign","--verify","--deep","--strict",str(app))
-    print("COMMUNITY_MENU_APP_SOURCE_BUILT",app,flush=True)
-    print("BUILD_ONLY_NO_PRODUCTION_MUTATION",flush=True)
+    print("STARMUX_APP_BUILT",app,flush=True)
     return app
 
 if __name__=="__main__":
@@ -98,5 +96,5 @@ if __name__=="__main__":
     args=cli.parse_args()
     try:build(args.output_dir.expanduser().resolve())
     except (RuntimeError,subprocess.CalledProcessError) as error:
-        print("PHASE3_UNIFIED_BUILD_ERROR",str(error)[:650],file=sys.stderr)
+        print("STARMUX_APP_BUILD_ERROR",str(error)[:650],file=sys.stderr)
         raise SystemExit(2)

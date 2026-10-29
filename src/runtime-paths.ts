@@ -6,6 +6,3 @@ export const cliEntry = (name = 'starmux') => path.join(packageRoot, 'bin', name
 // Vendored zero-telemetry build of Desktop Commander bundled inside dist/vendor.
 export const desktopCommanderEntry = path.join(packageRoot, 'dist', 'vendor', 'desktop-commander', 'dist', 'index.js');
 export const desktopCommanderPackageJson = path.join(packageRoot, 'dist', 'vendor', 'desktop-commander', 'package.json');
-export const fixtureRoot = path.join(packageRoot, 'test', 'fixtures');
-
-export const legacyCliEntry=()=>path.join(packageRoot,'dist/src/cli/mac-mcp-gateway.js');

@@ -49,7 +49,7 @@ export function renderDenyDashboard({rules,toolCatalog=[]}: {rules:DenyConfig;to
     '<p>仅检查具有明确文件路径参数的直接工具调用。'+
     '<strong>不限制 Shell、Python、脚本或上游工具间接访问文件。</strong> '+
     '也不是操作系统沙箱；对目录的递归枚举或搜索亦不能提供可靠隔离。'+
-    '需要真正隔离时，应由 Desktop Commander / macOS / 容器负责。</p>'+
+    '需要真正隔离时，应由 Desktop Commander / 操作系统 / 容器负责。</p>'+
     '<table><thead><tr><th>过滤目录</th><th>操作</th></tr></thead><tbody>'+
     (paths||'<tr><td colspan="2">没有目录过滤规则</td></tr>')+
     '</tbody></table><h3>添加禁止的目录</h3>'+
@@ -62,7 +62,7 @@ export function renderDenyDashboard({rules,toolCatalog=[]}: {rules:DenyConfig;to
     '</section><p><a href="/dashboard">运行 Dashboard</a> · '+
     '<a href="/permissions">目录授权</a></p>'+
     '<small>黑名单是防误操作护栏，不是抵御恶意 Shell 或提示注入的安全边界。'+
-    '这里的管理密钥只由设备所有者在 Mac 本机使用，不得发送给远程 AI。</small>'+
+    '这里的管理密钥只由设备所有者在本机使用，不得发送给远程 AI。</small>'+
     '</body></html>';
 }
 export async function applyDenyPost(req: IncomingMessage,ruleStore: DenyRules,authorize:(token:unknown)=>Promise<boolean>,host:string|undefined): Promise<PostResult>{

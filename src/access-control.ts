@@ -15,7 +15,7 @@ const schema=z.object({version:z.literal(1),mode:z.enum(['ingress','api-key','oa
 type State=z.infer<typeof schema>;
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 const equal=(a:string,b:string)=>a.length===b.length&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
-export const defaultAccessFile=()=>process.env.MAC_MCP_ACCESS_FILE||path.join(homedir(),'.config','starmux','access-v1.json');
+export const defaultAccessFile=()=>process.env.STARMUX_ACCESS_FILE||path.join(homedir(),'.config','starmux','access-v1.json');
 const active=(c:Pick<z.infer<typeof credential>,'revokedAt'|'expiresAt'>)=>!c.revokedAt&&(!c.expiresAt||Date.parse(c.expiresAt)>Date.now());
 export async function createAccessControl(file=defaultAccessFile(),options:{initialize?:boolean}={}){
   if(!path.isAbsolute(file))throw Error('ACCESS_FILE_ABSOLUTE_REQUIRED');

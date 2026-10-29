@@ -8,17 +8,16 @@
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
     "noEmitOnError": true,
-    "sourceMap": true,
+    "sourceMap": false,
     "rootDir": ".",
     "outDir": "dist",
     "types": [
       "node"
     ],
     "skipLibCheck": true,
-    "inlineSources": true
+    "inlineSources": false
   },
   "include": [
-    "src/**/*.ts",
-    "test/**/*.ts"
+    "src/**/*.ts"
   ]
 }

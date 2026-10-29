@@ -342,15 +342,16 @@ if (existsSync(fsToolPath)) {
   writeFileSync(fsToolPath, fst);
 }
 
-// 8. Remove all .d.ts and .d.ts.map files from vendorDist to keep published tarball lean
+// 8. Remove declarations and all source maps from the shipped runtime.
 function pruneDeclarationsAndCollectFiles(dir, files = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       pruneDeclarationsAndCollectFiles(full, files);
-    } else if (entry.name.endsWith('.d.ts') || entry.name.endsWith('.d.ts.map')) {
+    } else if (entry.name.endsWith('.d.ts') || entry.name.endsWith('.map')) {
       rmSync(full, { force: true });
     } else {
+      if (entry.name.endsWith('.js')) writeFileSync(full, readFileSync(full, 'utf8').replace(/^\/\/# sourceMappingURL=.*$/gm, ''));
       files.push(full);
     }
   }

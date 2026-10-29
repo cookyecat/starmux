@@ -20,7 +20,7 @@ starmux auth
 starmux auth revoke CREDENTIAL_ID
 ```
 
-Creating a key automatically enables `api-key` mode and prints both Form UI fields and a ready-to-paste `mcpServers` JSON snippet. Copy the key when printed; Starmux stores only its digest. New keys begin with `smx_` (migrated `mgw_` keys continue to work). Expiration accepts positive durations (`30m`, `12h`, `30d`, `4w`) or a future ISO timestamp. Omit it for no expiry.
+Creating a key automatically enables `api-key` mode and prints both Form UI fields and a ready-to-paste `mcpServers` JSON snippet. Copy the key when printed; Starmux stores only its digest. New keys begin with `smx_`. Expiration accepts positive durations (`30m`, `12h`, `30d`, `4w`) or a future ISO timestamp. Omit it for no expiry.
 
 Configure your client with `Authorization: Bearer YOUR_KEY`. See the [complete HTTPS example](REMOTE_SETUP.md#2-https--bearer-api-key).
 

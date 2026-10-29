@@ -1,12 +1,13 @@
 import {windows,commandOptions,diskUsageCommand} from "./platform.js";
 import type { GrantsConfig,ToolArguments,WorkspaceGrants,WorkspacePolicy } from "./contracts.js";
-import { GatewayError,isInteger,isSafeInteger } from "./validation.js";
+import { GatewayError,errorCode,isInteger,isSafeInteger } from "./validation.js";
 // Release 1 broad read-only inventory, narrow independent write grants.
 // No OS sandbox claim: trusted-project Shell remains same-UID privileged.
 import { lstat,realpath } from "node:fs/promises";
 import path from "node:path";
 import { createProjectPolicy } from "./project-workspace-policy.js";
 import { isInside } from "./workspace-grants.js";
+import { prepareBatchRead } from "./batch-read-policy.js";
 
 function fail(reason: string): never {const e=new GatewayError(reason);throw e;};
 const fileTools=new Map([
@@ -28,9 +29,31 @@ async function broadPath(raw: unknown,kind: string){
     raw.includes("\0")||(!windows&&raw.includes("\\"))||raw.split(path.sep).includes("..")||
     path.normalize(raw)!==raw)fail("INVENTORY_ABSOLUTE_PATH_REQUIRED");
   safeSegments(raw);
-  const canonical=await realpath(raw);
+  // A read target may not exist yet. Resolve its nearest existing ancestor so
+  // the caller can still enforce grants on the canonical path before forwarding.
+  let current=raw,canonical:string;
+  const suffix:string[]=[];
+  for(;;){
+    try{canonical=path.join(await realpath(current),...suffix.slice().reverse());break;}
+    catch(error){
+      if(kind!=="file"||errorCode(error)!=="ENOENT")throw error;
+      const entry=await lstat(current).catch(e=>{
+        if(errorCode(e)==="ENOENT")return null;
+        throw e;
+      });
+      // Do not treat a dangling symlink as an ordinary missing path.
+      if(entry?.isSymbolicLink())fail("INVENTORY_SYMLINK_DENIED");
+      const parent=path.dirname(current);
+      if(parent===current)throw error;
+      suffix.push(path.basename(current));current=parent;
+    }
+  }
   safeSegments(canonical);
-  const st=await lstat(canonical);
+  const st=await lstat(canonical).catch(error=>{
+    if(kind==="file"&&errorCode(error)==="ENOENT")return null;
+    throw error;
+  });
+  if(!st)return canonical;
   if(st.isSymbolicLink())fail("INVENTORY_SYMLINK_DENIED");
   if(kind==="file"&&(!st.isFile()||st.nlink!==1||st.size>1024*1024))
     fail("INVENTORY_FILE_NOT_APPROVED");
@@ -87,6 +110,7 @@ export function createManagedWorkspacePolicy({basePolicy,grants}: {basePolicy: W
     return {kind:"denied"};
   }
   async function prepare(name: string,args: ToolArguments={}){
+    if(name==="read_multiple_files")return prepareBatchRead(args,prepare);
     const target=await locate(name,args);
     if(!target)return basePolicy.prepare(name,args);
     const data=await grants.snapshot();

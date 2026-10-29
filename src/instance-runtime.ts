@@ -15,6 +15,7 @@ const metadataSchema=z.object({instanceId:z.string().uuid(),runId:z.string().reg
 type Owner=z.infer<typeof metadataSchema>;
 export type ActiveConfig={config:InstanceConfig;revision:string;effectiveRevision:string;sourcePath:string};
 export type RuntimeState={instanceId:string;runId:string;pid:number;launcher:'cli'|'app';appParentPid:number|null;executionMode?:'foreground'|'background';
+  permissionMode?:'global'|'workspace';
   phase:'starting'|'running'|'stopping'|'stopped'|'error';port:number|null;active:ActiveConfig|null;problem:string|null;coreProgram:string;buildVersion:string};
 function runtimePaths(id:string){
   const root=path.join(controlRoot(),'i-'+id);const socket=windows?'\\\\.\\pipe\\gateway-instance-'+createHash('sha256').update(root).digest('hex').slice(0,28):path.join(root,'control.sock');
@@ -127,8 +128,8 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     await ensureAccessReady(await resolveInstance(instance.id,home),home);
     if(!await availablePort(config.config.port))throw Error('PORT_IN_USE: '+config.config.port);
     const env:NodeJS.ProcessEnv={};for(const key of childEnvKeys)if(process.env[key])env[key]=process.env[key]!;
-    Object.assign(env,instanceEnv(instance,config.config,home),{MAC_MCP_INTERNAL_SETUP_OWNER_PID:String(process.pid),MAC_MCP_INTERNAL_SETUP_RUN_ID:lease.owner.runId,MAC_MCP_INTERNAL_SETUP_TOKEN:lease.owner.token});
-    const upstreamFile=await prepareUpstreams(instance,config.config,home);if(upstreamFile)env.MAC_MCP_UPSTREAMS_FILE=upstreamFile;
+    Object.assign(env,instanceEnv(instance,config.config,home),{STARMUX_INTERNAL_SETUP_OWNER_PID:String(process.pid),STARMUX_INTERNAL_SETUP_RUN_ID:lease.owner.runId,STARMUX_INTERNAL_SETUP_TOKEN:lease.owner.token});
+    const upstreamFile=await prepareUpstreams(instance,config.config,home);if(upstreamFile)env.STARMUX_UPSTREAMS_FILE=upstreamFile;
     const log=path.join(instancePaths(instance,home).logs,'core.log');
     if(await exists(log))await readTrusted(log,true,32*1024*1024);
     const output=await open(log,'a',0o600);
@@ -139,7 +140,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
       const failed=()=>{clearTimeout(timer);child.off('message',ready);reject(Error('INSTANCE_START_FAILED: inspect instance logs'));};
       child.once('error',failed);child.once('exit',failed);child.on('message',ready);
     });
-    state.active=config;state.port=config.config.port;state.phase='running';lease.markRunning();
+    state.active=config;state.permissionMode=env.STARMUX_PERMISSION_MODE==='global'?'global':'workspace';state.port=config.config.port;state.phase='running';lease.markRunning();
     await atomicPrivate(path.join(instancePaths(instance,home).snapshots,'active.json'),JSON.stringify(config,null,2));
     child.once('exit',()=>{if(!expectedWorkerExit&&!ending){state.phase='error';state.problem='INSTANCE_WORKER_EXITED';emit('INSTANCE_ERROR');void serialize(()=>shutdown('INSTANCE_WORKER_EXITED'));}});
     emit('INSTANCE_RUNNING');

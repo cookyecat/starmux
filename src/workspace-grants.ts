@@ -12,7 +12,7 @@ import path from "node:path";
 
 function deny(s: string): never {const e=new GatewayError(s);throw e;};
 export const defaultGrantsPath=(home=os.homedir())=>
-  path.join(home,".config","mac-mcp-gateway","workspace-grants-v1.json");
+  path.join(home,".config","starmux","workspace-grants-v1.json");
 const expected=new Set(["version","homeRead","outsideRead","custom"]);
 export const isInside=within;
 async function safeStat(file: string,{directory=false,missing=false}={}){

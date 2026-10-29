@@ -10,13 +10,13 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {createAccessControl} from '../access-control.js';
 import {instanceStatus,instanceRequest,runInstance} from '../instance-runtime.js';
-import {atomicPrivate,availablePort,changeRegistry,configJSONSchema,createInstance,ensureAccessReady,exists,instanceConfigSchema,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,validateConfig,type Instance,type InstanceConfig} from '../instance-store.js';
+import {atomicPrivate,availablePort,changeRegistry,configJSONSchema,createInstance,ensureAccessReady,exists,instanceConfigSchema,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,validateConfig,usesGlobalPermissions,type Instance,type InstanceConfig} from '../instance-store.js';
 import {handle} from './instances.js';
-import {desktopCommanderEntry} from '../runtime-paths.js';
+import {packageRoot,desktopCommanderEntry} from '../runtime-paths.js';
 import {shellQuote} from '../platform.js';
 import {formatStarmuxStatus} from './starmux-status.js';
 
-const version='0.13.1';
+const {version}=JSON.parse(await readFile(path.join(packageRoot,'package.json'),'utf8')) as {version:string};
 const strings=['instance','port','lines','expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','revision','patch','file','output','name','target','mode','app-parent-pid'];
 const booleans=['help','version','json','write','code','read','yes','foreground','follow','archived','all','effective','link','allow-loopback-http','token-stdin','no-open','token'];
 const options:Record<string,{type:'string'|'boolean';short?:string}>={};
@@ -44,12 +44,11 @@ function help(){
     verify:'verify [--token-stdin]\n  Test MCP initialization, tool discovery and workspace read. Authenticated instances use STARMUX_TOKEN or stdin.',
     doctor:'doctor\n  Check Node, bundled dependencies, workspace, configuration, port and authentication.',
     logs:'logs [-f | --follow] [--lines 1..200]\n  Follow continues across restarts. Ctrl+C exits the follower only.',
-    migrate:'migrate [registry|setup|live] [-y]\n  No source: preview. Select a source to migrate, retaining originals.',
     status:'status [--all]\n  Show the selected instance, its actual endpoint and connection guide.',
     ls:'ls [--archived]\n  List local workspace instances.',
     rm:'rm [NAME] (alias for: config archive)\n  Stop and archive an instance.',
     down:'down (alias: stop)\n  Stop the selected instance.',
-    permissions:'permissions [status | token]\n  permissions disable-tool|enable-tool|deny-directory|allow-directory TARGET\n  Manage the selected instance’s tool and directory permissions.',
+    permissions:'permissions [status]\n  Show the selected instance’s mode. Switch with up --read or up --code.',
     privacy:'privacy [--all] [--target PATH]\n  Check privacy access through the running instance.'
   };
   if(topic&&topic!=='help'&&!sections[topic])fail('Unknown command: '+topic+'. Run starmux --help.');
@@ -72,8 +71,7 @@ function help(){
     '  starmux ls                   List workspace instances',
     '  starmux rm [name]            Stop and archive an instance',
     '  starmux init [path]          Save instance settings without starting',
-    '  starmux config               Inspect, edit or apply configuration',
-    '  starmux migrate              Import settings from a legacy installation'
+    '  starmux config               Inspect, edit or apply configuration'
   ].join('\n');
   process.stdout.write(`Starmux ${version}\n\n${sections[topic??'']??overview}\n\nGlobal: -i, --instance NAME_OR_ID   --json   -h, --help\nUse starmux COMMAND --help for details.\n`);
 }
@@ -102,7 +100,6 @@ async function configure(){
   if(selector)instance=registry.instances.find(i=>i.id===selector||i.name===selector);
   else if(registry.instances.length)instance=await resolveInstance();
   if(instance?.archived)fail('Instance is archived. Use starmux config restore -i '+instance.name);
-  if(!instance&&await exists(path.join(homedir(),'.config','mac-mcp-gateway'))&&!registry.instances.length)fail('Existing installation found. Run starmux migrate first.');
   const loaded=instance?await loadInstanceConfig(instance):undefined;
   const writing=flags.write||flags.code;
   if(flags.read&&writing)fail('--read cannot be combined with --write or --code.');
@@ -285,7 +282,7 @@ async function auth(instance:Instance){
     if(json)print({result:'REVOKED',id});else process.stdout.write('Revoked '+id+'\n');return;
   }
   if(op==='oauth'){
-    process.env.MAC_MCP_ACCESS_FILE=instancePaths(instance).access;
+    process.env.STARMUX_ACCESS_FILE=instancePaths(instance).access;
     const action=positional[1]??'status';const map:Record<string,string>={'init-keycloak':'keycloak-realm',setup:'configure',doctor:'doctor',status:'status'};
     if(!map[action])fail('Unknown OAuth command. See starmux auth --help.');
     const args=[map[action]!];for(const key of ['issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','allow-loopback-http'])if(flags[key]!==undefined)args.push('--'+(key==='subject'?'subjects':key),...(typeof flags[key]==='string'?[flags[key] as string]:[]));
@@ -380,7 +377,7 @@ async function main(){
   if(command==='help'||flags.help){help();return;}
   const allowed:Record<string,string[]>={
     up:['port','read','write','code','yes','foreground','app-parent-pid'],init:['port','read','write','code','yes'],
-    status:['all'],ls:['archived'],rm:[],down:[],stop:[],logs:['lines','follow'],doctor:[],verify:['token-stdin'],dashboard:['token','no-open'],migrate:['yes'],
+    status:['all'],ls:['archived'],rm:[],down:[],stop:[],logs:['lines','follow'],doctor:[],verify:['token-stdin'],dashboard:['token','no-open'],
     auth:['expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','allow-loopback-http'],
     config:['yes','archived','effective','link','name','revision','patch','file','output'],permissions:['target','mode'],privacy:['all','target']
   };
@@ -390,10 +387,6 @@ async function main(){
   if(['status','ls','down','stop','logs','doctor','verify','dashboard'].includes(command)&&positional.length)fail('Unexpected argument: '+positional[0]);
   if(command==='rm'&&positional.length>1)fail('Usage: starmux rm [NAME]');
   if(command==='auth'&&['key','mode','revoke'].includes(positional[0]??'')&&positional.length!==2)fail('Usage: starmux auth '+positional[0]+' VALUE');
-  if(command==='migrate'&&positional.length>1)fail('Usage: starmux migrate [registry|setup|live] [-y]');
-  // Public commands never inherit old environment overlays. Core's private protocol is retained.
-  for(const key of Object.keys(process.env))if(key.startsWith('MAC_MCP_'))delete process.env[key];
-  for(const [key,value] of Object.entries(process.env))if(key.startsWith('STARMUX_')&&key!=='STARMUX_TOKEN')process.env['MAC_MCP_'+key.slice(8)]=value;
   if(command==='up'||command==='init'){
     const instance=await configure();
     if(command==='up')await start(instance);
@@ -404,7 +397,6 @@ async function main(){
     }
     return;
   }
-  if(command==='migrate'){await (await import('../starmux-migration.js')).migrate(positional[0],yes(),json);return;}
   if(command==='ls'||command==='status'&&flags.all){await handle('instance',['list',...(flags.archived?['--archived']:[]),...(json?['--json']:[])]);return;}
   if(command==='rm'){
     const target=positional[0]??string('instance')??(await selected()).id;
@@ -441,6 +433,10 @@ async function main(){
       );
     }
   }else{
+    if(command==='permissions'&&usesGlobalPermissions((await loadInstanceConfig(instance)).config)){
+      if(positional.length&&positional[0]!=='status')fail('Directory grants and tool filters do not apply to global modes. Use starmux up --read or starmux up --code.');
+      await show(instance);return;
+    }
     const args=[...positional,'--instance',instance.id];for(const [key,value] of Object.entries(flags))if(key!=='instance'&&value!==undefined)args.push('--'+key,...(typeof value==='string'?[value]:[]));await handle(command,args);
   }
 }

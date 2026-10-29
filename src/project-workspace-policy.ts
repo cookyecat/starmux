@@ -7,6 +7,7 @@ import { lstat,realpath } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import { createDevPresets } from "./project-dev-presets.js";
+import { prepareBatchRead } from "./batch-read-policy.js";
 
 export class WorkspaceDenied extends Error {
   constructor(public readonly code: string){super(code);this.name="WorkspaceDenied";}
@@ -20,12 +21,12 @@ function keysExact(args: ToolArguments,required: string[],optional: string[]=[])
      Object.keys(args).some(k=>![...required,...optional].includes(k)))
     fail("ARGUMENTS_NOT_ALLOWED");
 }
-async function checked(target: string,kind: string,bytes?: number){
+async function checked(target: string,kind: string,bytes?: number,allowMissing=false){
   const st=await lstat(target).catch(e=>{
     if(errorCode(e)==="ENOENT")return null;
     throw e;
   });
-  if(!st){if(kind!=="new")fail("NOT_FOUND");return;}
+  if(!st){if(kind!=="new"&&!allowMissing)fail("NOT_FOUND");return;}
   if(st.isSymbolicLink()||!ownedByUser(target,st))fail("UNSAFE_OWNER_OR_LINK");
   if(kind==="directory"&&!st.isDirectory())fail("NOT_DIRECTORY");
   if(kind==="file"&&!st.isFile())fail("NOT_FILE");
@@ -50,7 +51,7 @@ export async function createProjectPolicy({root,mode="read-only",
   if(path.resolve(root)!==base)fail("ROOT_MUST_BE_CANONICAL");
   await checked(base,"directory");
   const devPresets=createDevPresets(base,mode);
-  async function scoped(raw: unknown,kind: string,bytes?: number){
+  async function scoped(raw: unknown,kind: string,bytes?: number,allowMissing=false){
     if(typeof raw!=="string"||!raw||raw.length>1024||
        raw.includes("\0")||(!windows&&raw.includes("\\"))||
        raw.startsWith("~")||/^[a-z]+:\/\//i.test(raw))
@@ -66,7 +67,7 @@ export async function createProjectPolicy({root,mode="read-only",
     for(let i=0;i<parts.length;i++){
       current=path.join(current,parts[i]!);
       await checked(current,i===parts.length-1?kind:"directory",
-                    i===parts.length-1?bytes:undefined);
+                    i===parts.length-1?bytes:undefined,allowMissing);
     }
     if(parts.length===0&&kind!=="directory")fail("ROOT_IS_DIRECTORY");
     return final;
@@ -79,6 +80,7 @@ export async function createProjectPolicy({root,mode="read-only",
     },
     observe(name,result,args){devPresets.observe(name,result,args);},
     async prepare(name,args={}){
+      if(name==="read_multiple_files")return prepareBatchRead(args,(tool,values)=>this.prepare(tool,values));
       if(name==="start_process"&&developerCommands==="trusted-project"){
         keysExact(args,["command","timeout_ms"]);
         if(typeof args.command!=="string"||!args.command.trim()||
@@ -107,7 +109,9 @@ export async function createProjectPolicy({root,mode="read-only",
           fail("OFFSET_LIMIT");
         if(args.length!==undefined&&(!isInteger(args.length)||args.length<1||args.length>1000))
           fail("LENGTH_LIMIT");
-        return {name,arguments:{path:await scoped(args.path,"file",maxReadBytes),
+        // Missing files are an upstream read result, not a permission denial.
+        // Existing ancestors still undergo the same owner/link/scope checks.
+        return {name,arguments:{path:await scoped(args.path,"file",maxReadBytes,true),
           offset:args.offset??0,length:args.length??1000}};
       }
       if(mode!=="read-write")fail("WRITE_NOT_APPROVED");

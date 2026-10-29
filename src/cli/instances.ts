@@ -1,4 +1,3 @@
-import {createInterface} from 'node:readline/promises';
 import {spawn} from 'node:child_process';
 import {readFile,writeFile,mkdtemp,rm,realpath} from 'node:fs/promises';
 import {tmpdir,homedir} from 'node:os';
@@ -7,10 +6,10 @@ import {createAccessControl} from '../access-control.js';
 import {createWorkspaceGrants} from '../workspace-grants.js';
 import {createDenyRules} from '../explicit-deny-rules.js';
 import {createPrivateDirectory} from '../platform.js';
-import {instanceStatus,instanceRequest,runInstance} from '../instance-runtime.js';
-import {atomicPrivate,changeRegistry,configJSONSchema,sourceRevision,configTemplate,createInstance,exists,fingerprint,instanceConfigSchema,instanceEnv,instancePaths,instancesRoot,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,validateConfig,withLock,type Instance,type InstanceConfig} from '../instance-store.js';
+import {instanceStatus,instanceRequest} from '../instance-runtime.js';
+import {atomicPrivate,changeRegistry,configJSONSchema,sourceRevision,configTemplate,validateConfig,withLock,createInstance,exists,fingerprint,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,type InstanceConfig} from '../instance-store.js';
 
-const booleans=new Set(['--json','--all','--link','--archived','--approve-trusted-developer','--approve-unrestricted','--confirm','--effective','--allow-loopback-http']);
+const booleans=new Set(['--json','--all','--link','--archived','--approve-trusted-developer','--approve-unrestricted','--effective','--allow-loopback-http']);
 function options(args:string[]){
   const flags=new Map<string,string>();const positional:string[]=[];
   for(let i=0;i<args.length;i++){const arg=args[i]!;if(!arg.startsWith('--')){positional.push(arg);continue;}
@@ -26,49 +25,9 @@ function requireApprovals(config:InstanceConfig,flags:Map<string,string>){
   if(config.accessRole==='trusted'&&!flags.has('--approve-trusted-developer'))throw Error('TRUSTED_APPROVAL_REQUIRED: add --approve-trusted-developer');
   if(config.accessRole==='trusted'&&process.platform!=='darwin'&&!flags.has('--approve-unrestricted'))throw Error('UNRESTRICTED_APPROVAL_REQUIRED: add --approve-unrestricted');
 }
-async function wizard(flags:Map<string,string>,current?:InstanceConfig){
-  let project=flags.get('--project')??current?.projectRoot;let role=flags.get('--access-role')??current?.accessRole??'restricted';
-  let port=Number(flags.get('--port')??current?.port??await suggestPort());
-  if(!project){
-    if(!process.stdin.isTTY)throw Error('PROJECT_REQUIRED: use --project /absolute/directory');
-    const rl=createInterface({input:process.stdin,output:process.stderr});
-    try{project=await rl.question('Work directory: ');role=(await rl.question('Capability (restricted / trusted) [restricted]: '))||'restricted';
-      if(role==='trusted'&&(await rl.question('Enable native tools and Shell as your OS account? Type yes: '))==='yes'){
-        flags.set('--approve-trusted-developer','true');if(process.platform!=='darwin')flags.set('--approve-unrestricted','true');
-      }
-      port=Number((await rl.question(`Local port [${port}]: `))||port);
-    }finally{rl.close();}
-  }
-  const config=instanceConfigSchema.parse({...current,schemaVersion:1,projectRoot:await realpath(path.resolve(project)),port,
-    accessRole:role,mode:current?.accessRole===role?current.mode:role==='trusted'?'read-write':'read-only',writeScope:current?.accessRole===role?current.writeScope:role==='trusted'&&process.platform==='darwin'?'home-only':'unrestricted',connection:flags.get('--connection')??current?.connection??'local'});
-  requireApprovals(config,flags);return validateConfig(config);
-}
-export async function maybeHandleInstances(argv:string[]):Promise<boolean>{
-  let command=argv[0]??'help';
-  if(command==='start-setup'&&!process.env.MAC_MCP_INTERNAL_SETUP_OWNER_PID){command='run';argv=['run','--profile','setup',...argv.slice(1)];}
-  if(command==='doctor-setup'){command='doctor';argv=['doctor','--profile','setup',...argv.slice(1)];}
-  const supported=['instance','config','run','status','stop','restart','logs','doctor','verify','access','permissions','privacy','setup'];
-  if(!supported.includes(command))return false;
-  try {
-  const explicit=argv.includes('--instance');const registry=await readRegistry();
-  const managed=registry.instances.length>0;
-  const firstWizard=command==='setup'&&argv.length===1&&process.stdin.isTTY;
-  if(!['instance','config'].includes(command)&&!explicit&&!managed&&!firstWizard)return false;
-  // A retained legacy profile remains available until the owner migrates it.
-  const profileIndex=argv.indexOf('--profile');
-  if(profileIndex>=0&&!registry.instances.some(i=>i.legacy===argv[profileIndex+1])&&argv[profileIndex+1]!=='auto'){
-    if(registry.instances.some(i=>i.legacy))throw Error('LEGACY_PROFILE_NOT_MIGRATED_USE_INSTANCE: select --instance explicitly');
-    return false;
-  }
-  await handle(command,argv.slice(1));}catch(error){
-    if(argv.includes('--json'))output({schemaVersion:1,error:message(error)});
-    else process.stderr.write(message(error)+'\n');process.exitCode=1;
-  }
-  return true;
-}
 export async function handle(command:string,args:string[]){
   const {flags,positional}=options(args);const json=flags.has('--json');
-  const known=new Set([...booleans,'--instance','--name','--project','--port','--access-role','--connection','--profile','--app-parent-pid','--revision','--patch','--file','--output','--lines','--expires','--issuer','--resource','--resource-aliases','--client-id','--subjects','--registration','--token-auth','--callback','--target','--mode']);
+  const known=new Set([...booleans,'--instance','--name','--project','--port','--access-role','--connection','--app-parent-pid','--revision','--patch','--file','--output','--lines','--expires','--issuer','--resource','--resource-aliases','--client-id','--subjects','--registration','--token-auth','--callback','--target','--mode']);
   for(const flag of flags.keys())if(!known.has(flag))throw Error('UNKNOWN_OPTION: '+flag);
   if(command==='instance'){
     const op=positional[0]??'list';
@@ -103,18 +62,11 @@ export async function handle(command:string,args:string[]){
         }
       }return;
     }
-    if(op==='create'){
-      const config=await wizard(flags);const instance=await createInstance(positional[1]??flags.get('--name')??'default',{config});
-      output({instance,message:'Saved. Start with: starmux up -i '+JSON.stringify(instance.name)});return;
-    }
     if(op==='import'){
       const file=positional[1];if(!file)throw Error('IMPORT_FILE_REQUIRED');
       const config=await validateConfig(parseConfig(await readTrusted(path.resolve(file),false)));requireApprovals(config,flags);
       output({instance:await createInstance(flags.get('--name')??path.basename(file,path.extname(file)),{file,link:flags.has('--link')}),
         message:flags.has('--link')?'Bound to original file. Changes require apply.':'Imported a private copy. The original file is no longer used.'});return;
-    }
-    if(op==='migrate'){
-      const {migrateLegacy}=await import('../instance-migration.js');output(await migrateLegacy(positional[1],flags.has('--confirm'),flags.get('--name')));return;
     }
     const instance=await resolveInstance(positional[1]??flags.get('--instance'),homedir(),op==='restore');
     if(op==='copy'){
@@ -141,25 +93,8 @@ export async function handle(command:string,args:string[]){
     else if(op==='restore')process.stdout.write(`Restored instance '${instance.name}'.\n`);
     return;
   }
-  if(command==='status'&&!flags.has('--instance')&&(!json||flags.has('--all')))return handle('instance',['list',...(json?['--json']:[])]);
-  const profile=flags.get('--profile');
-  let selector=flags.get('--instance');
-  if(profile&&profile!=='auto'){
-    const legacy=(await readRegistry()).instances.find(i=>i.legacy===profile);if(!legacy)throw Error('LEGACY_PROFILE_NOT_MIGRATED');selector=legacy.id;
-  }
-  if(command==='setup'&&!(await readRegistry()).instances.length){await handle('instance',['create','default',...args]);return;}
+  const selector=flags.get('--instance');
   const instance=await resolveInstance(selector);const p=instancePaths(instance);
-  if(command==='status'){output(await instanceStatus(instance));return;}
-  if(command==='run'){
-    if(flags.has('--port'))throw Error('INSTANCE_PORT_OVERRIDE_DENIED: edit configuration and apply');
-    await runInstance(instance,{json,...(flags.has('--app-parent-pid')?{appParentPid:Number(flags.get('--app-parent-pid'))}:{})});return;
-  }
-  if(command==='stop'){output({result:(await instanceRequest(instance,'stop'))?'STOPPED':'ALREADY_STOPPED',instanceId:instance.id});return;}
-  if(command==='restart'){await handle('config',['apply','--instance',instance.id,...(json?['--json']:[])]);return;}
-  if(command==='setup'){
-    const current=await loadInstanceConfig(instance);const config=await wizard(flags,current.config);
-    await patchInstanceConfig(instance,config,current.revision);output({result:'SAVED',instanceId:instance.id,message:'Apply changes to restart the running instance.'});return;
-  }
   if(command==='config'){
     const op=positional[0]??'show';
     if(op==='path'){if(json)output({instanceId:instance.id,...p,source:instance.source});else process.stdout.write(instance.source.path+'\n');return;}
@@ -272,19 +207,6 @@ export async function handle(command:string,args:string[]){
     }
     throw Error('CONFIG_ACTION_INVALID');
   }
-  if(command==='logs'){
-    const file=path.join(p.logs,'core.log');const lines=Math.min(200,Math.max(1,Number(flags.get('--lines')??60)));
-    if(!Number.isSafeInteger(Number(flags.get('--lines')??60))||Number(flags.get('--lines')??60)<1||Number(flags.get('--lines')??60)>200)throw Error('INVALID_LINES: expected 1..200');
-    const text=await exists(file)?(await readTrusted(file,true,32*1024*1024)).split('\n').slice(-lines).join('\n'):'No logs yet.';
-    if(json)output({instanceId:instance.id,output:text});else process.stdout.write(text+'\n');return;
-  }
-  if(command==='access'){
-    process.env.MAC_MCP_ACCESS_FILE=p.access;
-    const clean=args.filter((_,i)=>args[i]!=='--instance'&&args[i-1]!=='--instance'&&args[i]!=='--profile'&&args[i-1]!=='--profile');
-    await (await import('./access.js')).accessCommand(clean);
-    if(positional[0]==='mode'){const mode=positional[1];if(mode==='ingress'||mode==='api-key'||mode==='oauth')await changeRegistry(async r=>{r.instances.find(i=>i.id===instance.id)!.requiredAccess=mode;});}
-    return;
-  }
   if(command==='permissions'){
     const grants=await createWorkspaceGrants({file:p.grants});const deny=await createDenyRules({file:p.deny});const op=positional[0]??'status';
     if(op==='token')output({token:await readTrusted(grants.tokenFile)});
@@ -292,28 +214,9 @@ export async function handle(command:string,args:string[]){
     else if(['disable-tool','enable-tool','deny-directory','allow-directory'].includes(op))output(await deny.update(op,flags.get('--target')??positional[1]));
     else {output(await grants.update(op,{target:flags.get('--target'),mode:flags.get('--mode')}));}return;
   }
-  const loaded=await loadInstanceConfig(instance);
-  if(command==='doctor'){
-    const {ensureAccessReady}=await import('../instance-store.js');await ensureAccessReady(instance);
-    const status=await instanceStatus(instance);
-    output({result:'PASS',instanceId:instance.id,source:instance.source,config:loaded.config,configState:status.configState,
-      message:'Configuration and access state validated. Run verify after starting to check real tools.'});return;
-  }
   if(command==='privacy'){
     const status=await instanceStatus(instance);if(!status.runtime?.port)throw Error('INSTANCE_NOT_RUNNING');
     output(await (await import('../privacy-diagnostics.js')).privacyReport({port:status.runtime.port,home:homedir(),all:flags.has('--all'),target:flags.get('--target')??null}));return;
   }
-  if(command==='verify'){
-    const state=await instanceRequest(instance,'status');if(state?.phase!=='running'||!state.port)throw Error('INSTANCE_NOT_RUNNING');
-    const endpoint=`http://127.0.0.1:${state.port}`;
-    const health=await fetch(endpoint+'/healthz',{signal:AbortSignal.timeout(3000)}).then(r=>r.json()) as {instanceId?:string};
-    if(health.instanceId!==instance.id)throw Error('INSTANCE_HEALTH_IDENTITY_MISMATCH');
-    const request=async(method:string,params:unknown)=>{
-      const reply=await fetch(endpoint+'/mcp',{method:'POST',headers:{'content-type':'application/json',accept:'application/json, text/event-stream',...(process.env.MAC_MCP_API_KEY?{authorization:'Bearer '+process.env.MAC_MCP_API_KEY}:{})},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params}),signal:AbortSignal.timeout(15000)});
-      if(!reply.ok)throw Error(reply.status===401?'VERIFICATION_CREDENTIAL_REQUIRED: set MAC_MCP_API_KEY':'MCP_VERIFICATION_FAILED');
-      const data=await reply.json() as {error?:unknown;result?:{isError?:boolean}};if(data.error||data.result?.isError)throw Error('MCP_VERIFICATION_FAILED');return data.result;
-    };
-    await request('tools/list',{});await request('tools/call',{name:'list_directory',arguments:{path:'.',depth:0}});
-    output({result:'PASS',instanceId:instance.id,port:state.port,remoteClientVerified:false});return;
-  }
+  throw Error('INSTANCE_COMMAND_UNSUPPORTED');
 }

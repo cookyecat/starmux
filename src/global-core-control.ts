@@ -19,7 +19,7 @@ export function controlPaths(port: number,root=controlRoot()){
   if(!validPort(port))deny("CORE_INVALID_PORT");
   const lock=path.join(root,`core-${port}.lease`);
   return {root,lock,recovery:lock+".recovery",
-    meta:path.join(lock,"owner.json"),socket:windows?`\\\\.\\pipe\\mac-mcp-gateway-${crypto.createHash("sha256").update(path.resolve(lock).toLowerCase()).digest("hex").slice(0,32)}`:path.join(lock,"control.sock")};
+    meta:path.join(lock,"owner.json"),socket:windows?`\\\\.\\pipe\\starmux-${crypto.createHash("sha256").update(path.resolve(lock).toLowerCase()).digest("hex").slice(0,32)}`:path.join(lock,"control.sock")};
 }
 function secureDir(p: string,create=false){
   if(create)createPrivateDirectory(p);
@@ -224,7 +224,7 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
 }
 
 // Private worker handoff for the setup profile. This is a same-UID
-// supervisor identity check, not an OS boundary against the Mac owner.
+// supervisor identity check, not an OS boundary against the local owner.
 export function verifyInternalSetupWorker({port,ownerPid,runId,token}: {port:number; ownerPid:unknown; runId:unknown; token:unknown}){
   const paths=controlPaths(port);
   const owner=readOwner(paths);

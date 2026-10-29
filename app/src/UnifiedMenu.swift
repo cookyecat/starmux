@@ -313,8 +313,7 @@ extension AppForegroundExitDelegate {
 }
 
 @main
-struct MacMCPUnifiedApp: App {
-    // Service registration research is archived; not a product entrypoint.
+struct StarmuxApp: App {
     @NSApplicationDelegateAdaptor(AppForegroundExitDelegate.self) private var lifecycle
     private let menuMark: NSImage? = {
         guard let path = Bundle.main.path(forResource: "MenuBarTemplate", ofType: "png"),

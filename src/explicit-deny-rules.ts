@@ -4,7 +4,7 @@ import { denySchema } from "./config-schemas.js";
 import type { AuditSink,DenyConfig,ToolArguments } from "./contracts.js";
 import { GatewayError,errorCode,parseJSON,record } from "./validation.js";
 // Optional explicit-deny preferences. Never a sandbox; native tools and command
-// semantics belong to upstream Desktop Commander and the macOS execution user.
+// semantics belong to upstream Desktop Commander and the OS execution user.
 // Reads the owner-only 0600 profile on EVERY discovery/call, so revocation applies
 // to stale-client tool calls without restarting the Gateway.
 import { randomBytes } from "node:crypto";
@@ -17,7 +17,7 @@ const toolName=/^[a-zA-Z_][a-zA-Z0-9_.:-]{0,127}$/;
 const pathKeys=new Set(["path","file_path","paths","source","destination","outputPath"]);
 const defaults=(): DenyConfig=>({version:1,deniedTools:[],deniedDirectories:[]});
 export const defaultDenyRulesPath=(home=homedir())=>
-  path.join(home,".config","mac-mcp-gateway","deny-rules-v1.json");
+  path.join(home,".config","starmux","deny-rules-v1.json");
 function verify(value: unknown): DenyConfig {
   const obj=record(value,"DENY_RULES_INVALID");
   if(!obj||typeof obj!=="object"||Array.isArray(obj)||

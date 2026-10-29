@@ -24,7 +24,7 @@ Cloud AI assistants (like **ChatGPT Web**, **Claude**, **Codex**, or **WorkBuddy
 
 - **Batteries-Included Workspace Tools:** Powered by a built-in [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) engine (installed automatically via npm). Out of the box, your AI can read/write files, search code, run Shell commands, and manage Git.
 - **Code on Any Host (macOS, Linux, Windows & Edge Devices):** Many AI clients (like **ChatGPT Desktop** or **WorkBuddy**) have no native Linux or ARM64 client. Because Starmux runs anywhere **Node.js 22.12+** runs—including **macOS**, **Linux (`x64` / `arm64`)**, **NVIDIA Jetson**, headless servers, and **Windows**—you can use your favorite AI client on your main computer or browser to develop directly on any target machine.
-- **Safe by Default:** Starts in strict **Read-Only** mode (`starmux up`). Explicitly opt into **Coding Mode** (`starmux up --code`) only when you want AI to edit files or run terminal commands.
+- **Two Clear Permission Modes:** Starts in global **Read-Only** mode (`starmux up`): AI can read files your OS account and the upstream server permit, while writes and arbitrary execution are blocked. Explicitly opt into **Coding Mode** (`starmux up --code`) to use native tools with your OS account permissions.
 - **Your Network, Your Keys:** No vendor-hosted relay required. Protect your gateway with Bearer **API Keys**, browser-based **OAuth**, or your existing **Tunnel / Reverse Proxy** access controls. Revoke access instantly at any time.
 
 ---
@@ -44,7 +44,7 @@ npm install -g starmux
 ```bash
 cd /path/to/your/project
 
-# Option A: Safe read-only mode (default — inspect files & code)
+# Option A: Global read-only mode (default — inspect files & code)
 starmux up
 
 # Option B: Full coding mode (edit files, run Shell & Git)
@@ -53,27 +53,17 @@ starmux up --code
 
 Starmux initializes itself and runs in the background on port `18893` (coding mode asks for confirmation the first time):
 
-```text
-● Starmux is running
-  Listen          http://127.0.0.1:18893/mcp  (this computer only)
-  Workspace       /path/to/your/project
-  Mode            Read-only  (run 'starmux up --code' to enable edits & shell)
-  Auth            None (no token required)
-  Runtime         Background · continues after this terminal closes
+Switch back from Coding mode with
 
-Connect an AI client (MCP settings)
-  Transport       Streamable HTTP
-  URL (Local)     http://127.0.0.1:18893/mcp  (AI client on this computer)
-  URL (Remote)    https://<your-domain-or-tunnel>/mcp  (via protected HTTPS proxy or tunnel -> 127.0.0.1:18893)
-  Authentication  None  (optional Bearer API key: starmux auth key "My AI Client")
-
-Commands
-  Verify          starmux verify
-  Auth & keys     starmux auth
-  Dashboard       starmux dashboard  (view & copy settings in browser)
-  Logs            starmux logs -f
-  Stop            starmux down
 ```
+starmux up --read
+```
+
+Add `-i NAME` for a named instance. Both `up` and `status` show the mode-switch command.
+
+`Project` provides context for relative file paths in Read-only mode; it does not restrict access to that directory. Read-only applies across the computer wherever the OS account and upstream server permit reading. Coding forwards native operations with the account's permissions. Neither mode uses Starmux directory grants or path exclusions.
+
+In Read-only mode, `read_multiple_files` supports up to 20 files and 4 MiB of combined file sizes per batch. Missing files retain Desktop Commander's per-file errors alongside successful contents. Oversized batches return `BATCH_READ_COUNT_LIMIT` or `BATCH_READ_SIZE_LIMIT` with guidance to split the request.
 
 ### 3. Add Starmux to your AI client
 
@@ -176,7 +166,7 @@ See [Client Compatibility](docs/CLIENTS.md) and [Remote Setup](docs/REMOTE_SETUP
 
 ---
 
-## Everyday CLI & Multi-Workspace
+## Everyday CLI & Multiple Instances
 
 Manage your gateway with simple, human-friendly commands:
 
@@ -190,11 +180,11 @@ starmux logs -f         # Stream live gateway logs
 starmux down            # Stop the gateway (alias: stop)
 ```
 
-After initialization, `starmux up` reuses your saved workspace. Use `starmux up .` to switch it to your current directory, or pass `--foreground` to keep the process in your terminal.
+After initialization, `starmux up` reuses your instance's saved project context. Use `starmux up .` to change it to your current directory, or pass `--foreground` to keep the process in your terminal. Only a new instance defaults to the current directory when no path is supplied.
 
-### Advanced: Running multiple workspaces (`-i`)
+### Advanced: Running multiple instances (`-i`)
 
-*(Optional)* By default, Starmux manages a single `default` workspace so you never have to pass extra flags. When you need to expose multiple projects simultaneously or run different permission modes on the same machine, pass `-i <name>` to create isolated instances with their own ports, credentials, policies, and logs:
+*(Optional)* By default, Starmux manages a single `default` instance so you never have to pass extra flags. To use different project contexts or permission modes on the same machine, pass `-i <name>` to create instances with their own ports, credentials, configuration, and logs. Instances share the OS account; they are not filesystem sandboxes:
 
 ```bash
 starmux up ~/work/repo-a -i work --code
@@ -238,8 +228,8 @@ Explore the `docs/` guides by topic:
   - [Access Control & API Keys](docs/ACCESS_CONTROL.md) — Creating/revoking Bearer API keys, expiration policies, and using the local Web Access Console.
   - [ChatGPT Web & OAuth 2.0](docs/OAUTH.md) & [Connect ChatGPT](docs/CONNECT_CHATGPT.md) — Configuring Keycloak OAuth 2.0 + PKCE and OpenAI Secure MCP Tunnel.
 - **⚙️ Advanced Configuration & Security**
-  - [Multi-Instance & JSONC Config](docs/INSTANCES.md) — Managing multiple isolated workspaces, hot-reloading `config.jsonc`, mounting extra `stdio` MCP upstreams, and secrets.
-  - [Security & Workspace Permissions](docs/SECURITY.md) — Understanding Read-Only vs. Coding Mode, directory grants, tool deny rules, and macOS privacy boundaries.
+  - [Multi-Instance & JSONC Config](docs/INSTANCES.md) — Managing instances, hot-reloading `config.jsonc`, mounting extra `stdio` MCP upstreams, and secrets.
+  - [Security & Permissions](docs/SECURITY.md) — Understanding global Read-Only vs. Coding Mode, upstream permissions, and macOS privacy boundaries.
   - [Client Compatibility](docs/CLIENTS.md) & [Platform Details](docs/PLATFORMS.md) — Tested AI client matrix and macOS / Linux / Windows runtime specifics.
 - **🛠️ Reference & Project**
   - [Documentation Index](docs/README.md) · [Installation](docs/INSTALL.md) · [Contributing](CONTRIBUTING.md)

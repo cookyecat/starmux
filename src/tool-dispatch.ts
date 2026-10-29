@@ -2,25 +2,58 @@ import type { AuditSink,CallToolResult,RequestContext,ToolInvocation } from './c
 import type { BridgeOptions,BridgeUpstream } from './desktop-commander-facade.js';
 import { authorizeInvocation,createInvocationExecutor,observeSafely } from './invocation.js';
 import { errorCode } from './validation.js';
+import { isReadOnlyTool } from './account-access-policy.js';
+
+function workspaceErrorText(error:unknown,hasGrants:boolean):string{
+  const code=errorCode(error);
+  switch(code){
+    case 'BATCH_READ_COUNT_LIMIT':
+      return 'BATCH_READ_COUNT_LIMIT: read_multiple_files accepts at most 20 files per request. Split the request into smaller batches.';
+    case 'BATCH_READ_SIZE_LIMIT':
+      return 'BATCH_READ_SIZE_LIMIT: Combined file sizes exceed 4 MiB (4194304 bytes). Split the request into smaller batches.';
+    case 'BATCH_READ_ARGUMENTS_DENIED':
+      return 'BATCH_READ_ARGUMENTS_DENIED: Provide only a non-empty paths array of file path strings.';
+    case 'FILE_TOO_LARGE':
+      return 'FILE_TOO_LARGE: A file exceeds the per-file read size limit (1 MiB).';
+    case 'INVALID_PATH':
+      return 'INVALID_PATH: Provide a non-empty file path.';
+    case 'NOT_FOUND':
+    case 'ENOENT':
+      return 'ENOENT: no such file or directory';
+    case 'NOT_DIRECTORY':
+    case 'ENOTDIR':
+      return 'ENOTDIR: a path component is not a directory';
+    case 'NOT_FILE':
+      return 'NOT_FILE: The read target must be a regular file.';
+    case 'EACCES':
+    case 'EPERM':
+      return `${code}: The operating system denied access to the path.`;
+    default:
+      return hasGrants?'WORKSPACE_DENIED: Review directory grants on your local Dashboard /permissions':'WORKSPACE_DENIED';
+  }
+}
 
 // The dispatch order is part of the compatibility contract: Gateway tools,
-// extension routes, owner-enabled native mode, workspace policy, then fixtures.
+// extension routes, owner-enabled native mode, workspace policy, then deny.
 export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink, options: BridgeOptions) {
   const execute = createInvocationExecutor(upstream);
   return async (params: ToolInvocation, context: RequestContext): Promise<CallToolResult> => {
     const id = context.requestId;
     const name = params.name;
     const args = params.arguments || {};
+    if(options.globalReadOnly&&!isReadOnlyTool(name)){
+      audit({event:'DC_BRIDGE_DENIED',requestId:id,tool:name,reason:'READ_ONLY_MODE'});
+      return {isError:true,content:[{type:'text',text:"READ_ONLY_MODE: This operation requires Coding mode. Run 'starmux up --code' to enable edits & shell."}]};
+    }
     const observe = (fn: () => void) => observeSafely(fn, audit, context);
     if(name==="health_check"){
       audit({event:"DC_BRIDGE_HEALTH_CHECK",requestId:id});
       return {content:[{type:"text",text:JSON.stringify({
-        status:"ok",service:"mac-mcp-gateway-dc-bridge",
+        status:"ok",service:"starmux-dc-bridge",
         upstream:"desktop-commander",tools:upstream.upstreamCatalog.length,
         routes:options.upstreamRouter?.routes||[{id:"desktop",toolCount:upstream.upstreamCatalog.length}],
-        workspaceMode:options.workspacePolicy?.mode||"fixed-fixture",
-        developerCommands:options.workspacePolicy?.developerCommands||"fixed-fixture",
-        nativeAccess:options.nativePassthrough===true,
+        mode:options.globalReadOnly?'read-only':options.nativePassthrough?'coding':
+          options.workspacePolicy?.mode||'unconfigured',
         traceId:id
       })}]};
     }
@@ -29,8 +62,9 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
       const policy=options.workspacePolicy;
       audit({event:"GATEWAY_CONFIG_READ",requestId:id});
       return {content:[{type:"text",text:JSON.stringify({
-        source:"mac-mcp-gateway",configType:"effective-workspace-summary",
+        source:"starmux",configType:"effective-workspace-summary",
         projectRoot:policy.root,workspaceMode:policy.mode,
+        permissionMode:options.permissionMode??'workspace',
         developerCommands:policy.developerCommands,
         commandSafety:"Desktop Commander upstream blocklist; advisory, not OS sandbox",
         remoteConfigMutation:"owner-only",
@@ -42,7 +76,7 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
     if(name==="set_config_value"&&options.workspacePolicy&&!options.nativePassthrough){
       audit({event:"GATEWAY_CONFIG_MUTATION_DENIED",requestId:id});
       return {isError:true,content:[{type:"text",text:
-        "OWNER_ONLY_CONFIG: Remote AI cannot modify safety settings; use the Mac owner dashboard."}]};
+        "OWNER_ONLY_CONFIG: Remote AI cannot modify safety settings; use the local owner dashboard."}]};
     }
     if(name==="gateway_disk_usage"&&options.workspacePolicy?.prepareDiskUsage){
       try{
@@ -61,7 +95,7 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
         audit({event:"GATEWAY_DISK_USAGE_DENIED",requestId:id,
           reason:errorCode(error)||"DISK_USAGE_ERROR"});
         return {isError:true,content:[{type:"text",text:"WORKSPACE_DENIED: "+
-          "Check directory grants on the Mac Dashboard /permissions"}]};
+          "Check directory grants on the local Dashboard /permissions"}]};
       }
     }
     if(options.gitWorkflow?.names.includes(name)){
@@ -100,7 +134,7 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
       }
     }
     // Deliberately trusted, owner-enabled native mode: the upstream server
-    // and the macOS process account decide execution. Do not maintain a
+    // and the OS process account decide execution. Do not maintain a
     // second incomplete tool/path/argument whitelist here. Never use this
     // path for unrecognized names, routed extensions or Gateway tools.
     if(options.nativePassthrough&&
@@ -124,10 +158,8 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
       catch(error){
         audit({event:"DC_BRIDGE_DENIED",requestId:id,tool:name,
                reason:errorCode(error)||"POLICY_ERROR"});
-        return {isError:true,content:[{type:"text",text:
-          options.workspacePolicy.grantsSnapshot?
-            "WORKSPACE_DENIED: Review directory grants on your Mac Dashboard /permissions":
-            "WORKSPACE_DENIED"}]};
+        return {isError:true,content:[{type:"text",text:workspaceErrorText(error,
+          !!options.workspacePolicy.grantsSnapshot)}]};
       }
       audit({event:"DC_BRIDGE_FORWARDED",requestId:id,tool:name});
       try{
@@ -142,37 +174,7 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
         return {isError:true,content:[{type:"text",text:"UPSTREAM_UNAVAILABLE"}]};
       }
     }
-    const keys=Object.keys(args);
-    const allowed=(name==="read_file"&&
-      ["p1-fixture.txt","dc-bridge-canary.txt","README.md"].includes(String(args.path))&&
-      keys.length===1&&keys[0]==="path") ||
-      (name==="write_file"&&args.path==="dc-bridge-canary.txt"&&
-       typeof args.content==="string"&&Buffer.byteLength(args.content)<=256&&
-       keys.every(k=>["path","content"].includes(k))) ||
-      (name==="start_process"&&args.command==="/usr/bin/uname -s"&&
-       args.timeout_ms===3000&&
-       keys.every(k=>["command","timeout_ms"].includes(k)));
-    if(!allowed){
-      audit({event:"DC_BRIDGE_DENIED",requestId:id,tool:name});
-      return {isError:true,content:[{type:"text",text:"NOT_APPROVED_IN_P1_FIXTURE"}]};
-    }
-    audit({event:"DC_BRIDGE_FORWARDED",requestId:id,tool:name});
-    try {
-      let response;
-      if(name==="read_file"&&args.path!=="README.md")
-        response=await upstream.callApprovedRead!(String(args.path));
-      else if(name==="read_file")
-        response=await upstream.callApprovedProjectRead!();
-      else if(name==="write_file")
-        response=await upstream.callApprovedCanaryWrite!(String(args.content));
-      else
-        response=await upstream.callApprovedSystemName!();
-      audit({event:"DC_BRIDGE_COMPLETED",requestId:id,tool:name,
-             isError:response.isError===true});
-      return response;
-    }catch{
-      audit({event:"DC_BRIDGE_UPSTREAM_FAILED",requestId:id,tool:name});
-      return {isError:true,content:[{type:"text",text:"UPSTREAM_FAILED"}]};
-    }
+    audit({event:"DC_BRIDGE_DENIED",requestId:id,tool:name,reason:"POLICY_REQUIRED"});
+    return {isError:true,content:[{type:"text",text:"POLICY_REQUIRED: Configure an instance before using tools."}]};
   };
 }

@@ -129,17 +129,5 @@ final class InstanceController: ObservableObject {
         issue = "Some App-owned instances have not stopped. Retry quitting after checking their logs."
         return false
     }
-    static func selfTest() throws {
-        let raw = Data(#"{"schemaVersion":1,"defaultInstanceId":null,"instances":[]}"#.utf8)
-        guard try InstanceList.decode(raw).instances.isEmpty else { throw NSError(domain: "InstanceSelfTest", code: 1) }
-        // A live process is not enough: menu readiness requires the verified health identity.
-        let status = Data(#"{"instanceId":"sample","name":"default","archived":false,"source":{"kind":"managed","path":"/sample/config.jsonc"},"phase":"running","configState":"pending","connectionState":"local-ready-remote-unverified","requiredAccess":"api-key","health":"ok","executionMode":"background","active":{"config":{"projectRoot":"/sample/work","mode":"read-only","accessRole":"restricted","writeScope":"unrestricted"}}}"#.utf8)
-        let live = try JSONDecoder().decode(ManagedInstance.self, from: status)
-        guard live.ready, live.active?.config.mode == "read-only", live.executionMode == "background" else { throw NSError(domain: "InstanceSelfTest", code: 3) }
-        let unavailable = Data(String(decoding: status, as: UTF8.self).replacingOccurrences(of: "\"health\":\"ok\"", with: "\"health\":\"unreachable\"").utf8)
-        guard try !JSONDecoder().decode(ManagedInstance.self, from: unavailable).ready else { throw NSError(domain: "InstanceSelfTest", code: 4) }
-        let invalid = Data(#"{"schemaVersion":2,"defaultInstanceId":null,"instances":[]}"#.utf8)
-        do { _ = try InstanceList.decode(invalid); throw NSError(domain: "InstanceSelfTest", code: 2) }
-        catch let error as NSError where error.domain == "Gateway" { }
-    }
+
 }

@@ -22,8 +22,6 @@ struct InstanceManagerView: View {
     @State private var create = false
     @State private var showArchived = false
     @State private var computer = false
-    @State private var migration = ""
-    @State private var migrationSource = "registry"
     var body: some View {
         HSplitView {
             VStack(alignment: .leading, spacing: 12) {
@@ -38,7 +36,6 @@ struct InstanceManagerView: View {
                 }
                 Toggle(it("显示归档", "Show archived"), isOn: $showArchived).font(.caption)
                 Button(it("＋ 新建 / 导入", "+ Create / Import")) { create = true }
-                Button(it("发现旧配置", "Discover legacy configuration")) { Task { if let data = await model.perform(["migrate"]) { migration = String(decoding: data, as: UTF8.self) } } }
                 Button(it("此电脑", "This computer")) { computer = true }
             }.padding().frame(minWidth: 200, idealWidth: 230, maxWidth: 280)
             VStack(alignment: .leading, spacing: 12) {
@@ -55,18 +52,6 @@ struct InstanceManagerView: View {
                 Button(it("打开系统隐私设置", "Open system privacy settings")) { NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy")!) }
                 Button(it("完成", "Done")) { computer = false }
             }.padding(24).frame(width: 500)
-        }
-        .sheet(isPresented: Binding(get: { !migration.isEmpty }, set: { if !$0 { migration = "" } })) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(it("迁移预览", "Migration preview")).font(.title2)
-                ScrollView { Text(migration).font(.system(.caption, design: .monospaced)).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
-                Picker(it("来源", "Source"), selection: $migrationSource) { Text("registry").tag("registry"); Text("setup").tag("setup"); Text("live").tag("live") }
-                Text(it("切换将停止使用旧状态的实例，并停用对应旧自启动。原文件保留。", "Switching stops legacy instances using these stores and disables their old automatic starts. Original files are retained."))
-                HStack {
-                    Button(it("取消", "Cancel")) { migration = "" }
-                    Button(it("确认迁移", "Migrate")) { Task { if await model.perform(["migrate", migrationSource, "-y"]) != nil { migration = "" } } }.disabled(model.busy)
-                }
-            }.padding(24).frame(width: 650, height: 470)
         }
         .task { while !Task.isCancelled { await model.refresh(); try? await Task.sleep(nanoseconds: 2_000_000_000) } }
     }

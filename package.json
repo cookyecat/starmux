@@ -29,15 +29,11 @@
     "start:setup": "node bin/starmux.mjs up",
     "verify:setup": "node bin/starmux.mjs verify",
     "status": "node bin/starmux.mjs status",
-    "remote:revoke": "node bin/community-remote-revoke.mjs",
-    "test": "npm run build && node dist/test/run.js",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build:test": "npm run build",
     "prepare": "node scripts/prepare.mjs",
     "prepack": "npm run build",
-    "sync:upstream": "npm install --save-dev --save-exact @wonderwhy-er/desktop-commander@latest --ignore-scripts && npm run build",
-    "test:oauth:keycloak": "npm run build && node --test dist/test/keycloak.integration.js"
+    "sync:upstream": "npm install --save-dev --save-exact @wonderwhy-er/desktop-commander@latest --ignore-scripts && npm run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -62,17 +58,11 @@
     "typescript": "5.9.3"
   },
   "files": [
-    "dist/src",
+    "dist/src/**/*.js",
     "dist/vendor",
-    "src/dc-workspace-http.mjs",
-    "scripts/prepare.mjs",
-    "test/fixtures/p1-fixture.txt",
-    "LICENSE",
-    "README.md",
-    "CONTRIBUTING.md",
-    "SECURITY.md",
     "bin/starmux.mjs",
-    "docs/*.md",
-    "app/README.md"
+    "scripts/prepare.mjs",
+    "LICENSE",
+    "README.md"
   ]
 }

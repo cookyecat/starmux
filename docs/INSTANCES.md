@@ -1,6 +1,6 @@
 # Instances and configuration
 
-Use one implicit default instance for everyday work. Add `-i NAME` when you want separate projects with separate ports, credentials, policies and logs.
+Use one implicit default instance for everyday work. Add `-i NAME` when you want separate project contexts with separate ports, credentials, configuration and logs.
 
 ```sh
 starmux up ~/work/repo-a -i work --code
@@ -13,6 +13,36 @@ starmux rm blog
 ```
 
 Names such as `work` and `blog` are arbitrary labels. Names and stable IDs both work with `-i` / `--instance`, before or after the command. Instances share the OS account; coding mode uses that account's permissions.
+
+`up` and `status` put the instance name in the status heading and show its full stable UUID on the `Instance` line, including for the default instance. Read-only resolves relative file paths against `Project`; Coding preserves the upstream server's path behavior. Project is not an access boundary. `Mode` describes global Read-only or Coding access and shows the command to switch modes. A running instance's output uses its active configuration rather than unapplied configuration edits.
+
+The connection guide and command list remain available below the compact status summary:
+
+```text
+● Starmux is running  (instance: default)
+  Instance        <instance UUID>
+  Listen          http://127.0.0.1:18893/mcp  (this computer only)
+  Project         /path/to/your/project
+  Mode            Read-only (global · OS account)  (run 'starmux up --code' to enable edits & shell)
+  Auth            None (no token required)
+
+Connect an AI client (MCP settings)
+  Transport       Streamable HTTP
+  URL (Local)     http://127.0.0.1:18893/mcp  (AI client on this computer)
+  URL (Remote)    https://<your-domain-or-tunnel>/mcp  (via protected HTTPS proxy or tunnel -> 127.0.0.1:18893)
+  Authentication  None  (optional Bearer API key: starmux auth key "My AI Client")
+
+Commands
+  Verify          starmux verify
+  Auth & keys     starmux auth
+  Dashboard       starmux dashboard  (view & copy settings in browser)
+  Logs            starmux logs -f
+  Stop            starmux down
+```
+
+Normal instances use two global permission modes. Read-only blocks writes and arbitrary execution while allowing file reads permitted by the OS account and upstream server. Coding forwards native operations with the account's permissions. Saved directory grants and path filters do not affect these modes, and remain on disk for legacy configurations.
+
+The MCP `health_check` reports the active mode as `mode: "read-only"` or `mode: "coding"`, alongside connection and diagnostic information. It no longer exposes the internal `workspaceMode`, `developerCommands`, `nativeAccess` or `permissionMode` fields. Read-only access can include paths outside Project, such as `/etc/hosts`, when the OS account and upstream server allow them.
 
 ## Edit configuration
 
@@ -38,7 +68,7 @@ Set `VISUAL` or `EDITOR` to your editor executable for `config edit`. JSONC supp
     snapshots/
 ```
 
-Configuration holds workspace, port, permissions and optional upstream settings. Credentials and secrets live in private state. `config validate` and `config schema` provide diagnostics and the full schema. `starmux config schema` also works before creating an instance.
+Configuration holds project context, port, permission mode and optional upstream settings. Credentials and secrets live in private state. `config validate` and `config schema` provide diagnostics and the full schema. `starmux config schema` also works before creating an instance.
 
 ## Import, bind and export
 

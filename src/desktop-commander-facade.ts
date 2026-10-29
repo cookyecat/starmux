@@ -1,10 +1,10 @@
 import type { RequestContext,AuditSink,DenyRules,GitWorkflow,McpUpstream,ResourceProvider,UpstreamRouter,WorkspacePolicy } from "./contracts.js";
 import type { InvocationMiddleware } from "./invocation.js";
 import { createInvocationPipeline,safeAuditSink } from "./invocation.js";
-import type { LocalDesktopReadProbe } from './local-desktop-read-probe.js';
 import { createToolDispatcher } from "./tool-dispatch.js";
-export type BridgeUpstream = McpUpstream & Partial<ResourceProvider> & Partial<Pick<LocalDesktopReadProbe,'callApprovedRead'|'callApprovedProjectRead'|'callApprovedCanaryWrite'|'callApprovedSystemName'>>;
-export interface BridgeOptions {oauthScope?:string;request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
+import { isReadOnlyTool } from './account-access-policy.js';
+export type BridgeUpstream = McpUpstream & Partial<ResourceProvider>;
+export interface BridgeOptions {oauthScope?:string;request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;globalReadOnly?:boolean;permissionMode?:'global'|'workspace';denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
 // Desktop Commander tool-schema facade. Upstream catalog remains unmodified.
 // Preserve all native upstream tools; owner-approved native mode forwards unchanged.
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -22,7 +22,7 @@ export function createDesktopCommanderBridge(upstream: BridgeUpstream, audit: Au
   const resourcesEnabled=typeof upstream.listResources==="function"&&
     typeof upstream.readResource==="function";
   const server=new Server({
-    name:"mac-mcp-gateway-desktop-commander-bridge",version:"0.1.0"
+    name:"starmux-desktop-commander-bridge",version:"0.1.0"
   },{capabilities:{tools:{},...(resourcesEnabled?{resources:{}}:{})}});
   if(resourcesEnabled){
     server.setRequestHandler(ListResourcesRequestSchema,async()=>{
@@ -52,10 +52,10 @@ export function createDesktopCommanderBridge(upstream: BridgeUpstream, audit: Au
       annotations:{readOnlyHint:true,destructiveHint:false}
     }]:[]),{
       name:"health_check",
-      description:"Mac MCP Gateway bridge connection and genuine upstream availability check",
+      description:"Starmux bridge connection, upstream availability and active mode check. Read-only blocks writes and arbitrary execution; Coding uses upstream tools with OS account permissions.",
       inputSchema:{type:"object",properties:{},additionalProperties:false},
       annotations:{readOnlyHint:true,destructiveHint:false}
-    }].filter(tool=>!state?.deniedTools.includes(tool.name)).map(tool=>options.oauthScope?{...tool,
+    }].filter(tool=>!state?.deniedTools.includes(tool.name)&&(!options.globalReadOnly||isReadOnlyTool(tool.name))).map(tool=>options.oauthScope?{...tool,
       securitySchemes:[{type:'oauth2',scopes:[options.oauthScope]}],
       _meta:{...('_meta' in tool?tool._meta:{}),securitySchemes:[{type:'oauth2',scopes:[options.oauthScope]}]}}:tool)};
   });

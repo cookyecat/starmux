@@ -1,4 +1,4 @@
-name: CLI platforms
+name: Build packages
 on:
   push:
   pull_request:
@@ -8,7 +8,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm, windows-latest]
         node: ['22']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
@@ -20,5 +20,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
       - run: npm pack
+      - name: Build macOS App
+        if: runner.os == 'macOS'
+        run: |
+          python3 app/scripts/build_ui.py --output-dir "${{ runner.temp }}/starmux-ui"

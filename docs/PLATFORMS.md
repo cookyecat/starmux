@@ -25,5 +25,3 @@ starmux down
 Starmux runs on **macOS** (`Apple Silicon` and `Intel`), **Linux** (`x64`, `ARM64`, and edge devices such as **NVIDIA Jetson**), and **Windows**.
 
 The native macOS menu bar App is provided as a development build in [`app/`](../app/README.md).
-
-`npm test` uses isolated home directories and ports to verify process lifecycle, workspace permissions, authentication, configuration, and the CLI.

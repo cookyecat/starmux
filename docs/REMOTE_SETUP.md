@@ -1,6 +1,6 @@
-# Remote installation: HTTPS + API key, or ChatGPT OAuth
+# Remote installation: SSH, HTTPS + API key, or ChatGPT OAuth
 
-This guide follows the paths exercised with the real Gateway and Desktop Commander. Start with [local installation](INSTALL.md). Commands use the installed `starmux` CLI. Shell examples use POSIX syntax; on Windows set environment variables in PowerShell and use the corresponding `.bat` Keycloak commands.
+This guide covers SSH local port forwarding, HTTPS, and protected tunnels. Start with [local installation](INSTALL.md). Commands use the installed `starmux` CLI. Shell examples use POSIX syntax; on Windows set environment variables in PowerShell and use the corresponding `.bat` Keycloak commands.
 
 For help choosing between the three authentication modes, read [the access-control comparison](ACCESS_CONTROL.md#choose-an-authentication-mode). For other guides, use the [documentation index](README.md).
 
@@ -30,6 +30,41 @@ AI client → HTTPS / protected Tunnel → authentication → 127.0.0.1:18893/mc
 ```
 
 Starmux starts the local service. Choose one of the following routes to connect a remote client. Each key or login uses the instance's approved tool permissions.
+
+## SSH local port forwarding
+
+For a desktop client on a Mac and Starmux on a Linux or NVIDIA Jetson host, SSH can forward a local port to the host's loopback MCP endpoint. The two ports may differ. This example uses Mac port **18894** and target port **18893**; replace the SSH account, address and port with your own.
+
+On the target host, run `starmux up` and `starmux status`. Confirm that Starmux listens on `http://127.0.0.1:18893/mcp`. For the example below, its authentication mode is **None**. Use that mode only when you trust the processes on both hosts that can reach either loopback endpoint and the SSH account is authorized to access this Starmux instance. SSH authenticates the tunnel connection; Starmux does not receive an SSH user identity. Restrict SSH login and forwarding permissions to the intended users. If the instance already uses API keys or OAuth, keep that mode and supply the required Bearer token in the MCP client.
+
+On the Mac, keep this command running:
+
+```sh
+ssh -NT -o ExitOnForwardFailure=yes \
+  -L 127.0.0.1:18894:127.0.0.1:18893 \
+  -p 2222 nvidia@192.168.1.2
+```
+
+The explicit `127.0.0.1` bind keeps the Mac's forwarding port on loopback. `ExitOnForwardFailure=yes` reports failure to establish the forwarding listener; it does not prove that Starmux is reachable or that MCP initialization succeeds.
+
+Merge this entry into WorkBuddy's `~/.workbuddy/mcp.json`, then reload its MCP configuration. If the client shows an authentication choice, select **None** for this example:
+
+```json
+{
+  "mcpServers": {
+    "nvidia-nx": {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:18894/mcp"
+    }
+  }
+}
+```
+
+SSH forwards TCP bytes without rewriting HTTP headers. Starmux accepts `Host: 127.0.0.1:18894` or `Host: localhost:18894` on `/mcp` even though it listens on port 18893. Hostnames remain restricted to `127.0.0.1` and `localhost`; TCP peer, Origin and authentication checks still apply. This compatibility applies only to `/mcp`. `/healthz`, OAuth metadata and local management routes still require the Host port to match the actual listening port.
+
+Validate the complete route from the desktop client with tool discovery and a `health_check` tool call, followed by a read of an approved test file. A local `/healthz` check on the target host does not verify the SSH route.
+
+If an older Starmux version returns `403 Denied` when the ports differ, upgrade or temporarily use the same free port on both ends, such as `-L 127.0.0.1:18893:127.0.0.1:18893`, and update the client URL to port 18893. On current versions, `403 HOST_NOT_ALLOWED` identifies a rejected Host header and `403 LOOPBACK_REQUIRED` identifies a non-loopback TCP peer. These are transport-policy failures; changing an instance from None to OAuth does not fix them. A `401` from `/mcp` instead requires checking the instance's active authentication mode and the supplied credential.
 
 ## 2. HTTPS + Bearer API key
 
@@ -70,7 +105,9 @@ caddy run --config /absolute/path/Caddyfile --adapter caddyfile
 
 Caddy's automatic certificate provisioning requires a working ACME validation route. Binding standard ports may require OS service/administrator setup. Keep the process running or install it as a managed service. Keep `/access`, `/dashboard` and all owner-management routes private. The proxy preserves the client's Authorization header; do not replace it with a shared privileged credential.
 
-**Already have a certificate, or using port 8443?** The tested IPv6 variant uses `https://mcp.example.com:8443` as the site address, `bind YOUR_PUBLIC_IPV6` and `tls /absolute/path/cert.crt /absolute/path/cert.key` inside the site block. Include `:8443` in the client URL. Certificate renewal and proxy reload remain your responsibility. An IPv6-only endpoint requires an IPv6-capable client execution environment; test from another network rather than assuming DNS proves reachability.
+Keep `header_up Host 127.0.0.1:18893` (using the actual listening port). The SSH compatibility above allows different ports for loopback hostnames on `/mcp`; it does not accept the public domain in the Host header or trust `X-Forwarded-Host` as a substitute.
+
+**Already have a certificate, or using port 8443?** For IPv6, use `https://mcp.example.com:8443` as the site address, `bind YOUR_PUBLIC_IPV6` and `tls /absolute/path/cert.crt /absolute/path/cert.key` inside the site block. Include `:8443` in the client URL. Certificate renewal and proxy reload remain your responsibility. An IPv6-only endpoint requires an IPv6-capable client execution environment; test from another network rather than assuming DNS proves reachability.
 
 ### Configure WorkBuddy or another header-capable client
 
@@ -100,7 +137,7 @@ url = "https://mcp.example.com/mcp"
 bearer_token_env_var = "STARMUX_TOKEN"
 ```
 
-Set that variable securely in the environment of the actual Codex process; setting it in an unrelated terminal does not configure an already running desktop app. This is a documented configuration example, not a claim that this exact Codex API-key path has received project acceptance. See [official Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+Set that variable securely in the environment of the actual Codex process; setting it in an unrelated terminal does not configure an already running desktop app. See [official Codex MCP configuration](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
 ### Verify, then test revocation
 
@@ -114,9 +151,9 @@ Local `starmux verify` in API-key mode reads `STARMUX_TOKEN` from its environmen
 
 ## 3. OAuth: deploy the authorization server
 
-This is currently an **operator setup**, not a one-click wizard. The tested provider is Keycloak **26.8.1**, Java **21**, with persistent PostgreSQL **17**. The Gateway package does not install or operate these services for you. Use official distributions and maintain backups/upgrades; the pinned version describes the tested baseline, not a promise of indefinite security support.
+This setup uses Keycloak **26.8.1**, Java **21**, and persistent PostgreSQL **17**. Install these services separately from Starmux using official distributions, and maintain their backups and upgrades.
 
-For the tested Tunnel layout, use one HTTPS origin for both MCP and the issuer:
+For the Tunnel layout, use one HTTPS origin for both MCP and the issuer:
 
 ```text
 https://auth.example.com/mcp                         → Core 127.0.0.1:18893
@@ -127,7 +164,7 @@ Create your ChatGPT custom MCP definition and copy its **exact callback URL**. K
 
 ### Prepare Keycloak and persistent storage
 
-1. Install Java 21 and unpack the official Keycloak 26.8.1 distribution into a private operator directory. Provision a dedicated persistent PostgreSQL database and role with access only to that database. Do not use the Gateway's disposable in-memory test deployment for real accounts.
+1. Install Java 21 and unpack the official Keycloak 26.8.1 distribution into a private operator directory. Provision a dedicated persistent PostgreSQL database and role with access only to that database.
 2. Generate the realm import; use your hostname and callback:
 
 ```sh
@@ -158,7 +195,7 @@ KC_BOOTSTRAP_ADMIN_PASSWORD=<temporary-bootstrap-password>
   --import-realm
 ```
 
-Run the provider under a service manager for sustained use. Realm import initializes a new realm; it is not a general update mechanism for an existing realm. Do not use public `start-dev`. Keycloak's resource-indicators feature is experimental in this tested version.
+Run the provider under a service manager for sustained use. Realm import initializes a new realm; it is not a general update mechanism for an existing realm. Do not use public `start-dev`. Keycloak's resource-indicators feature is experimental in this version.
 
 5. Manage Keycloak locally with its admin CLI, or through a separately protected administrative route. The public proxy below intentionally does not expose `/admin`. For local CLI access, authenticate with `bin/kcadm.sh config credentials --server http://127.0.0.1:18080 --realm master --user gateway-admin` and enter the password when prompted. Use an owner-only home/config for the admin CLI's stored credentials.
 6. In realm `gateway`, create a dedicated enabled owner account with a non-temporary password; record its user ID. For CLI provisioning, `kcadm.sh create users -r gateway -f /private/path/owner.json` accepts a private user representation with `username`, `enabled: true`, profile fields and `credentials: [{"type":"password","value":"<owner-password>","temporary":false}]`. Create that file with an editor and owner-only permissions. Do not put it in the repository. Meet the realm's required profile fields; if email is unnecessary, explicitly make it optional rather than inventing an address.
@@ -219,16 +256,16 @@ In ChatGPT's custom MCP definition choose OAuth and **custom/provided client**, 
 
 ### Direct HTTPS
 
-Use `https://auth.example.com/mcp` as the server URL. Core and Keycloak use that same resource identifier. This configuration is supported by the resource-server design; real ChatGPT direct-HTTPS acceptance is still separate from the tested Tunnel path. Verify reachability from the client's actual network, especially for IPv6-only deployments.
+Use `https://auth.example.com/mcp` as the server URL. Core and Keycloak use that same resource identifier. Verify reachability from the client's actual network, especially for IPv6-only deployments.
 
-### Official OpenAI Tunnel — tested ChatGPT path
+### Official OpenAI Tunnel
 
-Provision your own Tunnel and runtime credential using [OpenAI's guide](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels). The existing [Tunnel guide](CONNECT_CHATGPT.md#2-secure-mcp-tunnel--no-inbound-port) explains workspace permissions. For OAuth on the tested tunnel-client **0.0.16** layout:
+Provision your own Tunnel and runtime credential using [OpenAI's guide](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels). The existing [Tunnel guide](CONNECT_CHATGPT.md#2-secure-mcp-tunnel--no-inbound-port) explains workspace permissions. For OAuth with tunnel-client **0.0.16** layout:
 
 - Set `--mcp.server-url url=https://auth.example.com/mcp`.
 - Set `--mcp.oauth-trusted-origin https://auth.example.com`.
 - Keep the Tunnel ID and runtime secret in private client configuration; neither is the OAuth client secret.
-- Retain automatic OAuth target registration. Do not substitute generic Harpoon targets or disable TLS checks. The tested layout registered ten typed OAuth targets.
+- Retain automatic OAuth target registration. Do not substitute generic Harpoon targets or disable TLS checks.
 - Choose that Tunnel in ChatGPT, then discover OAuth metadata.
 
 **Important resource-alias step:** Tunnel discovery rewrites the MCP resource identifier. Copy the exact discovered **Resource** value from ChatGPT. Do not invent it, use a wildcard, or copy the maintainer's Tunnel ID.
@@ -261,14 +298,16 @@ Manage keys/sessions in the local **Dashboard → Access control**. The macOS Ap
 | Metadata discovery fails | Both protected-resource paths, issuer discovery and same-origin Tunnel configuration |
 | Keycloak rejects requested resource | Exact discovered resource, resource client's attribute, granted audience mapper and Core aliases |
 | HTTP 401 after revoke or idle expiry | Do not retry tools indefinitely; inspect local revocation state, then use a fresh authorized login if appropriate |
-| HTTP 403 | Allowed owner/client and `gateway:access`; do not expand permissions just to hide a failure |
+| HTTP 403 with `HOST_NOT_ALLOWED` or `LOOPBACK_REQUIRED` | Check the Host header, the local proxy connection and the [SSH route](#ssh-local-port-forwarding); these failures occur before MCP authentication |
+| Older version returns `403 Denied` through SSH | Use matching forwarding/listening ports temporarily, or upgrade for `/mcp` forwarding between different ports |
+| HTTP 403 during OAuth authorization | Allowed owner/client and `gateway:access`; do not expand permissions just to hide a failure |
 | OAuth works but a write is denied | Existing workspace/OS/upstream policy still applies |
 | Web answer/app fails to render | Correlate actual tool/audit results (`starmux logs -f`) before deciding whether execution failed; never automatically repeat a side-effecting call |
 | CLI changes do not affect the server | Check `starmux ls` and `starmux status` to ensure you are targeting the intended instance (`-i <name>`) |
 
-The local App, Core, proxy, database, provider and Tunnel have separate process lifecycles. Stopping Core stops new tool service; it does not automatically shut down the others. Persist private configuration and PostgreSQL/Caddy data, configure service startup deliberately, and repeat acceptance after reboot or deployment changes.
+The local App, Core, proxy, database, provider and Tunnel have separate process lifecycles. Stopping Core stops new tool service; it does not automatically shut down the others. Persist private configuration and PostgreSQL/Caddy data, configure service startup deliberately, and verify the connection after reboot or deployment changes.
 
-[OAuth contracts and acceptance evidence](OAUTH.md) · [Access control](ACCESS_CONTROL.md) · [Install](INSTALL.md) · [README](../README.md)
+[OAuth configuration and reference](OAUTH.md) · [Access control](ACCESS_CONTROL.md) · [Install](INSTALL.md) · [README](../README.md)
 
 
 ## Network troubleshooting

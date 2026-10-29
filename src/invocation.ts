@@ -70,7 +70,7 @@ export function createInvocationPipeline(options: {
     } catch (error) {
       const reason = errorCode(error) || 'DENY_RULE_CHECK_FAILED';
       audit({event:'TOOL_EXPLICITLY_DENIED',requestId:request.requestId,tool:invocation.name,reason});
-      return {isError:true,content:[{type:'text',text:reason+': Review filters on the Mac owner Dashboard /filters'}]};
+      return {isError:true,content:[{type:'text',text:reason+': Review filters on the local owner Dashboard /filters'}]};
     }
     const result = await options.dispatch(invocation, request);
     for (const hook of hooks) {

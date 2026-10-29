@@ -8,7 +8,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type { AuditSink } from "./contracts.js";
 import { isSafeInteger } from "./validation.js";
 // Explicit project-root Desktop Commander MCP endpoint. Never exposed to public Caddy.
-// Start only with owner-approved MAC_MCP_PROJECT_ROOT; no default HOME traversal.
+// Start only with owner-approved STARMUX_PROJECT_ROOT; no default HOME traversal.
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "node:http";
 import { createAuthorizedWorkspacePolicy } from "./authorized-workspace-roots.js";
@@ -26,6 +26,8 @@ import { createPrivateMCPActivity } from "./private-mcp-activity.js";
 import { createGitWorkflow } from "./project-git-workflow.js";
 import { createProjectPolicy } from "./project-workspace-policy.js";
 import { createWorkspaceGrants } from "./workspace-grants.js";
+import { createAccountAccessPolicy } from './account-access-policy.js';
+import { isAllowedGatewayHost } from './http-host-policy.js';
 
 export interface RuntimeOptions {env?: NodeJS.ProcessEnv; audit?: AuditSink}
 export interface GatewayRuntime {start(): Promise<void>; close(): Promise<void>; readonly port: number|null}
@@ -54,26 +56,30 @@ export function createGatewayRuntime(options: RuntimeOptions={}): GatewayRuntime
   };
 }
 async function initializeGateway({env=process.env,audit:externalAudit}: RuntimeOptions){
-const access=await createAccessControl(env.MAC_MCP_ACCESS_FILE);
-const page=(html:string)=>instancePage(html,env.MAC_MCP_INSTANCE_NAME,env.MAC_MCP_INSTANCE_ID);
-const root=env.MAC_MCP_PROJECT_ROOT;
+const access=await createAccessControl(env.STARMUX_ACCESS_FILE);
+const page=(html:string)=>instancePage(html,env.STARMUX_INSTANCE_NAME,env.STARMUX_INSTANCE_ID);
+const root=env.STARMUX_PROJECT_ROOT;
 if(!root)throw new Error("OWNER_APPROVED_PROJECT_ROOT_REQUIRED");
-const mode=env.MAC_MCP_WORKSPACE_MODE||"read-only";
-const developerCommands=env.MAC_MCP_DEV_COMMANDS||"presets";
-const nativeAccessMode=env.MAC_MCP_DC_ACCESS_MODE||"workspace";
-const writeScope=env.MAC_MCP_DC_WRITE_SCOPE||"unrestricted";
+const mode=env.STARMUX_WORKSPACE_MODE||"read-only";
+const developerCommands=env.STARMUX_DEV_COMMANDS||"presets";
+const nativeAccessMode=env.STARMUX_DC_ACCESS_MODE||"workspace";
+const writeScope=env.STARMUX_DC_WRITE_SCOPE||"unrestricted";
+const globalPermissions=env.STARMUX_PERMISSION_MODE==='global';
+const globalReadOnly=globalPermissions&&mode==='read-only';
 if(!["unrestricted","home-only"].includes(writeScope)||
    (writeScope==="home-only"&&nativeAccessMode!=="native"))
   throw Error("HOME_WRITE_SCOPE_REQUIRES_NATIVE_ROLE");
-if(writeScope==="home-only"&&env.MAC_MCP_UPSTREAMS_FILE)
+if(writeScope==="home-only"&&env.STARMUX_UPSTREAMS_FILE)
   throw Error("HOME_WRITE_SCOPE_UNSANDBOXED_EXTRA_UPSTREAMS");
 if(!["workspace","native"].includes(nativeAccessMode)||
    (nativeAccessMode==="native"&&
     (developerCommands!=="trusted-project"||mode!=="read-write")))
   throw new Error("NATIVE_ACCESS_REQUIRES_OWNER_TRUSTED_DEVELOPER_PROFILE");
-const policy=await createProjectPolicy({root,mode,developerCommands,
+if(globalPermissions&&(writeScope!=='unrestricted'||(!globalReadOnly&&nativeAccessMode!=='native')))
+  throw Error('GLOBAL_ACCESS_MODE_INVALID');
+const policy=globalPermissions?await createAccountAccessPolicy(root,mode):await createProjectPolicy({root,mode,developerCommands,
   allowTrustedHomeRoot:nativeAccessMode==="native"&&developerCommands==="trusted-project"});
-const desiredPort=Number(env.MAC_MCP_PROJECT_PORT||8793);
+const desiredPort=Number(env.STARMUX_PROJECT_PORT||18893);
 if(!isSafeInteger(desiredPort)||desiredPort<0||desiredPort>65535)
   throw new Error("INVALID_PORT");
 let activity: ReturnType<typeof createPrivateMCPActivity>|null=null;
@@ -100,31 +106,30 @@ try {
 await upstream.connect();
 // Default configuration remains the original Desktop Commander-only profile.
 // Additional trusted operator-owned routes require an explicit private config.
-configured=await bootstrapConfiguredUpstreams(env.MAC_MCP_UPSTREAMS_FILE,audit);
+configured=await bootstrapConfiguredUpstreams(env.STARMUX_UPSTREAMS_FILE,audit);
 const router=createMCPUpstreamRouter({routes:[
   {id:"desktop",upstream,exposeNativeNames:true},...configured.routes
 ]});
-// Owner explicitly opts in on isolated development runs only.
-// Not enabled in the currently deployed 8793 process.
-if(env.MAC_MCP_PRIVATE_ACTIVITY_OBSERVER==="1")
+// The instance supervisor enables this bounded, owner-local activity observer.
+if(env.STARMUX_PRIVATE_ACTIVITY_OBSERVER==="1")
   activity=createPrivateMCPActivity({routeFor:name=>router.routeFor(name)});
-const worktreeMode=env.MAC_MCP_WORKTREE_MODE||"off";
+const worktreeMode=env.STARMUX_WORKTREE_MODE||"off";
 if(!["off","linked"].includes(worktreeMode))throw Error("INVALID_WORKTREE_MODE");
 const worktreePolicy=createAuthorizedWorkspacePolicy({
-  basePolicy:policy,linkedGitWorktrees:worktreeMode
+  basePolicy:policy,linkedGitWorktrees:globalPermissions?'off':worktreeMode
 });
 // Explicit opt-in: existing/private deployments remain unchanged without this file.
-const grants=env.MAC_MCP_GRANTS_FILE?
-  await createWorkspaceGrants({file:env.MAC_MCP_GRANTS_FILE,audit}):null;
+const grants=!globalPermissions&&env.STARMUX_GRANTS_FILE?
+  await createWorkspaceGrants({file:env.STARMUX_GRANTS_FILE,audit}):null;
 const workspacePolicy=grants?
   createManagedWorkspacePolicy({basePolicy:worktreePolicy,grants}):worktreePolicy;
 // Optional explicit deny preferences: default empty, independent from DC tools.
 // Owner-managed only via the same local token as Workspace Permissions.
-if(env.MAC_MCP_DENY_FILE&&!grants)
+if(!globalPermissions&&env.STARMUX_DENY_FILE&&!grants)
   throw Error("DENY_CONSOLE_REQUIRES_OWNER_GRANTS");
-const denyRules=env.MAC_MCP_DENY_FILE?
-  await createDenyRules({file:env.MAC_MCP_DENY_FILE,audit}):null;
-const gitMode=env.MAC_MCP_GIT_MODE||"off";
+const denyRules=!globalPermissions&&env.STARMUX_DENY_FILE?
+  await createDenyRules({file:env.STARMUX_DENY_FILE,audit}):null;
+const gitMode=globalPermissions?'off':env.STARMUX_GIT_MODE||"off";
 if(!["off","review","write","push"].includes(gitMode))throw new Error("INVALID_GIT_MODE");
 if(writeScope==="home-only"&&gitMode!=="off")
   throw Error("HOME_WRITE_SCOPE_GATEWAY_GIT_MUST_BE_OFF");
@@ -133,12 +138,22 @@ const gitWorkflow=gitMode==="off"?null:createGitWorkflow({
   pushEnabled:gitMode==="push"
 });
 http=createServer(async(req,res)=>{
-  const local=req.socket.remoteAddress==="127.0.0.1";
+  const denyRequest=(reason:'LOOPBACK_REQUIRED'|'HOST_NOT_ALLOWED')=>{
+    audit({event:'HTTP_REQUEST_DENIED',reason});
+    res.writeHead(403,{'content-type':'text/plain; charset=utf-8','cache-control':'no-store'}).end(reason);
+  };
+  if(req.socket.remoteAddress!=="127.0.0.1"){denyRequest('LOOPBACK_REQUIRED');return;}
+  let route: string;
+  try{route=new URL(req.url||"/","http://localhost").pathname;}
+  catch{res.writeHead(400).end('Invalid request target');return;}
   const address=http?.address();
   const port=address&&typeof address!=="string"?address.port:null;
-  const hostOk=[`127.0.0.1:${port}`,`localhost:${port}`].includes(req.headers.host??"");
-  if(!local||!hostOk){res.writeHead(403).end("Denied");return;}
-  const route=new URL(req.url||"/","http://localhost").pathname;
+  if(!isAllowedGatewayHost(req,port,route)){denyRequest('HOST_NOT_ALLOWED');return;}
+  if(globalPermissions&&(route==='/permissions'||route==='/filters')){
+    res.writeHead(410,{'content-type':'text/plain; charset=utf-8','cache-control':'no-store'});
+    res.end('Starmux uses global Read-only or Coding mode. Directory grants and tool filters do not apply. Use starmux up --read or starmux up --code.');
+    return;
+  }
   if(route.startsWith('/.well-known/oauth-protected-resource')&&(req.method==='GET'||req.method==='OPTIONS')){
     try{
       const config=await access.oauthSettings();
@@ -162,10 +177,10 @@ http=createServer(async(req,res)=>{
         res.writeHead(200,{...accessHeaders,"content-type":"text/html; charset=utf-8"}).end(page(accessPage(await access.snapshot())));
       }else if(req.method==="POST"){
         const result=await accessPost(req,access);
-        if(result.status===200&&env.MAC_MCP_INSTANCE_ID){
+        if(result.status===200&&env.STARMUX_INSTANCE_ID){
           const {changeRegistry,instancePaths}=await import('./instance-store.js');
           await changeRegistry(async registry=>{
-            const instance=registry.instances.find(i=>i.id===env.MAC_MCP_INSTANCE_ID);
+            const instance=registry.instances.find(i=>i.id===env.STARMUX_INSTANCE_ID);
             if(instance&&instancePaths(instance).access===access.file)instance.requiredAccess=(await access.snapshot()).mode;
           });
         }
@@ -229,10 +244,11 @@ http=createServer(async(req,res)=>{
   if((route==="/dashboard"||route==="/dashboard.json")&&req.method==="GET"){
     try{
       const snapshot={...await collectOperationsSnapshot(),configuredUpstreams:configured!.status(),
-        ...(env.MAC_MCP_INSTANCE_ID?{instance:{id:env.MAC_MCP_INSTANCE_ID,name:env.MAC_MCP_INSTANCE_NAME??env.MAC_MCP_INSTANCE_ID,port:desiredPort}}:{}),
+        ...(env.STARMUX_INSTANCE_ID?{instance:{id:env.STARMUX_INSTANCE_ID,name:env.STARMUX_INSTANCE_NAME??env.STARMUX_INSTANCE_ID,port:desiredPort}}:{}),
         accessControl:await access.snapshot(),
         permissionManagementEnabled:Boolean(grants),
         nativeAccessEnabled:nativeAccessMode==="native",
+        permissionMode:globalPermissions?'global':'workspace',
         denyRuleManagementEnabled:Boolean(denyRules)};
       const json=route.endsWith(".json");
       res.writeHead(200,{...dashboardHeaders,
@@ -267,7 +283,7 @@ http=createServer(async(req,res)=>{
     res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});
     const accessMode=await access.snapshot().then(s=>s.mode).catch(()=>"unavailable");
     res.end(JSON.stringify({status:"ok",service:"dc-project-workspace",mode,
-      writeScope,accessMode,...(env.MAC_MCP_INSTANCE_ID?{instanceId:env.MAC_MCP_INSTANCE_ID,instanceName:env.MAC_MCP_INSTANCE_NAME}:{})}));
+      writeScope,accessMode,...(env.STARMUX_INSTANCE_ID?{instanceId:env.STARMUX_INSTANCE_ID,instanceName:env.STARMUX_INSTANCE_NAME}:{})}));
     return;
   }
   if(route!=="/mcp"){
@@ -296,6 +312,7 @@ http=createServer(async(req,res)=>{
   const gateway=createDesktopCommanderBridge(router,audit,{
     request,...(oauth?{oauthScope:oauth.scope}:{}),workspacePolicy,upstreamRouter:router,
     nativePassthrough:nativeAccessMode==="native",denyRules,
+    globalReadOnly,permissionMode:globalPermissions?'global':'workspace',
     ...(gitWorkflow?{gitWorkflow}:{})
   });
   bridges.add(gateway);

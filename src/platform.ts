@@ -1,4 +1,4 @@
-// Host integration for the shared CLI. macOS App and legacy paths stay stable.
+// Host integration for the shared CLI and native App.
 import {execFileSync} from 'node:child_process';
 import {lstatSync,mkdirSync,type Stats} from 'node:fs';
 import {homedir,tmpdir} from 'node:os';
@@ -45,9 +45,9 @@ export function createPrivateDirectory(folder:string){
   if(!ownedByUser(folder,lstatSync(folder),true))throw Error('PRIVATE_DIRECTORY_UNSAFE');
 }
 export function controlRoot(){
-  if(process.platform==='darwin')return `/private/tmp/mac-mcp-gateway-${process.getuid!()}`;
+  if(process.platform==='darwin')return `/private/tmp/starmux-${process.getuid!()}`;
   const id=windows?createHash('sha256').update(homedir().toLowerCase()).digest('hex').slice(0,16):String(process.getuid!());
-  return path.join(tmpdir(),`mac-mcp-gateway-${id}`);
+  return path.join(tmpdir(),`starmux-${id}`);
 }
 export function within(candidate:string,root:string){
   const relative=path.relative(root,candidate);

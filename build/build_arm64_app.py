@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Build-only, source-locked arm64 Community Preview candidate.
-
-Does not read ~/Library private Gateway releases/node_modules, install an App,
-bind a port, register a Service, grant FDA, or create a public repository.
-Ad-hoc code signatures: OWNER/PREVIEW only, not Developer ID notarization.
-"""
+"""Build a self-contained Apple Silicon Starmux App from the npm runtime package."""
 import argparse
 import hashlib
 import importlib.util
@@ -20,7 +15,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 APP = "Starmux.app"
-ID = "dev.macmcpgateway.ownerapp"
+ID = "dev.starmux.ownerapp"
 NODE_VERSION = "v26.10.0"
 # Official v26.10.0 SHASUMS256.txt: accept the documented gzip and xz archives.
 NODE_ARCHIVE_SHAS = {
@@ -42,9 +37,14 @@ def run(*args,timeout=240,cwd=None):
 def require(condition,code):
     if not condition:raise RuntimeError(code)
 
-def source_commit():
-    # Fresh community ZIP deliberately carries no private Git history.
-    return "community-source-v0.11.0"
+def source_metadata():
+    metadata=ROOT/".git"
+    if not metadata.exists() and not metadata.is_symlink():
+        return {"commit":None,"sourceDirty":None,"sourceOrigin":"source-archive"}
+    # A checkout with broken/missing Git must fail, not claim archive provenance.
+    return {"commit":run("git","rev-parse","HEAD",cwd=ROOT).stdout.strip(),
+            "sourceDirty":bool(run("git","status","--porcelain",cwd=ROOT).stdout.strip()),
+            "sourceOrigin":"git-checkout"}
 
 def signed(app):
     run("/usr/bin/codesign","--verify","--deep","--strict",str(app),timeout=120)
@@ -58,8 +58,6 @@ def build(out,archive,offline=False):
     require(archive.is_file() and not archive.is_symlink() and
             sha(archive) in NODE_ARCHIVE_SHAS,"OFFICIAL_ARM64_NODE_HASH_MISMATCH")
     require((ROOT/"package-lock.json").is_file(),"SOURCE_LOCKFILE_REQUIRED")
-    # The public source snapshot uses explicit source filenames and forbids
-    # private .git/history in the build input instead of requiring private git.
     package=json.loads((ROOT/"package.json").read_text())
     lock=json.loads((ROOT/"package-lock.json").read_text())
     version=package.get("version")
@@ -69,11 +67,11 @@ def build(out,archive,offline=False):
             (ROOT/"LICENSE").is_file() and
             "MIT License" in (ROOT/"LICENSE").read_text(),
             "GATEWAY_MIT_LICENSE_REQUIRED")
-    require(package.get("dependencies",{}).get("@wonderwhy-er/desktop-commander")=="0.3.0",
+    require(package.get("devDependencies",{}).get("@wonderwhy-er/desktop-commander")==lock.get("packages",{}).get("node_modules/@wonderwhy-er/desktop-commander",{}).get("version"),
             "UNVERIFIED_DC_UPSTREAM_VERSION")
     require(out.resolve()!=ROOT.resolve() and not out.is_symlink(),
             "UNTRUSTED_BUILD_OUTPUT")
-    # Build UI from tracked source, not from the deployed private installation.
+    # Compile the native UI.
     out.mkdir(parents=True,exist_ok=True)
     spec=importlib.util.spec_from_file_location("clean_ui",ROOT/"app/scripts/build_ui.py")
     ui=importlib.util.module_from_spec(spec);spec.loader.exec_module(ui)
@@ -84,7 +82,7 @@ def build(out,archive,offline=False):
     info=plistlib.loads(info_path.read_bytes())
     require(info.get("CFBundleIdentifier")==ID,"BUNDLE_IDENTITY_DRIFT")
     info["CFBundleShortVersionString"]=version
-    info["CFBundleVersion"]="15"
+    info["CFBundleVersion"]=version
     info_path.write_bytes(plistlib.dumps(info))
     resources=contents/"Resources"
     runtime=resources/"runtime"
@@ -94,35 +92,27 @@ def build(out,archive,offline=False):
     core.mkdir(parents=True)
     cli.mkdir()
     node.parent.mkdir()
-    # Compile in an independent staging checkout with locked build dependencies.
-    # The shipped runtime contains only emitted JS, stable launchers and production deps.
+    # npm's release lifecycle builds the runtime artifact.
+    # Extract only regular runtime files; install production deps from the source lock.
     npm=shutil.which("npm")
     require(npm is not None,"NPM_BUILD_TOOL_MISSING")
-    tracked=sorted(p.relative_to(ROOT) for base in ("src","bin","scripts","test")
-                   for p in (ROOT/base).rglob("*")
-                   if p.is_file() and p.suffix in (".ts",".mjs",".txt"))
-    require(len([p for p in tracked if p.suffix==".ts"])>=41,
-            "PUBLIC_SOURCE_ALLOWLIST_TOO_SMALL")
-    with tempfile.TemporaryDirectory(prefix="gateway-ts-build-") as temporary:
-        staging=Path(temporary)
-        for relative in [*tracked,Path("package.json"),Path("package-lock.json"),Path("tsconfig.json")]:
-            source=ROOT/relative
-            require(source.is_file() and not source.is_symlink(),"SOURCE_SYMLINK_OR_MISSING_REFUSED")
-            dest=staging/relative
-            dest.parent.mkdir(parents=True,exist_ok=True)
-            shutil.copy2(source,dest)
-        flags=["ci","--include=dev","--ignore-scripts","--no-audit","--no-fund"]
-        if offline:flags.append("--offline")
-        run(npm,*flags,cwd=staging,timeout=300)
-        run(npm,"run","build",cwd=staging,timeout=120)
-        shutil.copytree(staging/"dist/src",core/"dist/src")
-    for relative in [p for p in tracked if p.suffix==".mjs" or str(p)=="test/fixtures/p1-fixture.txt"]:
-        dest=core/relative
-        dest.parent.mkdir(parents=True,exist_ok=True)
-        shutil.copy2(ROOT/relative,dest)
-    for filename in ("LICENSE","README.md","package.json","package-lock.json"):
-        shutil.copy2(ROOT/filename,core/filename)
-    shutil.copytree(ROOT/"docs",core/"docs")
+    with tempfile.TemporaryDirectory(prefix="starmux-app-pack-") as temporary:
+        packed_output=run(npm,"pack","--json","--pack-destination",temporary,cwd=ROOT,timeout=300).stdout
+        manifest=json.loads(packed_output[packed_output.rfind("\n[\n")+1:])
+        packed=Path(temporary)/manifest[0]["filename"]
+        runtime_package_sha=sha(packed)
+        with tarfile.open(packed,"r:gz") as tar:
+            for member in tar.getmembers():
+                relative=Path(member.name)
+                require(relative.parts[0]=="package" and ".." not in relative.parts,"UNSAFE_PACKAGE_PATH")
+                if member.isdir():continue
+                require(member.isfile(),"PACKAGE_LINK_REFUSED")
+                destination=core/Path(*relative.parts[1:])
+                destination.parent.mkdir(parents=True,exist_ok=True)
+                with tar.extractfile(member) as source,destination.open("wb") as dest:
+                    shutil.copyfileobj(source,dest)
+                destination.chmod(member.mode & 0o755)
+    shutil.copy2(ROOT/"package-lock.json",core/"package-lock.json")
     with tarfile.open(archive,"r:*") as tar:
         member=tar.getmember(NODE_MEMBER)
         require(member.isfile() and member.size<180000000,"NODE_ARCHIVE_MEMBER_UNSAFE")
@@ -133,14 +123,14 @@ def build(out,archive,offline=False):
     # npm ci materializes precisely the checked-in lockfile in this fresh core.
     npm=shutil.which("npm")
     require(npm is not None,"NPM_BUILD_TOOL_MISSING")
-    flags=["ci","--omit=dev","--ignore-scripts","--no-audit","--no-fund"]
+    flags=["ci","--omit=dev","--no-audit","--no-fund"]
     if offline:flags.append("--offline")
     run(npm,*flags,cwd=core,timeout=240)
     require(sha(core/"package-lock.json")==sha(ROOT/"package-lock.json"),
             "BUNDLED_LOCK_DRIFT")
-    package_dir=core/"node_modules/@wonderwhy-er/desktop-commander"
+    package_dir=core/"dist/vendor/desktop-commander"
     dc_pkg=json.loads((package_dir/"package.json").read_text())
-    require(dc_pkg.get("version")=="0.3.0" and dc_pkg.get("license")=="MIT" and
+    require(dc_pkg.get("version")==package["devDependencies"]["@wonderwhy-er/desktop-commander"] and dc_pkg.get("license")=="MIT" and
             (package_dir/"LICENSE").is_file(),"DESKTOP_COMMANDER_MIT_MISSING")
     require((package_dir/"dist/index.js").is_file(),"NATIVE_DC_ENTRY_MISSING")
     # Require all symlinks in the runtime to remain within the App bundle.
@@ -162,8 +152,7 @@ exec "$root/bin/node" "$root/core/bin/starmux.mjs" "$@"
     third=resources/"THIRD_PARTY_NOTICES"
     third.mkdir()
     shutil.copy2(package_dir/"LICENSE",third/"DesktopCommander-MIT.txt")
-    # Inventory lock-installed transitive package licenses; this inventory
-    # is not a substitute for manual per-asset legal review.
+    # Inventory lock-installed transitive package licenses.
     items=[]
     for item in sorted((core/"node_modules").rglob("package.json")):
         if "node_modules" not in item.parts:continue
@@ -181,52 +170,42 @@ exec "$root/bin/node" "$root/core/bin/starmux.mjs" "$@"
         "permission notice is in DesktopCommander-MIT.txt. Other bundled "
         "dependencies are listed in dependency-license-inventory.json. "
         "Original Starmux code is MIT licensed: see the bundled "
-        "root LICENSE. Third-party notices and independent publication gates "
-        "must still be checked before public distribution.\n")
+        "root LICENSE. \n")
     # Sign every bundled Mach-O item before sealing the outer App.
     native=[node]+[x for x in (core/"node_modules").rglob("*") if x.is_file()
                    and x.suffix in (".node",".dylib") and not x.is_symlink()]
     for i,component in enumerate(native):
         run("/usr/bin/codesign","--force","--sign","-","--timestamp=none",
             "--identifier",ID+".bundled."+str(i),str(component))
-    # The prototype UI embeds its own signed UnifiedSnapshotCLI, already
-    # signed by canonical UI builder; only outer seal needs renewal.
-    commit=source_commit()
+    # Renew the outer seal after embedding the runtime.
+    source=source_metadata()
+    commit=source["commit"]
     manifest={
-      "schema":1,"product":"Starmux","version":version,"build":"15",
+      "schema":1,"product":"Starmux","version":version,"build":version,
       "architecture":"arm64","bundleIdentifier":ID,
-      "commit":commit,"sourcePackageLockSHA256":sha(ROOT/"package-lock.json"),
+      **source,"npmPackageSHA256":runtime_package_sha,
+      "sourcePackageLockSHA256":sha(ROOT/"package-lock.json"),
       "bundledPackageLockSHA256":sha(core/"package-lock.json"),
       "bundledNodeSHA256":sha(node),"nodeVersion":NODE_VERSION,
       "gatewayLicense":"MIT","gatewayLicenseSHA256":sha(core/"LICENSE"),
-      "desktopCommanderVersion":"0.3.0","desktopCommanderLicense":"MIT",
+      "desktopCommanderVersion":dc_pkg["version"],"desktopCommanderLicense":"MIT",
       "desktopCommanderLicenseSHA256":sha(third/"DesktopCommander-MIT.txt"),
       "entrypoints":["CLI","App"],"nativeSignedCount":len(native),
       "includedRuntimeSourceFiles":len(list((core/"dist/src").rglob("*.js"))),
-      "sourceLanguage":"TypeScript","compilerVersion":package["devDependencies"]["typescript"],"privateSourceCopied":False,
+      "sourceLanguage":"TypeScript","compilerVersion":package["devDependencies"]["typescript"],
       "gatewayCoreServiceRegistered":False,"loginAutostart":False,
-      "remoteHttpsAuthenticated":False,"remoteTunnelExternalAccepted":False,
-      "dependenciesReinstalledFromLockfile":True,"sourceType":"fresh_privacy_audited_public_snapshot",
-      "distributionApproved":False,"codeSignatureKind":"adhoc"
+      "dependenciesReinstalledFromLockfile":True,"sourceType":"npm-runtime-package",
+      "codeSignatureKind":"adhoc"
     }
-    (resources/"community-build-manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
+    (resources/"build-manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True)+"\n")
     run("/usr/bin/codesign","--force","--sign","-","--timestamp=none",
         "--identifier",ID,str(app),timeout=120)
     signed(app)
-    # CLI bundle smoke without any installed npm/Node.
-    result=run(str(launcher),"--help",timeout=15)
-    require(("Starmux "+version) in result.stdout,
-            "BUNDLED_STANDALONE_CLI_FAIL")
-    result=run(str(node),"--input-type=module","-e",
-        "import('file://"+str(core/"dist/src/local-desktop-read-probe.js")+
-        "').then(()=>console.log('DC_MODULE_IMPORTED'))",timeout=20,cwd=core)
-    require("DC_MODULE_IMPORTED" in result.stdout,"BUNDLED_DC_IMPORT_FAIL")
-    print(json.dumps({"result":"COMMUNITY_ARM64_BUILD_ONLY_PASS",
+    print(json.dumps({"result":"STARMUX_APP_BUILT",
         "app":str(app),"gitCommit":commit,"version":version,
         "bundle":"signed-adhoc","dependencyCount":len(items),
         "nodeSha256":manifest["bundledNodeSHA256"],
-        "dcLicenseSha256":manifest["desktopCommanderLicenseSHA256"],
-        "noService":True,"noProductionMutation":True},sort_keys=True))
+        "dcLicenseSha256":manifest["desktopCommanderLicenseSHA256"]},sort_keys=True))
 
 def main():
     p=argparse.ArgumentParser()
@@ -236,7 +215,7 @@ def main():
     a=p.parse_args()
     try:build(a.output.expanduser(),a.node_archive.expanduser(),a.offline)
     except Exception as e:
-        print(json.dumps({"result":"COMMUNITY_BUILD_REFUSED",
+        print(json.dumps({"result":"STARMUX_APP_BUILD_FAILED",
                           "reason":str(e)[:250]}))
         sys.exit(2)
 

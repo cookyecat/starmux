@@ -1,2 +1,0 @@
-Mac-MCP-Gateway P1 local stdio test fixture.
-This file contains only synthetic non-private test data.

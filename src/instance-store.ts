@@ -10,8 +10,10 @@ import {z} from 'zod';
 import {zodToJsonSchema} from 'zod-to-json-schema';
 import {validateConfiguredUpstreams} from './configured-mcp-upstreams.js';
 import {createPrivateDirectory,ownedByUser} from './platform.js';
-import {checkSetupValues,setupRuntimeEnv} from './release1-onboarding.js';
+import {supportedHost} from './platform.js';
+import {createProjectPolicy} from './project-workspace-policy.js';
 import {createAccessControl} from './access-control.js';
+import {createAccountAccessPolicy} from './account-access-policy.js';
 
 const nameSchema=z.string().trim().min(1).max(80).regex(/^[^\x00-\x1f\x7f/\\]+$/);
 const sourceSchema=z.object({kind:z.enum(['managed','linked']),path:z.string()}).strict();
@@ -88,15 +90,6 @@ export async function resolveInstance(selector?:string,home=homedir(),includeArc
 export function parseConfig(text:string):InstanceConfig{
   const errors:ParseError[]=[];let value:unknown=parse(text,errors,{allowTrailingComma:true});
   if(errors.length){const e=errors[0]!;const prefix=text.slice(0,e.offset);throw Error(`CONFIG_JSON_INVALID line ${prefix.split('\n').length}, column ${e.offset-(prefix.lastIndexOf('\n')+1)+1}: ${printParseErrorCode(e.error)}`);}
-  // Import the three historical onboarding formats without changing their authority.
-  if(value&&typeof value==='object'&&'version' in value){
-    const legacy=value as Record<string,unknown>;
-    if(![1,2,3].includes(Number(legacy.version)))throw Error('CONFIG_VERSION_UNSUPPORTED');
-    const allowed=new Set(['version','projectRoot','mode','connection','port','accessRole','writeScope']);
-    if(Object.keys(legacy).some(k=>!allowed.has(k)))throw Error('CONFIG_UNKNOWN_LEGACY_FIELD');
-    value={schemaVersion:1,projectRoot:legacy.projectRoot,mode:legacy.mode,connection:legacy.connection,port:legacy.port,
-      accessRole:legacy.version===1?'restricted':legacy.accessRole,writeScope:legacy.version===3?'home-only':'unrestricted'};
-  }
   const result=instanceConfigSchema.safeParse(value);
   if(!result.success)throw Error('CONFIG_INVALID: '+result.error.issues.map(i=>`${i.path.join('.')||'config'}: ${i.message}`).join('; '));
   return result.data;
@@ -105,8 +98,14 @@ export async function validateConfig(config:InstanceConfig){
   const {accessRole,writeScope}=config;
   if(writeScope==='home-only'&&(accessRole!=='trusted'||config.upstreams.length||config.gitMode!=='off'))
     throw Error('CONFIG_INVALID writeScope: home-only requires trusted mode without extra upstreams or Gateway Git');
-  const legacy={projectRoot:config.projectRoot,mode:config.mode,port:config.port,connection:config.connection==='local'?'https':config.connection};
-  await checkSetupValues(accessRole==='restricted'&&config.mode==='read-write'?{...legacy,version:1}:writeScope==='home-only'?{...legacy,version:3,accessRole,writeScope}:{...legacy,version:2,accessRole});
+  supportedHost();
+  instanceConfigSchema.parse(config);
+  if(!path.isAbsolute(config.projectRoot))throw Error('CONFIG_INVALID projectRoot: absolute path required');
+  if(accessRole==='trusted'&&config.mode!=='read-write')throw Error('CONFIG_ACCESS_ROLE_MISMATCH');
+  if(writeScope==='home-only'&&process.platform!=='darwin')throw Error('HOME_WRITE_SANDBOX_PLATFORM_UNSUPPORTED');
+  if(usesGlobalPermissions(config))await createAccountAccessPolicy(config.projectRoot,config.mode);
+  else await createProjectPolicy({root:config.projectRoot,mode:config.mode,
+    developerCommands:accessRole==='trusted'?'trusted-project':'presets',allowTrustedHomeRoot:accessRole==='trusted'});
   validateConfiguredUpstreams({version:1,upstreams:config.upstreams.map(({envRefs,...u})=>({...u,env:Object.fromEntries(Object.keys(envRefs).map(k=>[k,'reference']))}))});
   return config;
 }
@@ -127,7 +126,7 @@ export async function suggestPort(home=homedir()){
   throw Error('NO_AVAILABLE_INSTANCE_PORT');
 }
 export function configTemplate(config:InstanceConfig){return '// Gateway startup settings. Save, then apply to restart this instance.\n// Credentials and grants live in the private instance state directory.\n'+JSON.stringify(config,null,2)+'\n';}
-export async function createInstance(name:string,options:{config?:InstanceConfig;file?:string;link?:boolean;requiredAccess?:Instance['requiredAccess'];legacy?:'setup'|'live'}={},home=homedir()){
+export async function createInstance(name:string,options:{config?:InstanceConfig;file?:string;link?:boolean;requiredAccess?:Instance['requiredAccess']}={},home=homedir()){
   name=nameSchema.parse(name);
   const input=options.file?path.resolve(options.file):undefined;
   if(options.link&&!input)throw Error('LINK_SOURCE_REQUIRED');
@@ -139,13 +138,13 @@ export async function createInstance(name:string,options:{config?:InstanceConfig
     if(input&&options.link&&registry.instances.some(i=>i.source.path===input))throw Error('CONFIG_ALREADY_BOUND');
     const id=randomUUID();const root=path.join(instancesRoot(home),'instances',id);
     const instance=instanceSchema.parse({id,name,archived:false,requiredAccess:options.requiredAccess??'ingress',
-      source:{kind:options.link?'linked':'managed',path:options.link?input!:path.join(root,'config.jsonc')},...(options.legacy?{legacy:options.legacy}:{})});
+      source:{kind:options.link?'linked':'managed',path:options.link?input!:path.join(root,'config.jsonc')}});
     createPrivateDirectory(path.join(instancesRoot(home),'instances'));createPrivateDirectory(root);
     for(const dir of ['state','logs','snapshots'])createPrivateDirectory(path.join(root,dir));
     try{
       await atomicPrivate(path.join(instancesRoot(home),'gateway.schema.json'),JSON.stringify(configJSONSchema(),null,2)+'\n');
       if(!options.link){
-        const original=text&&!('version' in (parse(text) as object))?text:configTemplate(config);
+        const original=text??configTemplate(config);
         await atomicPrivate(instance.source.path,applyEdits(original,modify(original,['$schema'],'../../gateway.schema.json',{formattingOptions:{insertSpaces:true,tabSize:2}})));
       }
       registry.instances.push(instance);if(registry.instances.length===1)registry.defaultInstanceId=id;
@@ -171,13 +170,18 @@ export async function patchInstanceConfig(instance:Instance,patch:Record<string,
   for(const [key,value] of Object.entries(patch))text=applyEdits(text,modify(text,[key],value,{formattingOptions:{insertSpaces:true,tabSize:2}}));
   return saveInstanceConfig(instance,text,revision,home);
 }
+export function usesGlobalPermissions(config:InstanceConfig){
+  return config.writeScope==='unrestricted'&&
+    (config.accessRole==='restricted'&&config.mode==='read-only'||config.accessRole==='trusted'&&config.mode==='read-write');
+}
 export function instanceEnv(instance:Instance,config:InstanceConfig,home=homedir()):NodeJS.ProcessEnv{
-  const legacy={projectRoot:config.projectRoot,mode:config.mode,port:config.port,connection:config.connection==='local'?'https':config.connection,
-    ...(config.accessRole==='restricted'&&config.mode==='read-write'?{version:1}:config.writeScope==='home-only'?{version:3,accessRole:config.accessRole,writeScope:'home-only'}:{version:2,accessRole:config.accessRole})};
   const p=instancePaths(instance,home);
-  return {...setupRuntimeEnv(legacy),MAC_MCP_ACCESS_FILE:p.access,MAC_MCP_GRANTS_FILE:p.grants,MAC_MCP_DENY_FILE:p.deny,
-    MAC_MCP_GIT_MODE:config.gitMode,MAC_MCP_WORKTREE_MODE:config.worktreeMode,MAC_MCP_INSTANCE_ID:instance.id,MAC_MCP_INSTANCE_NAME:instance.name,
-    MAC_MCP_PRIVATE_ACTIVITY_OBSERVER:'1'};
+  return {STARMUX_PROJECT_ROOT:config.projectRoot,STARMUX_PROJECT_PORT:String(config.port),
+    STARMUX_WORKSPACE_MODE:config.mode,STARMUX_DEV_COMMANDS:config.accessRole==='trusted'?'trusted-project':'presets',
+    STARMUX_DC_ACCESS_MODE:config.accessRole==='trusted'?'native':'workspace',STARMUX_DC_WRITE_SCOPE:config.writeScope,
+    STARMUX_ACCESS_FILE:p.access,STARMUX_GRANTS_FILE:p.grants,STARMUX_DENY_FILE:p.deny,
+    STARMUX_GIT_MODE:config.gitMode,STARMUX_WORKTREE_MODE:config.worktreeMode,STARMUX_INSTANCE_ID:instance.id,STARMUX_INSTANCE_NAME:instance.name,
+    STARMUX_PRIVATE_ACTIVITY_OBSERVER:'1',STARMUX_PERMISSION_MODE:usesGlobalPermissions(config)?'global':'workspace'};
 }
 export async function ensureAccessReady(instance:Instance,home=homedir()){
   const access=await createAccessControl(instancePaths(instance,home).access);const state=await access.snapshot();

@@ -36,4 +36,7 @@ DerivedData/
 /artifacts/
 /out/
 /tmp/
-/test/fixtures/.community-*/
+*.map
+
+# Local internal working material
+/.internal/

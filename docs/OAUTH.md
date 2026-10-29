@@ -2,7 +2,7 @@
 
 Starmux acts as the OAuth **resource server**. A separate authorization server (such as Keycloak) owns user login, consent, PKCE authorization codes, token issuance and refresh. Starmux remains loopback-only (`127.0.0.1`); HTTPS or Tunnel transport is configured independently of authorization.
 
-**Start here:** [step-by-step remote installation](REMOTE_SETUP.md) covers Keycloak, HTTPS proxy, CLI configuration, ChatGPT fields and the tested Tunnel layout. This document covers provider setup and the OAuth reference contract.
+**Start here:** [step-by-step remote installation](REMOTE_SETUP.md) covers Keycloak, HTTPS proxy, CLI configuration, ChatGPT fields and the Tunnel layout. This document covers provider setup and the OAuth reference contract.
 
 ## Implementation overview
 
@@ -34,7 +34,7 @@ The default registration method is `provided` and token endpoint method is `none
 
 Configure ChatGPT with OAuth, the corresponding registration mode and client ID. `none` means no **client secret**, not no user authentication. Use `gateway:access` as the base scope. Leave OIDC/domain-claim features off unless your provider is configured for them. Tool names, input schemas and results retain upstream semantics; OAuth security metadata is added to advertised descriptors without replacing other `_meta` entries.
 
-Forward the MCP route and the protected-resource metadata routes through your HTTPS ingress, preserving Authorization and WWW-Authenticate headers. The local upstream Host header must match the loopback endpoint; the Core retains its loopback Host validation. Keep `/access`, `/dashboard`, `/permissions` and other local management endpoints private. Do not derive issuer/resource from an untrusted Host or forwarded header.
+Forward the MCP route and the protected-resource metadata routes through your HTTPS ingress, preserving Authorization and WWW-Authenticate headers. Keep the proxy's upstream Host set to `127.0.0.1:<actual listening port>` as shown in [remote setup](REMOTE_SETUP.md). Only `/mcp` accepts a different port with a loopback hostname (`127.0.0.1` or `localhost`) for SSH forwarding; OAuth metadata, health and management routes retain exact listening-port validation. Public domain Host values are not accepted by this exception. Keep `/access`, `/dashboard`, `/permissions` and other local management endpoints private. Do not derive issuer/resource from an untrusted Host or forwarded header.
 
 For Secure MCP Tunnel, verify metadata discovery through the tunnel separately. The authorization server's browser-facing login and token endpoints are not automatically made reachable by an MCP tunnel.
 
@@ -96,16 +96,6 @@ A maximum of 512 remembered OAuth sessions is enforced without evicting revocati
 JWT verification checks signatures, issuer, audience, expiry/not-before, issued-at, client, owner subject, session and scope. A wrong scope/owner is denied before MCP dispatch. The Core does not retry tools when authentication fails. Locally trusted Shell tools remain capable of accessing owner files; OAuth admission does not isolate them from the owner account.
 
 See [client compatibility](CLIENTS.md) and [remote setup](REMOTE_SETUP.md) for deployment details.
-
-## Reproduce the local provider test
-
-Use a **disposable** unpacked Keycloak 26.8.1 distribution and Java 21. The test starts Keycloak only on loopback with an in-memory database, imports a temporary realm into that distribution, generates temporary credentials, and stops it afterward. Do not point this test at an existing provider installation.
-
-```sh
-GATEWAY_KEYCLOAK_HOME=/absolute/path/to/disposable/keycloak-26.8.1 npm run test:oauth:keycloak
-```
-
-The test exercises exact callback checks, consent rejection, PKCE mismatch, authorization-code replay rejection, real token audience, MCP discovery and reading, token expiry, refresh rotation, and Gateway revocation surviving a provider refresh. It does not connect to ChatGPT or deploy a public authorization server. The normal `npm test` suite does not require Keycloak.
 
 ## Sources
 

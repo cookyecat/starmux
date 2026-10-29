@@ -34,13 +34,13 @@ export function renderPermissionDashboard({project,home,config,warning="",native
     'input,select,button{font:inherit;padding:6px;margin:4px}input[name=target]{width:90%;max-width:550px}'+
     'small{display:block;color:#657083}code{overflow-wrap:anywhere}button{cursor:pointer}</style></head><body>'+
     '<h1>Starmux · 目录授权</h1>'+
-    '<p>本页在 Mac 本机管理 Gateway 权限。远程 AI 不可自行增加权限。'+
+    '<p>本页在本机管理 Gateway 权限。远程 AI 不可自行增加权限。'+
     '增加或撤销授权后，下一次工具调用立即使用新权限。</p>'+
     (warning?'<section role="alert">'+e(warning)+'</section>':"")+
     (nativeAccessEnabled?'<section role="alert"><h2>可信开发模式 · 完整本地执行权限</h2>'+
       '<p>此设备所有者启用了原生 Desktop Commander 工具透传。'+
       '以下 Home/外部/自定义目录开关<strong>不限制原生 DC 文件和 Shell 工具</strong>；'+
-      '可访问范围由 Desktop Commander 和 macOS 用户账户决定。'+
+      '可访问范围由 Desktop Commander 和操作系统用户账户决定。'+
       '开关仅在切回受限工作区模式后生效。请勿将此服务暴露给未经认证的客户端。</p>'+
       '</section>':"")+
     '<section><h2>工作目录 · 读写范围</h2><code>'+e(project.path)+'</code>'+
@@ -67,7 +67,7 @@ export function renderPermissionDashboard({project,home,config,warning="",native
     '<button type="submit">确认授权</button></form></section>'+
     '<p><a href="/dashboard">返回运行 Dashboard</a> · '+
     '<a href="/filters">工具黑名单</a></p>'+
-    '<small>授权管理密钥仅在 Mac 本地终端显示；不可交给远程 Agent。'+
+    '<small>授权管理密钥仅在本地终端显示；不可交给远程 Agent。'+
     '本页不改变 trusted-project 的同 UID Shell 风险。</small></body></html>';
 }
 export async function applyPermissionPost(req: IncomingMessage,grants: WorkspaceGrants,host: string|undefined): Promise<PostResult>{

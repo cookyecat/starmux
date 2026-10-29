@@ -24,17 +24,3 @@ export async function runtimeIdentity(){
   return {coreProgram:path.join(root,'dist','src','dc-workspace-http.js'),
     buildVersion:`${pkg.version} (sha256:${hash.digest('hex').slice(0,16)})`};
 }
-
-export function formatStartup(details:{configSource:string;coreProgram:string;buildVersion:string;port:number}){
-  const row=(name:string,value:string)=>`  ${name.padEnd(17)}${value}`;
-  return [
-    '', '  Mac MCP Gateway · Starting', '  '+'─'.repeat(64),
-    row('Config source',details.configSource),
-    row('Core program',details.coreProgram),
-    row('Build version',details.buildVersion),
-    row('Listening port',String(details.port)+' (127.0.0.1)'),
-    row('Endpoint',`http://127.0.0.1:${details.port}/mcp`),
-    '  '+'─'.repeat(64),
-    '  Starting the Core bundled with this CLI. Press Ctrl+C to stop.',''
-  ].join('\n')+'\n';
-}
