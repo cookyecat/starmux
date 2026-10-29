@@ -1,6 +1,6 @@
 {
   "name": "starmux",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "description": "Connect AI clients to files, terminals and development tools on your own computer.",
   "license": "MIT",
   "homepage": "https://github.com/cookyecat/starmux#readme",
