@@ -1,6 +1,6 @@
 <div align="center">
 
-# Starmux MCP Gateway
+# Starmux Self-hosted MCP Gateway
 
 ### Give cloud AI clients secure access to your local machine.
 
