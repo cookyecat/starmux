@@ -6,11 +6,14 @@ Use Node.js 22.12 or newer and npm.
 npm ci
 npm run typecheck
 npm run build
+npm test
 node bin/starmux.mjs --help
 npm pack
 ```
 
 `npm ci` installs the locked dependencies and builds the runtime. `npm run build` regenerates `dist/` from TypeScript and bundles Desktop Commander. The npm package contains compiled runtime files; installations from npm do not need TypeScript.
+
+`npm test` compiles the sources and runs lifecycle and CLI regression tests. Tests use temporary homes, private control records and local sockets; they do not stop existing instances. Build once before testing so the real CLI tests can use the bundled engine.
 
 ## Source layout
 

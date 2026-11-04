@@ -29,7 +29,7 @@ struct InstanceManagerView: View {
                 List(selection: $model.selectedId) {
                     ForEach(model.instances.filter { showArchived || !$0.archived }) { i in
                         VStack(alignment: .leading, spacing: 4) {
-                            HStack { Circle().fill(i.running ? Color.green : Color.gray).frame(width: 6, height: 6); Text(i.name); if i.id == model.defaultInstanceId { Image(systemName: "star.fill").font(.caption).foregroundStyle(.orange) } }
+                            HStack { Circle().fill(i.phase == "unknown" || i.phase == "error" ? Color.orange : i.running ? Color.green : Color.gray).frame(width: 6, height: 6); Text(i.name); if i.id == model.defaultInstanceId { Image(systemName: "star.fill").font(.caption).foregroundStyle(.orange) } }
                             Text(i.archived ? it("已归档", "Archived") : i.configState == "pending" ? it("有待应用变更", "Changes pending") : i.phase).font(.caption).foregroundStyle(.secondary)
                         }.tag(i.id)
                     }
@@ -147,10 +147,17 @@ private struct InstanceDetail: View {
                     }
                 }
                 Spacer()
-                Button(instance.running ? it("停止", "Stop") : it("启动", "Start")) { Task { if instance.running { await model.perform(["stop"] + target) } else { await model.start(instance) } } }.disabled(model.busy || instance.archived)
+                if instance.canStop {
+                    Button(instance.phase == "stopping" ? it("正在停止", "Stopping") : it("停止", "Stop")) { Task { await model.perform(["down"] + target) } }.disabled(model.busy || instance.phase == "stopping")
+                } else if instance.phase == "stopped" {
+                    Button(it("启动", "Start")) { Task { await model.start(instance) } }.disabled(model.busy || !instance.canStart)
+                } else {
+                    Button(it("诊断", "Diagnose")) { tab = 3 }
+                }
             }
             if let endpoint = instance.endpoint { HStack { Text(endpoint).font(.system(.callout, design: .monospaced)); Button(it("复制", "Copy")) { NSPasteboard.general.clearContents(); NSPasteboard.general.setString(endpoint, forType: .string) } } }
             if let problem = instance.configProblem { Text(problem).foregroundStyle(.orange).font(.caption).textSelection(.enabled) }
+            if let problem = instance.runtimeProblem { Text(problem).foregroundStyle(.orange).font(.caption).textSelection(.enabled) }
             Picker("", selection: $tab) { Text(it("概览", "Overview")).tag(0); Text(it("配置", "Configuration")).tag(1); Text(it("连接与访问", "Connections & access")).tag(2); Text(it("日志与诊断", "Logs & diagnostics")).tag(3) }.pickerStyle(.segmented)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -184,7 +191,7 @@ private struct InstanceDetail: View {
                 Button(it("在 Finder 中显示", "Reveal in Finder")) { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: instance.source.path)]) }
             }
             Text(it("连接状态", "Connection status")).font(.headline)
-            Text(instance.running ? it("本机服务已启动；远程连接尚未验证", "Local service started; remote connectivity has not been verified") : it("尚未运行", "Not running"))
+            Text(instance.ready ? it("本机服务已启动；远程连接尚未验证", "Local service started; remote connectivity has not been verified") : instance.phase == "stopped" ? it("尚未运行", "Not running") : instance.phase == "unknown" ? it("无法确认运行状态，请查看诊断", "Runtime state cannot be confirmed; inspect diagnostics") : instance.phase)
             if let at = instance.lastToolCallAt { Text(it("最近工具调用：", "Last tool call: ") + at).font(.caption) }
             if let runtime = instance.runtime { Text(runtime.buildVersion + "\n" + runtime.coreProgram).font(.caption).textSelection(.enabled) }
             Divider()

@@ -6,7 +6,7 @@ import {createAccessControl} from '../access-control.js';
 import {createWorkspaceGrants} from '../workspace-grants.js';
 import {createDenyRules} from '../explicit-deny-rules.js';
 import {createPrivateDirectory} from '../platform.js';
-import {instanceStatus,instanceRequest} from '../instance-runtime.js';
+import {instanceStatus,instanceRequest,stopInstance} from '../instance-runtime.js';
 import {atomicPrivate,changeRegistry,configJSONSchema,sourceRevision,configTemplate,validateConfig,withLock,createInstance,exists,fingerprint,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,type InstanceConfig} from '../instance-store.js';
 
 const booleans=new Set(['--json','--all','--link','--archived','--approve-trusted-developer','--approve-unrestricted','--effective','--allow-loopback-http']);
@@ -42,16 +42,17 @@ export async function handle(command:string,args:string[]){
             :'No instances. Run: starmux up\n');
           return;
         }
-        const rows=await Promise.all(instances.map(async(s,idx)=>{
-          const raw=filtered[idx]!;
-          const cfg=s.active?.config??(await loadInstanceConfig(raw).catch(()=>null))?.config;
+        const rows=instances.map(s=>{
+          const cfg=s.phase==='stopped'?s.saved?.config:s.active?.config;
+          const saved=s.saved?.config;
           const mark=s.instanceId===registry.defaultInstanceId?'*':' ';
           const state=s.archived?'archived':s.configState==='pending'?`${s.phase} (pending)`:s.phase;
-          const mode=cfg?.accessRole==='trusted'?'coding':(s.workspaceMode??'read-only');
+          const describe=(value:InstanceConfig|undefined)=>!value?'unavailable':value.accessRole==='trusted'?'coding':value.mode;
+          const mode=s.phase==='stopped'?`${describe(saved)} (saved)`:s.phase==='unknown'?`unavailable / ${describe(saved)} (saved)`:s.configState==='pending'?`${describe(cfg)} / ${describe(saved)} (saved)`:describe(cfg);
           const port=String(s.port??'—');
-          const workspace=cfg?.projectRoot??s.source.path;
+          const workspace=cfg?.projectRoot??(saved?`${saved.projectRoot} (saved)`:s.source.path);
           return {mark,name:s.name,state,mode,port,workspace};
-        }));
+        });
         const wName=Math.max(4,...rows.map(r=>r.name.length));
         const wState=Math.max(6,...rows.map(r=>r.state.length));
         const wMode=Math.max(4,...rows.map(r=>r.mode.length));
@@ -82,7 +83,11 @@ export async function handle(command:string,args:string[]){
       if(op==='rename'){
         const name=positional[2];if(!name)throw Error('NAME_REQUIRED');if(registry.instances.some(i=>i.name===name))throw Error('INSTANCE_NAME_EXISTS');item.name=name;
       }else if(op==='default')registry.defaultInstanceId=item.id;
-      else if(op==='archive'||op==='remove'){const stopped=await instanceRequest(instance,'stop');if(stopped&&stopped.phase!=='stopped')throw Error('INSTANCE_STILL_RUNNING');item.archived=true;if(registry.defaultInstanceId===item.id)registry.defaultInstanceId=null;}
+      else if(op==='archive'||op==='remove'){
+        const stopped=await stopInstance(instance);
+        if(stopped.restarted)throw Error('INSTANCE_RESTARTED: cannot archive a new running instance');
+        item.archived=true;if(registry.defaultInstanceId===item.id)registry.defaultInstanceId=null;
+      }
       else if(op==='restore')item.archived=false;
       else throw Error('INSTANCE_ACTION_INVALID');
     });
@@ -101,9 +106,9 @@ export async function handle(command:string,args:string[]){
     if(op==='schema'){output(configJSONSchema());return;}
     if(op==='show'){
       if(flags.has('--effective')){
-        const active=(await instanceStatus(instance)).active;
+        const status=await instanceStatus(instance);const active=status.active;
         if(json)output(active);
-        else if(!active)process.stdout.write(`Instance ${instance.name} has no active running configuration.\n`);
+        else if(!active)process.stdout.write(`Instance ${instance.name} has no confirmed active configuration (state: ${status.phase}).\n`);
         else process.stdout.write(
           `Instance       ${instance.name} (effective running config)\n`+
           `Workspace      ${active.config.projectRoot}\n`+
@@ -133,7 +138,7 @@ export async function handle(command:string,args:string[]){
       }return;
     }
     if(op==='recover'){
-      const snapshot=(await instanceStatus(instance)).active;if(!snapshot)throw Error('NO_SUCCESSFUL_CONFIG_SNAPSHOT');
+      const snapshot=(await instanceStatus(instance)).lastActive;if(!snapshot)throw Error('NO_SUCCESSFUL_CONFIG_SNAPSHOT');
       await validateConfig(snapshot.config);
       const target=path.join(p.root,'config.jsonc');
       await changeRegistry(async registry=>{
@@ -189,7 +194,11 @@ export async function handle(command:string,args:string[]){
       return;
     }
     if(op==='apply'){
+      const before=await instanceStatus(instance);
+      if(before.phase!=='running'&&before.phase!=='stopped')throw Error(`INSTANCE_NOT_READY: ${before.runtimeProblem??before.phase}`);
       const state=await instanceRequest(instance,'apply',flags.get('--revision')??loaded.revision);
+      if(state&&state.phase!=='running')throw Error('INSTANCE_APPLY_UNVERIFIED');
+      if(!state&&before.phase==='running')throw Error('INSTANCE_CHANGED_DURING_APPLY');
       if(json)output({result:state?'APPLIED':'VALID_ON_NEXT_START',instanceId:instance.id,runtime:state});
       else process.stdout.write(state?`Applied configuration to '${instance.name}'.\n`:`Configuration validated; will take effect on next 'starmux up'.\n`);
       return;

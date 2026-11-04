@@ -45,6 +45,9 @@ export function createPrivateDirectory(folder:string){
   if(!ownedByUser(folder,lstatSync(folder),true))throw Error('PRIVATE_DIRECTORY_UNSAFE');
 }
 export function controlRoot(){
+  // Local control address contract: keep independent of the package version,
+  // install path, project directory and display name. A branding edit must not
+  // silently move the rendezvous point of an already-running supervisor.
   if(process.platform==='darwin')return `/private/tmp/starmux-${process.getuid!()}`;
   const id=windows?createHash('sha256').update(homedir().toLowerCase()).digest('hex').slice(0,16):String(process.getuid!());
   return path.join(tmpdir(),`starmux-${id}`);

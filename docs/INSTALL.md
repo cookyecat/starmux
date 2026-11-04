@@ -10,7 +10,7 @@ starmux up
 
 The first start creates a private configuration and starts a background process on `127.0.0.1:18893`. The terminal returns when the service is ready.
 
-Starmux stores configuration under `~/.config/starmux`. Existing Starmux instances remain usable after upgrades. Importing previous product installations is no longer supported; create a new configuration with `starmux init` or `starmux up`.
+Starmux stores configuration under `~/.config/starmux`. Importing previous product installations is not supported; create a new configuration with `starmux init` or `starmux up`.
 
 Read the **Connect an AI client (MCP settings)** section printed by `up` (also available with `status`):
 
@@ -70,9 +70,25 @@ starmux down
 
 A later `starmux up` reuses the saved project context. Use `starmux up .` to switch to your current directory. `up --foreground` runs until Ctrl+C; background runs continue after the terminal closes. Background operation does not configure login autostart.
 
-If port 18893 is occupied, choose `starmux up --port 18894`. Use the actual endpoint shown by `status` when configuring your proxy or client.
+If a port is occupied or the instance state is `unknown`, run `starmux doctor` and inspect `starmux status` before starting again. A missing control record does not prove that its service has stopped. If another application owns the port, choose a free port in `starmux config edit`, then run `starmux up`. Use the actual endpoint shown by `status` when configuring your proxy or client.
 
 With API-key or OAuth authentication enabled, give `verify` a valid Bearer credential using `STARMUX_TOKEN` or `--token-stdin`.
+
+## Upgrade
+
+Stop each running instance with the currently installed CLI before installing a new version:
+
+```sh
+starmux ls
+starmux down                 # Default instance
+starmux down -i NAME         # Repeat for other instances
+npm install -g starmux
+starmux up                  # Start the instances you need
+```
+
+Continue with installation only after stopping succeeds. `down` waits for the selected run to release its managed resources; an accepted request alone is not success. Already stopped instances return `Already stopped`. An unresolved control error or timeout returns a nonzero exit code.
+
+The control protocol has its own version, independent of the package version. Unsupported control versions are reported explicitly; this release does not migrate old runtime directories or adapt old control protocols. Replacing package files does not upgrade a supervisor that is already running.
 
 ## Connect remotely
 

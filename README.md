@@ -39,6 +39,8 @@ Requires **Node.js 22.12+**.
 npm install -g starmux
 ```
 
+**Upgrading an existing installation?** Stop each running instance with the current CLI (`starmux down`, or `starmux down -i NAME`) before installing the new version, then run `starmux up` again. See the [upgrade instructions](https://github.com/cookyecat/starmux/blob/main/docs/INSTALL.md#upgrade) and [release notes](https://github.com/cookyecat/starmux/blob/main/CHANGELOG.md).
+
 ### 2. Start in your project directory
 
 ```bash

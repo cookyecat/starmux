@@ -40,6 +40,16 @@ Commands
   Stop            starmux down
 ```
 
+## Runtime state and stopping
+
+`status`, `ls`, `up`, `down`, and `doctor` use the same runtime inspection. `unknown` means that Starmux cannot confirm the current state, for example because the control channel is unreachable, its protocol is unsupported, or a service remains on a known port without a usable control record. It does not mean stopped. `up` refuses to start another supervisor in that state; `doctor` reports the problem instead of passing.
+
+Current permissions come only from the live supervisor. With pending changes, `status` shows **Active mode** and **Saved mode** separately. When state is unknown, active mode is unavailable and saved configuration is labelled explicitly. A stopped instance shows its saved settings for the next start. JSON status separates `active`, `saved`, `lastActive`, and `lastRun`; historical snapshots are for diagnostics and configuration recovery, not evidence of a live instance. `config show --effective` only reports confirmed active configuration.
+
+`down` first requests a stop, then waits for that run's cleanup. It prints `Stopped` only after confirmation, or `Already stopped` when no stop was needed. Control failures and timeouts return a nonzero exit code. If another command starts a new run concurrently, the result identifies that restart rather than claiming the instance is currently stopped. `rm` and `config archive` use the same stop confirmation and do not archive an unconfirmed or newly restarted instance.
+
+Stop instances before upgrading the installed package; see [upgrade instructions](INSTALL.md#upgrade). Runtime control addresses are separate from project paths. Instance IDs survive restarts, while each start has a new `runId`.
+
 Normal instances use two global permission modes. Read-only blocks writes and arbitrary execution while allowing file reads permitted by the OS account and upstream server. Coding forwards native operations with the account's permissions. Saved directory grants and path filters do not affect these modes, and remain on disk for legacy configurations.
 
 The MCP `health_check` reports the active mode as `mode: "read-only"` or `mode: "coding"`, alongside connection and diagnostic information. It no longer exposes the internal `workspaceMode`, `developerCommands`, `nativeAccess` or `permissionMode` fields. Read-only access can include paths outside Project, such as `/etc/hosts`, when the OS account and upstream server allow them.

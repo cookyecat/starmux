@@ -19,7 +19,9 @@ struct ManagedInstance: Decodable, Identifiable {
     let connectionState: String; let requiredAccess: String; let lastToolCallAt: String?
     var running: Bool { phase == "running" || phase == "starting" }
     var ready: Bool { phase == "running" && health == "ok" }
-    var endpoint: String? { guard running, let port else { return nil }; return "http://127.0.0.1:\(port)/mcp" }
+    var canStart: Bool { phase == "stopped" && !archived && configProblem == nil && runtimeProblem == nil }
+    var canStop: Bool { runtime != nil && phase != "stopped" && phase != "unknown" }
+    var endpoint: String? { guard ready, let port else { return nil }; return "http://127.0.0.1:\(port)/mcp" }
 }
 struct InstanceList: Decodable {
     let schemaVersion: Int; let defaultInstanceId: String?; let instances: [ManagedInstance]
@@ -95,7 +97,7 @@ final class InstanceController: ObservableObject {
         } catch { issue = error.localizedDescription; await refresh(); return nil }
     }
     func start(_ instance: ManagedInstance) async {
-        guard !busy, children[instance.id] == nil else { return }
+        guard !busy, instance.canStart, children[instance.id] == nil else { return }
         busy = true; defer { busy = false }
         do {
             let child = Process(); child.executableURL = try Self.cliURL()

@@ -9,7 +9,7 @@ import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {createAccessControl} from '../access-control.js';
-import {instanceStatus,instanceRequest,runInstance} from '../instance-runtime.js';
+import {instanceStatus,instanceRequest,stopInstance,runInstance} from '../instance-runtime.js';
 import {atomicPrivate,availablePort,changeRegistry,configJSONSchema,createInstance,ensureAccessReady,exists,instanceConfigSchema,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,validateConfig,usesGlobalPermissions,type Instance,type InstanceConfig} from '../instance-store.js';
 import {handle} from './instances.js';
 import {packageRoot,desktopCommanderEntry} from '../runtime-paths.js';
@@ -100,6 +100,10 @@ async function configure(){
   if(selector)instance=registry.instances.find(i=>i.id===selector||i.name===selector);
   else if(registry.instances.length)instance=await resolveInstance();
   if(instance?.archived)fail('Instance is archived. Use starmux config restore -i '+instance.name);
+  if(command==='up'&&instance){
+    const state=await instanceStatus(instance);
+    if(state.phase!=='running'&&state.phase!=='stopped')fail(`Cannot start ${instance.name}: ${state.runtimeProblem??state.phase}. Run starmux doctor -i ${instance.id}.`);
+  }
   const loaded=instance?await loadInstanceConfig(instance):undefined;
   const writing=flags.write||flags.code;
   if(flags.read&&writing)fail('--read cannot be combined with --write or --code.');
@@ -127,18 +131,24 @@ async function instanceFlag(instance:Instance){
 async function show(instance:Instance){
   const status=await instanceStatus(instance);
   if(json){print(status);return;}
-  const config=status.phase==='running'?status.active?.config:(await loadInstanceConfig(instance).catch(()=>null))?.config;
+  const config=status.phase==='stopped'?status.saved?.config:status.active?.config;
   process.stdout.write(await formatStarmuxStatus(instance,status,config,{isDefault:await isDefaultInstance(instance)}));
 }
 async function start(instance:Instance){
   const state=await instanceStatus(instance);
   if(state.phase==='running'){
-    if(state.configState==='pending')await instanceRequest(instance,'apply',(await loadInstanceConfig(instance)).revision);
+    if(state.configState==='pending'){
+      const applied=await instanceRequest(instance,'apply',(await loadInstanceConfig(instance)).revision);
+      if(!applied||applied.phase!=='running')fail('Configuration was not applied: instance changed while starting. Run starmux status.');
+    }
+    const current=await instanceStatus(instance);
+    if(current.phase!=='running'||current.health!=='ok')fail(`Instance is not ready: ${current.runtimeProblem??current.health}. Run starmux doctor -i ${instance.id}.`);
     await show(instance);return;
   }
+  if(state.phase!=='stopped')fail(`Cannot start ${instance.name}: ${state.runtimeProblem??state.phase}. Run starmux doctor -i ${instance.id}.`);
   await ensureAccessReady(instance);
   const config=(await loadInstanceConfig(instance)).config;
-  if(!await availablePort(config.port))fail(`Port ${config.port} is in use. Choose another with starmux up --port PORT.`);
+  if(!await availablePort(config.port))fail(`Port ${config.port} is in use. Inspect starmux doctor -i ${instance.id} before changing the port.`);
   if(flags.foreground||string('app-parent-pid')){
     await runInstance(instance,{json,...(!json?{onReady:()=>show(instance)}:{}),...(string('app-parent-pid')?{appParentPid:Number(string('app-parent-pid'))}:{})});return;
   }
@@ -407,26 +417,36 @@ async function main(){
   if(!(await readRegistry()).instances.length){if(command==='status'||command==='down'||command==='stop'){if(json)print({phase:'stopped',initialized:false});else process.stdout.write('Not initialized. Run starmux up in your project.\n');return;}}
   const instance=await selected();
   if(command==='status')await show(instance);
-  else if(command==='down'||command==='stop'){await instanceRequest(instance,'stop');if(json)print({result:'STOPPED',instanceId:instance.id});else process.stdout.write('Stopped '+instance.name+'\n');}
+  else if(command==='down'||command==='stop'){
+    const result=await stopInstance(instance);
+    if(json)print(result);
+    else if(result.restarted)process.stdout.write(`Stopped the previous run of ${instance.name}; another command has started a new run.\n`);
+    else process.stdout.write(`${result.result==='ALREADY_STOPPED'?'Already stopped':'Stopped'} ${instance.name}\n`);
+  }
   else if(command==='auth')await auth(instance);
   else if(command==='dashboard')await dashboard(instance);
   else if(command==='verify')await verify(instance);
   else if(command==='logs')await logs(instance);
   else if(command==='doctor'){
     if(Number(process.versions.node.split('.')[0])<22||(process.versions.node.startsWith('22.')&&Number(process.versions.node.split('.')[1])<12))fail('Node 22.12 or newer is required.');
-    await stat(desktopCommanderEntry);const loaded=await loadInstanceConfig(instance);await ensureAccessReady(instance);const state=await instanceStatus(instance);
-    if(state.phase!=='running'&&!await availablePort(loaded.config.port))fail('Configured port is in use: '+loaded.config.port);
+    const state=await instanceStatus(instance);
+    if(state.configProblem||state.runtimeProblem||state.runtime?.problem)fail(state.configProblem??state.runtimeProblem??state.runtime!.problem!);
+    if(state.phase!=='running'&&state.phase!=='stopped')fail('Instance state is '+state.phase+'. Inspect starmux logs -i '+instance.id);
+    if(state.phase==='running'&&state.health!=='ok')fail('Instance health is '+state.health+'. Inspect starmux logs -i '+instance.id);
+    await stat(desktopCommanderEntry);const loaded=await loadInstanceConfig(instance);await ensureAccessReady(instance);
+    if(state.phase==='stopped'&&!await availablePort(loaded.config.port))fail('Configured port is in use: '+loaded.config.port);
     if(json)print({result:'PASS',node:process.version,instanceId:instance.id,configState:state.configState});
     else{
       const isDef=await isDefaultInstance(instance);
       const access=await (await createAccessControl(instancePaths(instance).access,{initialize:false})).snapshot();
-      const modeLabel=loaded.config.accessRole==='trusted'?'Coding mode':'Read-only mode';
+      const effective=state.phase==='running'?state.active?.config:loaded.config;
+      const modeLabel=!effective?'Mode unavailable':effective.accessRole==='trusted'?'Coding mode':effective.mode==='read-write'?'File writes':'Read-only mode';
       const authLabel=access.mode==='ingress'?'None (no token required)':access.mode==='api-key'?`API key (${access.credentials.filter(c=>c.status==='active').length} active)`:'OAuth';
       const portState=state.phase==='running'?`Running on 127.0.0.1:${state.port}`:`Stopped · port ${loaded.config.port} available`;
       process.stdout.write(
         `✓ Runtime            Node ${process.version} & Desktop Commander engine ready\n`+
         `✓ Service            ${portState}${isDef?'':` (instance: ${instance.name})`}\n`+
-        `✓ Workspace          ${loaded.config.projectRoot} (${modeLabel})\n`+
+        `✓ Workspace          ${effective?.projectRoot??'Unavailable'} (${modeLabel})\n`+
         `✓ Configuration      ${instance.source.path} (${state.configState})\n`+
         `✓ Authentication     ${authLabel}\n`+
         `PASS · Node, dependencies, workspace, configuration, port and authentication.\n`

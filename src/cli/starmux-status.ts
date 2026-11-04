@@ -30,8 +30,8 @@ async function authentication(instance:Instance,status:Status):Promise<AuthSumma
 }
 
 export async function formatStarmuxStatus(instance:Instance,status:Status,config:InstanceConfig|undefined,options:{isDefault?:boolean}={}){
-  // Pending edits must never be shown as permissions of the running instance.
-  if(status.phase==='running')config=status.active?.config;
+  // Only the live supervisor can confirm active permissions.
+  config=status.phase==='stopped'?status.saved?.config:status.active?.config;
   const auth=await authentication(instance,status);
   // Omit `-i default` for the default instance to keep everyday single-instance output clean.
   const omitSelector=options.isDefault===true&&instance.name==='default';
@@ -46,27 +46,37 @@ export async function formatStarmuxStatus(instance:Instance,status:Status,config
     'api-key':`API key (Bearer token; ${auth.activeKeys} active ${auth.activeKeys===1?'key':'keys'})`,
     oauth:'OAuth (browser sign-in)'
   };
-  const saved=status.phase==='running'?' (saved; live state unavailable)':' (saved for next start)';
+  const saved=status.phase==='stopped'?' (saved for next start)':' (saved; live state unavailable)';
   const row=(label:string,value:string)=>'  '+label.padEnd(16)+value;
   const codingCmd=command('up --code');
   const globalMode=status.phase==='running'?status.runtime?.permissionMode==='global':!!config&&usesGlobalPermissions(config);
-  const mode=!config
+  const describeMode=(value:InstanceConfig|undefined,global:boolean)=>!value
     ?'Unavailable'
-    :config.accessRole==='trusted'
-    ?`${config.writeScope==='home-only'?'Coding (Home sandbox · edits, shell & git)':'Coding (OS account · edits, shell & git)'}  (run '${command('up --read')}' to return to read-only)`
-    :config.mode==='read-write'
+    :value.accessRole==='trusted'
+    ?value.writeScope==='home-only'?'Coding (Home sandbox · edits, shell & git)':'Coding (OS account · edits, shell & git)'
+    :value.mode==='read-write'
     ?'File writes (restricted)'
-    :`Read-only (${globalMode?'global · OS account':'project scope'})  (run '${codingCmd}' to enable edits & shell)`;
+    :`Read-only (${global?'global · OS account':'project scope'})`;
+  const switchHint=config&&(status.phase==='running'||status.phase==='stopped')
+    ?config.accessRole==='trusted'?`  (run '${command('up --read')}' to return to read-only)`:`  (run '${codingCmd}' to enable edits & shell)`
+    :'';
+  const mode=describeMode(config,globalMode)+switchHint;
   const title=`${indicator} Starmux is ${status.phase}  (instance: ${instance.name})`;
   const lines=['',title,row('Instance',instance.id)];
   if(ready&&status.port){
     lines.push(row('Listen',`http://127.0.0.1:${status.port}/mcp  (this computer only)`));
   }
   lines.push(
-    row('Project',config?.projectRoot??'Unavailable'),
-    row('Mode',mode),
+    row(status.phase==='stopped'?'Saved project':'Project',config?.projectRoot??'Unavailable'),
+    row(status.phase==='stopped'?'Saved mode':status.phase==='unknown'||status.configState==='pending'?'Active mode':'Mode',mode),
     row('Auth',auth.mode?labels[auth.mode]+(ready?'':saved):'Unavailable')
   );
+  if(status.phase!=='stopped'&&(status.configState==='pending'||!status.active)){
+    const savedConfig=status.saved?.config;
+    lines.push(row('Saved mode',describeMode(savedConfig,!!savedConfig&&usesGlobalPermissions(savedConfig))+(status.configState==='pending'?' (pending)':'')));
+    if(!status.active)lines.push(row('Saved project',savedConfig?.projectRoot??'Unavailable'));
+  }
+  if(status.runtime)lines.push(row('Runtime',status.runtime.buildVersion));
   if(ready&&status.port&&auth.mode==='oauth'&&auth.oauth){
     lines.push(row('Client URL',auth.oauth.resource),row('Issuer',auth.oauth.issuer));
   }

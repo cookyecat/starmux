@@ -4,6 +4,7 @@ import { GatewayError,errorCode,isSafeInteger,parseJSON,record } from "./validat
 type ControlPaths=ReturnType<typeof controlPaths>;
 type Owner=ReturnType<typeof ownerSchema.parse>;
 interface ControlReply {result:string;runId:string;launcher:string}
+const CONTROL_VERSION=1;
 // One Core / two equal frontends. Owner-only local supervisor control.
 // The socket is never an MCP/public endpoint, and never signals a discovered PID.
 import crypto from "node:crypto";
@@ -37,7 +38,9 @@ function readOwner(paths: ControlPaths){
   secureFile(paths.meta,"file");
   const d=fs.readFileSync(paths.meta);
   if(d.length>1024)deny("CORE_CONTROL_METADATA_INVALID");
-  const checked=ownerSchema.safeParse(parseJSON(d.toString("utf8")));
+  const metadata=record(parseJSON(d.toString("utf8")),"CORE_CONTROL_METADATA_INVALID");
+  if(metadata.version!==CONTROL_VERSION)deny("CORE_CONTROL_PROTOCOL_UNSUPPORTED");
+  const checked=ownerSchema.safeParse(metadata);
   if(!checked.success)deny("CORE_CONTROL_METADATA_INVALID");
   const owner=checked.data;
   if(owner.port!==Number(path.basename(paths.lock).match(/\d+/)?.[0])||
@@ -59,7 +62,7 @@ async function exchange(paths: ControlPaths,owner: Owner,method: "status"|"stop"
       if(error)reject(error);else resolve(result!);
     };
     client.once("connect",()=>client.write(JSON.stringify({
-      version:1,...(windows?{nonce,proof:proof(owner.token,nonce+":"+owner.runId+":"+method)}:{token:owner.token}),runId:owner.runId,method})+"\n"));
+      version:CONTROL_VERSION,...(windows?{nonce,proof:proof(owner.token,nonce+":"+owner.runId+":"+method)}:{token:owner.token}),runId:owner.runId,method})+"\n"));
     client.on("data",d=>{
       body+=d.toString("utf8");
       if(body.length>2048)return finish(Error("CORE_CONTROL_REPLY_TOO_LARGE"));
@@ -67,8 +70,9 @@ async function exchange(paths: ControlPaths,owner: Owner,method: "status"|"stop"
       try{
         const reply=record(parseJSON(body.split("\n")[0]!));
         if(windows&&reply.proof!==proof(owner.token,nonce+":"+String(reply.result)))throw Error("CORE_CONTROL_REPLY_UNAUTHENTICATED");
-        if(reply.runId!==owner.runId||!["RUNNING","STARTING","STOPPED",
-             "STOP_FAILED"].includes(String(reply.result)))throw Error("CORE_CONTROL_REPLY_INVALID");
+        if(reply.version!==CONTROL_VERSION||reply.result==="PROTOCOL_UNSUPPORTED")throw Error("CORE_CONTROL_PROTOCOL_UNSUPPORTED");
+        if(reply.runId!==owner.runId||!["RUNNING","STARTING","STOPPING","STOPPED",
+             "STOP_ACCEPTED","STOP_FAILED"].includes(String(reply.result)))throw Error("CORE_CONTROL_REPLY_INVALID");
         finish(null,{result:String(reply.result),runId:owner.runId,launcher:owner.launcher});
       }catch(e){finish(e);}
     });
@@ -109,27 +113,53 @@ function cleanStale(paths: ControlPaths){
     try{fs.rmdirSync(paths.recovery);}catch{}
   }
 }
-export async function connectOwner(port: number,{root}: {root?: string|undefined}={}){
+export function inspectControlOwner(port: number,{root}: {root?: string|undefined}={}){
   const paths=controlPaths(port,root);
-  let owner;
-  try{owner=readOwner(paths);}
+  try{return readOwner(paths);}
   catch(e){
-    if(["ENOENT"].includes(errorCode(e)||""))return null;
+    if(errorCode(e)==="ENOENT"&&!fs.existsSync(paths.lock))return null;
     throw e;
   }
+}
+export async function connectOwner(port: number,{root}: {root?: string|undefined}={}){
+  const paths=controlPaths(port,root);
+  const owner=inspectControlOwner(port,{root});
+  if(!owner||!alive(owner.pid))return null;
   const result=await exchange(paths,owner,"status",1500);
   return {owner,result};
 }
-export async function globalStop(port: number,{root}: {root?: string|undefined}={}){
+export async function globalStop(port: number,{root,timeoutMs=65000}: {root?: string|undefined;timeoutMs?:number}={}){
+  if(!Number.isSafeInteger(timeoutMs)||timeoutMs<=0)deny("CORE_STOP_TIMEOUT_INVALID");
   const paths=controlPaths(port,root);
   let owner;
   try{owner=readOwner(paths);}catch(e){
-    if(errorCode(e)==="ENOENT")return {result:"NO_CONTROL_OWNER"};
+    if(errorCode(e)==="ENOENT"&&!fs.existsSync(paths.lock))return {result:"NO_CONTROL_OWNER"};
     throw e;
   }
-  const result=await exchange(paths,owner,"stop");
-  if(result.result!=="STOPPED")deny("CORE_STOP_UNVERIFIED");
-  return {result:"STOPPED",launcher:owner.launcher,ownerPid:owner.pid};
+  const deadline=Date.now()+timeoutMs;
+  const result=await exchange(paths,owner,"stop",Math.min(11500,timeoutMs));
+  if(result.result!=="STOP_ACCEPTED")deny("CORE_STOP_UNVERIFIED");
+  // The acknowledgment only accepts the request. Completion belongs to this
+  // lease, not to whatever may bind the same port after it has been released.
+  while(Date.now()<deadline){
+    try{
+      const current=readOwner(paths);
+      if(current.runId!==owner.runId)return {result:"STOPPED",launcher:owner.launcher,ownerPid:owner.pid,restarted:true};
+      try{
+        const state=await exchange(paths,owner,"status",Math.min(250,Math.max(1,deadline-Date.now())));
+        if(state.result==="STOP_FAILED")deny("CORE_STOP_FAILED");
+      }catch(e){
+        // Closing the control listener is part of releasing the lease.
+        if(!["ENOENT","ECONNREFUSED","ECONNRESET","EPIPE"].includes(errorCode(e)??"")&&
+           !["CORE_CONTROL_EOF","CORE_CONTROL_TIMEOUT"].includes(e instanceof Error?e.message:""))throw e;
+      }
+    }catch(e){
+      if(errorCode(e)!=="ENOENT")throw e;
+      if(!fs.existsSync(paths.lock))return {result:"STOPPED",launcher:owner.launcher,ownerPid:owner.pid,restarted:false};
+    }
+    await delay(Math.min(50,Math.max(1,deadline-Date.now())));
+  }
+  deny("CORE_STOP_TIMEOUT");
 }
 export async function acquireControl(port: number,{root,launcher="cli"}: {root?: string|undefined; launcher?: "cli"|"app"}={}){
   if(!["cli","app"].includes(launcher))deny("CORE_LAUNCHER_INVALID");
@@ -156,32 +186,40 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
     if(attempt===11)deny("CORE_CONTROL_CLAIM_TIMEOUT");
   }
   secureDir(paths.lock);
-  const owner={version:1,port,pid:process.pid,launcher,
+  const owner:Owner={version:CONTROL_VERSION,port,pid:process.pid,launcher,
     token:crypto.randomBytes(24).toString("hex"),
     runId:crypto.randomBytes(16).toString("hex")};
   fs.writeFileSync(paths.meta,JSON.stringify(owner),{mode:0o600,flag:"wx"});
-  let onStop: (()=>Promise<string>)|null=null,phase="STARTING";
+  let onStop: (()=>void|Promise<unknown>)|null=null,phase="STARTING",stopAccepted=false;
   const clients=new Set<net.Socket>();
   const server=net.createServer(socket=>{
     clients.add(socket);socket.setTimeout(12000,()=>socket.destroy());
+    socket.on("error",()=>{});
     socket.once("close",()=>clients.delete(socket));
-    let raw="";
-    socket.on("data",async chunk=>{
+    let raw="",handled=false;
+    socket.on("data",chunk=>{
+      if(handled)return;
       raw+=chunk.toString("utf8");
       if(raw.length>2048){socket.destroy();return;}
       if(!raw.includes("\n"))return;
-      const line=raw.split("\n")[0];raw="";
+      const line=raw.split("\n")[0];handled=true;
       let request;
       try{request=record(parseJSON(line!));}catch{socket.destroy();return;}
-      if(request.version!==1||
-         (windows?typeof request.nonce!=="string"||request.nonce.length!==48||request.proof!==proof(owner.token,request.nonce+":"+owner.runId+":"+String(request.method)):request.token!==owner.token)||
+      if((windows?typeof request.nonce!=="string"||request.nonce.length!==48||request.proof!==proof(owner.token,request.nonce+":"+owner.runId+":"+String(request.method)):request.token!==owner.token)||
          request.runId!==owner.runId){socket.destroy();return;}
-      let result="STOP_FAILED";
-      if(request.method==="status")result=phase;
+      let result="STOP_FAILED",startStop=false;
+      if(request.version!==CONTROL_VERSION)result="PROTOCOL_UNSUPPORTED";
+      else if(request.method==="status")result=phase;
       else if(request.method==="stop"&&onStop){
-        try{result=await onStop();}catch{result="STOP_FAILED";}
+        if(phase!=="STOP_FAILED"){
+          result="STOP_ACCEPTED";startStop=!stopAccepted;stopAccepted=true;phase="STOPPING";
+        }
       }
-      socket.end(JSON.stringify({result,runId:owner.runId,launcher:owner.launcher,...(windows?{proof:proof(owner.token,String(request.nonce)+":"+result)}:{})})+"\n");
+      socket.end(JSON.stringify({version:CONTROL_VERSION,result,runId:owner.runId,launcher:owner.launcher,...(windows?{proof:proof(owner.token,String(request.nonce)+":"+result)}:{})})+"\n",()=>{
+        // Never await shutdown on its own control connection: release() waits
+        // for these sockets to close. Acceptance and completion are distinct.
+        if(startStop)void Promise.resolve().then(()=>onStop!()).catch(()=>{phase="STOP_FAILED";});
+      });
     });
   });
   try{
@@ -198,27 +236,28 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
     try{fs.rmdirSync(paths.lock);}catch{}
     throw e;
   }
-  let closing=false;
+  let releasePromise:Promise<void>|null=null;
   return {
     owner,
     markRunning(){phase="RUNNING";},
     markStopped(){phase="STOPPED";},
-    onStop(fn: ()=>Promise<string>){onStop=fn;},
-    async release(){
-      if(closing)return;closing=true;
-      // Response sockets close before the lease disappears.
-      await new Promise(resolve=>{
-        server.close(resolve);
-        setTimeout(()=>{for(const s of clients)s.destroy();},1200).unref();
-      });
-      if(readOwner(paths).runId!==owner.runId)
-        deny("CORE_CONTROL_LEASE_CHANGED");
-      // node:net automatically unlinks a Unix socket on server.close().
-      // A second unlink is not required and must not abort lease cleanup.
-      try{if(!windows)fs.unlinkSync(paths.socket);}
-      catch(e){if(errorCode(e)!=="ENOENT")throw e;}
-      fs.unlinkSync(paths.meta);
-      fs.rmdirSync(paths.lock);
+    onStop(fn: ()=>void|Promise<unknown>){onStop=fn;},
+    release(){
+      return releasePromise??=(async()=>{
+        // Response sockets close before the lease disappears.
+        await new Promise<void>((resolve,reject)=>{
+          const timer=setTimeout(()=>{for(const s of clients)s.destroy();},1200);timer.unref();
+          server.close(error=>{clearTimeout(timer);if(error)reject(error);else resolve();});
+        });
+        if(readOwner(paths).runId!==owner.runId)
+          deny("CORE_CONTROL_LEASE_CHANGED");
+        // node:net automatically unlinks a Unix socket on server.close().
+        // A second unlink is not required and must not abort lease cleanup.
+        try{if(!windows)fs.unlinkSync(paths.socket);}
+        catch(e){if(errorCode(e)!=="ENOENT")throw e;}
+        fs.unlinkSync(paths.meta);
+        fs.rmdirSync(paths.lock);
+      })();
     }
   };
 }
