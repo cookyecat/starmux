@@ -121,3 +121,11 @@ starmux config patch --patch '{"port":18894}' --revision REVISION
 Use `--json` for scripts and obtain the revision from `config show`. Configured stdio upstreams retain explicit executable/tool allowlists and private environment references. Apply after changing upstream secrets.
 
 The macOS App manages the same instances and configuration. Quitting it stops only App-owned instances; CLI background instances remain running.
+
+### Durable control records
+
+Runtime identity records live in `~/.config/starmux/control`, with private permissions, independently of the project and package installation. Unix control sockets use short hashed addresses in a private temporary directory; Windows uses named pipes. Hashing the durable control address avoids Unix socket path limits with long home paths.
+
+If a running supervisor detects that its control records or Unix sockets have disappeared or been replaced, it stops its own worker and records `INSTANCE_CONTROL_FILES_LOST` in `lastRun`. It does not invent replacement credentials or signal a PID discovered in a file. Missing records can be cleaned by their live owner only while the original directory identity still matches; changed ownership is reported as an error.
+
+Stop existing instances with their current CLI before switching to a build with the new durable control layout. Existing temporary control records are not migrated automatically.

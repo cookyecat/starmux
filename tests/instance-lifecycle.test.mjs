@@ -267,3 +267,22 @@ test('resource cleanup failure is reported instead of a successful stop', async 
   assert.match(status.runtime.problem, /STOP_FAILED/);
   assert.equal(await availablePort(f.port), true);
 });
+
+for (const target of ['instance owner', 'port owner', 'instance socket', 'port socket']) {
+  test(`loss of ${target} stops its own worker and permits a clean restart`, async t => {
+    if (process.platform === 'win32' && target.endsWith('socket')) return t.skip('Windows uses named pipes');
+    const f = await fixture(t);
+    const supervisor = await f.start();
+    const paths = target.startsWith('instance') ? runtimePaths(f.instance.id) : controlPaths(f.port);
+    await rm(target.endsWith('owner') ? paths.meta : paths.socket);
+    await waitFor(() => supervisor.exitCode !== null || supervisor.signalCode !== null, 6000);
+    assert.equal(supervisor.exitCode, 0);
+    assert.equal(await availablePort(f.port), true);
+    const status = await instanceStatus(f.instance, f.home);
+    assert.equal(status.phase, 'stopped');
+    assert.equal(status.lastRun.problem, 'INSTANCE_CONTROL_FILES_LOST');
+    await f.start();
+    assert.equal((await instanceStatus(f.instance, f.home)).phase, 'running');
+    await stopInstance(f.instance, f.home);
+  });
+}

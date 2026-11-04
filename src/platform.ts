@@ -44,13 +44,22 @@ export function createPrivateDirectory(folder:string){
   }
   if(!ownedByUser(folder,lstatSync(folder),true))throw Error('PRIVATE_DIRECTORY_UNSAFE');
 }
-export function controlRoot(){
-  // Local control address contract: keep independent of the package version,
-  // install path, project directory and display name. A branding edit must not
-  // silently move the rendezvous point of an already-running supervisor.
+// Identity records are durable state, not disposable temporary files.
+export function controlRoot(){return path.join(homedir(),'.config','starmux','control');}
+export function controlSocketRoot(){
   if(process.platform==='darwin')return `/private/tmp/starmux-${process.getuid!()}`;
   const id=windows?createHash('sha256').update(homedir().toLowerCase()).digest('hex').slice(0,16):String(process.getuid!());
-  return path.join(tmpdir(),`starmux-${id}`);
+  return path.join(windows?tmpdir():'/tmp',`starmux-${id}`);
+}
+// Hash the durable address: short Unix socket paths even with a long HOME,
+// and separate endpoints for distinct accounts, homes and test control roots.
+export function controlSocket(address:string){
+  const id=createHash('sha256').update(path.resolve(address)).digest('hex').slice(0,32);
+  return windows?'\\\\.\\pipe\\starmux-'+id:path.join(controlSocketRoot(),id+'.sock');
+}
+export function sameFile(file:string){
+  const original=lstatSync(file);
+  return ()=>{try{const now=lstatSync(file);return !now.isSymbolicLink()&&now.dev===original.dev&&now.ino===original.ino;}catch{return false;}};
 }
 export function within(candidate:string,root:string){
   const relative=path.relative(root,candidate);

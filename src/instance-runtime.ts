@@ -1,7 +1,7 @@
-import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
+import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {createServer,createConnection,type Server} from 'node:net';
 import {fork,type ChildProcess} from 'node:child_process';
-import {mkdir,rm,open} from 'node:fs/promises';
+import {mkdir,rm,open,rmdir} from 'node:fs/promises';
 import {setTimeout as pause} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -9,14 +9,14 @@ import {homedir} from 'node:os';
 import type {z} from 'zod';
 import {INSTANCE_CONTROL_VERSION,instanceOwnerSchema,activeConfigSchema,runtimeStateSchema,controlRequestSchema,controlReplySchema,checkInstanceProtocol,type ActiveConfig,type RuntimeState} from './instance-control-protocol.js';
 export type {ActiveConfig,RuntimeState} from './instance-control-protocol.js';
-import {controlRoot,createPrivateDirectory,childEnvKeys,windows} from './platform.js';
+import {controlRoot,controlSocket,controlSocketRoot,sameFile,createPrivateDirectory,childEnvKeys,windows} from './platform.js';
 import {acquireControl,inspectControlOwner} from './global-core-control.js';
 import {runtimeIdentity} from './runtime-identity.js';
 import {atomicPrivate,changeRegistry,availablePort,ensureAccessReady,exists,instanceEnv,instancePaths,loadInstanceConfig,prepareUpstreams,readTrusted,resolveInstance,type Instance,type InstanceConfig} from './instance-store.js';
 
 type Owner=z.infer<typeof instanceOwnerSchema>;
 export function runtimePaths(id:string){
-  const root=path.join(controlRoot(),'i-'+id);const socket=windows?'\\\\.\\pipe\\gateway-instance-'+createHash('sha256').update(root).digest('hex').slice(0,28):path.join(root,'control.sock');
+  const root=path.join(controlRoot(),'i-'+id);const socket=controlSocket(root);
   return {root,socket,meta:path.join(root,'owner.json')};
 }
 const signature=(key:string,message:string)=>createHmac('sha256',key).update(message).digest('hex');
@@ -149,11 +149,15 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     // Serialise stale recovery independently; never remove a live owner's lease.
     const recovery=p.root+'.recovery';await mkdir(recovery,{mode:0o700});
     try{const check=await ownerFor(instance);if(!check||check.runId!==old.runId||alive(check.pid))throw Error('INSTANCE_CONTROL_CHANGED');
+      if(!windows)await rm(p.socket,{force:true});
       await rm(p.root,{recursive:true});await mkdir(p.root,{mode:0o700});
     }finally{await rm(recovery,{recursive:true,force:true});}
   }
   await atomicPrivate(p.meta,JSON.stringify(owner));
   },home);
+  const ownsDirectory=sameFile(p.root);
+  const ownsMetadata=sameFile(p.meta);
+  let controlTimer:ReturnType<typeof setInterval>|undefined;
   const state:RuntimeState={protocolVersion:INSTANCE_CONTROL_VERSION,instanceId:instance.id,runId:owner.runId,pid:process.pid,launcher:owner.launcher,appParentPid:parent??null,executionMode:options.background?'background':'foreground',phase:'starting',port:null,active:null,problem:null,...identity};
   let worker:ChildProcess|null=null;let portLease:Awaited<ReturnType<typeof acquireControl>>|null=null;let server:Server|null=null;
   let ending=false;let expectedWorkerExit=false;let sequence:Promise<unknown>=Promise.resolve();
@@ -269,14 +273,21 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
         })();
       });
     });
+    if(!windows)createPrivateDirectory(controlSocketRoot());
     await new Promise<void>((resolve,reject)=>{server!.once('error',reject);server!.listen(p.socket,()=>resolve());});
+    const ownsSocket=windows?()=>true:sameFile(p.socket);
     portLease=await acquireControl(initial.config.port,{launcher:owner.launcher});
     portLease.onStop(()=>requestStop());
     await serialize(()=>startWorker(active(initial),portLease!));
+    controlTimer=setInterval(()=>{
+      if(!ending&&(!ownsDirectory()||!ownsMetadata()||!ownsSocket()||portLease&&!portLease.intact()))void requestStop('INSTANCE_CONTROL_FILES_LOST');
+    },1000);
+    controlTimer.unref();
     if(options.onReady)await options.onReady();
     else if(!options.json)process.stderr.write(`\n${instance.name}: http://127.0.0.1:${state.port}/mcp\nConfig: ${instance.source.path}\nCtrl+C stops this instance.\n`);
     await finished;
   }catch(error){state.phase='error';state.problem=(error as Error).message;throw error;}finally{
+    if(controlTimer)clearInterval(controlTimer);
     if(parentTimer)clearInterval(parentTimer);process.off('SIGTERM',signal);process.off('SIGINT',signal);
     try{
       await stopWorker();await portLease?.release();
@@ -288,7 +299,12 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
       // Commit completion last. A stop acknowledgement only means accepted;
       // readers require this snapshot AND release of this run's owner record.
       await atomicPrivate(path.join(instancePaths(instance,home).snapshots,'last-runtime.json'),JSON.stringify(state));
-      const current=await ownerFor(instance);if(current?.runId===owner.runId)await rm(p.root,{recursive:true,force:true});
+      if(await exists(p.root)){
+        if(!ownsDirectory())throw Error('INSTANCE_CONTROL_CHANGED');
+        try{const current=await ownerFor(instance);if(current&&current.runId!==owner.runId)throw Error('INSTANCE_CONTROL_CHANGED');}
+        catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
+        await rm(p.meta,{force:true});await rmdir(p.root);
+      }
       if(state.phase==='stopped')emit('INSTANCE_STOPPED');
     }catch(error){
       state.phase='error';state.problem='INSTANCE_CLEANUP_FAILED: '+(error as Error).message;

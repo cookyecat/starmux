@@ -1,4 +1,4 @@
-import {ownedByUser,createPrivateDirectory,controlRoot,windows} from "./platform.js";
+import {ownedByUser,createPrivateDirectory,controlRoot,controlSocket,controlSocketRoot,sameFile,windows} from "./platform.js";
 import { ownerSchema } from "./config-schemas.js";
 import { GatewayError,errorCode,isSafeInteger,parseJSON,record } from "./validation.js";
 type ControlPaths=ReturnType<typeof controlPaths>;
@@ -20,7 +20,7 @@ export function controlPaths(port: number,root=controlRoot()){
   if(!validPort(port))deny("CORE_INVALID_PORT");
   const lock=path.join(root,`core-${port}.lease`);
   return {root,lock,recovery:lock+".recovery",
-    meta:path.join(lock,"owner.json"),socket:windows?`\\\\.\\pipe\\starmux-${crypto.createHash("sha256").update(path.resolve(lock).toLowerCase()).digest("hex").slice(0,32)}`:path.join(lock,"control.sock")};
+    meta:path.join(lock,"owner.json"),socket:controlSocket(lock)};
 }
 function secureDir(p: string,create=false){
   if(create)createPrivateDirectory(p);
@@ -108,6 +108,7 @@ function cleanStale(paths: ControlPaths){
         deny("CORE_CONTROL_STALE_UNTRUSTED");
       fs.unlinkSync(item);
     }
+    if(!windows&&fs.existsSync(paths.socket)){secureFile(paths.socket,"socket");fs.unlinkSync(paths.socket);}
     fs.rmdirSync(paths.lock);
   }finally{
     try{fs.rmdirSync(paths.recovery);}catch{}
@@ -165,6 +166,7 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
   if(!["cli","app"].includes(launcher))deny("CORE_LAUNCHER_INVALID");
   const paths=controlPaths(port,root);
   secureDir(paths.root,true);
+  if(!windows)createPrivateDirectory(controlSocketRoot());
   for(let attempt=0;attempt<12;attempt++){
     try{fs.mkdirSync(paths.lock,{mode:0o700});break;}
     catch(e){
@@ -236,9 +238,13 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
     try{fs.rmdirSync(paths.lock);}catch{}
     throw e;
   }
+  const ownsDirectory=sameFile(paths.lock);
+  const ownsMetadata=sameFile(paths.meta);
+  const ownsSocket=windows?()=>true:sameFile(paths.socket);
   let releasePromise:Promise<void>|null=null;
   return {
     owner,
+    intact:()=>ownsDirectory()&&ownsMetadata()&&ownsSocket(),
     markRunning(){phase="RUNNING";},
     markStopped(){phase="STOPPED";},
     onStop(fn: ()=>void|Promise<unknown>){onStop=fn;},
@@ -249,13 +255,13 @@ export async function acquireControl(port: number,{root,launcher="cli"}: {root?:
           const timer=setTimeout(()=>{for(const s of clients)s.destroy();},1200);timer.unref();
           server.close(error=>{clearTimeout(timer);if(error)reject(error);else resolve();});
         });
-        if(readOwner(paths).runId!==owner.runId)
-          deny("CORE_CONTROL_LEASE_CHANGED");
-        // node:net automatically unlinks a Unix socket on server.close().
-        // A second unlink is not required and must not abort lease cleanup.
-        try{if(!windows)fs.unlinkSync(paths.socket);}
+        // A missing record cannot be reconstructed by a CLI. Its live owner
+        // can still release its own unchanged directory without inventing keys.
+        if(!fs.existsSync(paths.lock))return;
+        if(!ownsDirectory())deny("CORE_CONTROL_LEASE_CHANGED");
+        try{if(readOwner(paths).runId!==owner.runId)deny("CORE_CONTROL_LEASE_CHANGED");}
         catch(e){if(errorCode(e)!=="ENOENT")throw e;}
-        fs.unlinkSync(paths.meta);
+        try{fs.unlinkSync(paths.meta);}catch(e){if(errorCode(e)!=="ENOENT")throw e;}
         fs.rmdirSync(paths.lock);
       })();
     }

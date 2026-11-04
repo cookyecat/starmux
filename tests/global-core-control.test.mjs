@@ -112,3 +112,28 @@ test('unknown owner protocol is explicit and is not recovered as stale',async t=
   assert.equal(JSON.parse(await fs.readFile(f.paths.meta,'utf8')).version,99);
   await fs.writeFile(f.paths.meta,JSON.stringify(lease.owner),{mode:0o600});
 });
+
+test('long durable state paths use short sockets',async t=>{
+  const f=await fixture(t),root=path.join(f.root,'long-home-'.repeat(16));
+  const lease=await acquireControl(port,{root});
+  t.after(()=>lease.release());
+  lease.markRunning();
+  assert.equal((await connectOwner(port,{root})).result.result,'RUNNING');
+});
+
+test('release can clean its own directory after its metadata is deleted',async t=>{
+  const f=await fixture(t),lease=await f.lease();
+  await fs.unlink(f.paths.meta);
+  assert.equal(lease.intact(),false);
+  await lease.release();
+  await assert.rejects(fs.stat(f.paths.lock),{code:'ENOENT'});
+});
+
+test('release refuses to remove a replaced control directory',async t=>{
+  const f=await fixture(t),lease=await f.lease();
+  await fs.rename(f.paths.lock,f.paths.lock+'.original');
+  await fs.mkdir(f.paths.lock,{mode:0o700});
+  await fs.writeFile(f.paths.meta,JSON.stringify(lease.owner),{mode:0o600});
+  await assert.rejects(lease.release(),/CORE_CONTROL_LEASE_CHANGED/);
+  assert.equal(JSON.parse(await fs.readFile(f.paths.meta,'utf8')).runId,lease.owner.runId);
+});
