@@ -1,24 +1,226 @@
-# AI client compatibility
+# AI Client Configuration Guides
 
-Choose a client you already use, then check its recommended connection below. Transport, authentication and host platform are configured independently.
+Starmux exposes a standard **MCP Streamable HTTP** endpoint (`/mcp`). Choose your AI client below for step-by-step connection instructions.
 
-| Client | Validation status | Connection guide |
-| --- | --- | --- |
-| **ChatGPT Web** | ✅ Tested: Secure Tunnel + OAuth (coding, session revocation and login) | [ChatGPT OAuth](REMOTE_SETUP.md#4-configure-starmux-and-chatgpt) |
-| **Claude App** | 🎯 Target: Remote MCP Custom Connector | [Official custom connector setup](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp) |
-| **Codex** | ✅ Tested: Protected Tunnel | [Tunnel setup](CONNECT_CHATGPT.md#2-secure-mcp-tunnel--no-inbound-port) · [HTTP API-key example](REMOTE_SETUP.md#configure-workbuddy-or-another-header-capable-client) |
-| **WorkBuddy** | ✅ Tested: Direct HTTPS + IPv6 + Bearer API key | [API Key setup](REMOTE_SETUP.md#2-https--bearer-api-key) · [SSH configuration](REMOTE_SETUP.md#ssh-local-port-forwarding) |
-| **Doubao (豆包)** | ✅ Community verified | [Deployment options](REMOTE_SETUP.md) |
+---
 
-See [OAuth setup](OAUTH.md) and [remote setup](REMOTE_SETUP.md) for step-by-step configuration.
+## Table of Contents
 
-## Use WorkBuddy or Desktop AI Clients with a Linux / NVIDIA Jetson Host
+1. [Client Compatibility Overview](#1-client-compatibility-overview)
+2. [ChatGPT Web (Tunnel, Direct HTTPS & OAuth)](#2-chatgpt-web-tunnel-direct-https--oauth)
+3. [AI Coding Agents (Claude Code, Antigravity, Codex, Cursor, WorkBuddy, DSH-Harness, Kimi Code, Minimax Code, ZCode)](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode)
+4. [Codex CLI (`config.toml`)](#4-codex-cli-configtoml)
+5. [Claude App & Doubao (豆包)](#5-claude-app--doubao-豆包)
 
-**Your AI client's operating system does not have to match your target machine's operating system.** Many AI clients (such as WorkBuddy or ChatGPT Desktop) only offer macOS and Windows desktop apps. You can keep your AI client on your Mac or Windows laptop, run `starmux up --code` on a **Linux (`x64` / `ARM64`)** server or **NVIDIA Jetson** device, and connect over HTTPS + Bearer API Key or Tunnel to edit code and run terminal commands on the target machine remotely.
+---
 
-See [platform support](PLATFORMS.md) for Linux and cross-platform details.
+## 1. Client Compatibility Overview
 
-For a Mac-to-NX connection, [SSH local port forwarding](REMOTE_SETUP.md#ssh-local-port-forwarding) supports a desktop URL such as `http://127.0.0.1:18894/mcp` forwarding to Starmux on `127.0.0.1:18893`. The guide includes WorkBuddy configuration with **Auth None** for a controlled SSH tunnel, plus the requirements for instances with authentication enabled. The SSH route requires validation of tool discovery and an actual tool call on your client and host.
+| AI Client | Status | Recommended Connection & Auth | Section |
+| :--- | :--- | :--- | :--- |
+| **ChatGPT Web** | ✅ Tested | **OpenAI Secure MCP Tunnel** or **Direct HTTPS** (+ `None` or `OAuth 2.0`) | [2. ChatGPT Web](#2-chatgpt-web-tunnel-direct-https--oauth) |
+| **Claude App / Code** | ✅ Tested | **Prompt Auto-Setup** (`Claude Code`) or **Remote MCP Custom Connector** (`Claude App`) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) · [5. Claude App](#5-claude-app--doubao-豆包) |
+| **Antigravity** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Codex** | ✅ Tested | **Prompt Auto-Setup**, **Protected Tunnel**, or **HTTPS + Bearer API Key** | [4. Codex CLI](#4-codex-cli-configtoml) |
+| **Cursor** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **WorkBuddy** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **DSH-Harness** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Kimi Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Minimax Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **ZCode** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Doubao (豆包)** | ✅ Tested | **Direct HTTPS** or **Secure Tunnel** | [5. Claude & Doubao](#5-claude-app--doubao-豆包) |
 
+---
 
-[Choose authentication](ACCESS_CONTROL.md#choose-an-authentication-mode) · [Remote deployment](REMOTE_SETUP.md) · [All documentation](README.md)
+## 2. ChatGPT Web (Tunnel, Direct HTTPS & OAuth)
+
+ChatGPT Web runs in the cloud and cannot connect to `http://127.0.0.1:18893/mcp` directly. Choose either **Path A (OpenAI Secure MCP Tunnel)** or **Path B (Direct HTTPS)**:
+
+| | **Path A: OpenAI Secure MCP Tunnel** *(No Inbound Port)* | **Path B: Direct HTTPS** *(Your Own Domain)* |
+| :--- | :--- | :--- |
+| **Best for** | Home Wi-Fi, NAT/CGNAT, or restrictive firewalls | Hosts with a public IPv4/IPv6 address and a domain name |
+| **Inbound ports** | ❌ None *(outbound connection from your host)* | ✅ Inbound `TCP 443` (or `8443`) |
+| **ChatGPT Connection field** | Select **Tunnel** (`tunnel_id`) | Enter `https://mcp.example.com/mcp` |
+
+### Path A — Connect ChatGPT Web via OpenAI Secure MCP Tunnel
+
+1. **Create a Tunnel in OpenAI Platform:**
+   Visit [OpenAI Platform Tunnel Settings](https://platform.openai.com/settings/organization/tunnels), create a Tunnel in the organization linked to your ChatGPT workspace (`Tunnels Read + Manage`), and save your `tunnel_id` and restricted runtime API key (see [OpenAI Secure MCP Tunnel Docs](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)).
+2. **Start Starmux and `tunnel-client` on your machine:**
+   ```bash
+   starmux up --code
+
+   export MAC_MCP_TUNNEL_KEY="your_restricted_runtime_api_key"
+   tunnel-client run \
+     --control-plane.tunnel-id "tunnel_YOUR_TUNNEL_ID" \
+     --control-plane.api-key "env:MAC_MCP_TUNNEL_KEY" \
+     --mcp.server-url "http://127.0.0.1:18893/mcp" \
+     --health.listen-addr "127.0.0.1:18891" \
+     --log.level info
+   ```
+   *(Behind a local HTTP proxy? Append `--control-plane.http-proxy "http://127.0.0.1:PROXY_PORT"`.)*
+3. **Add the connector in ChatGPT Web:**
+   Open **ChatGPT Web → Plugins / Settings → + → Add custom MCP server**, choose **Connection: Tunnel**, select your Tunnel, and create the connector.
+
+### Path B — Connect ChatGPT Web via Direct HTTPS
+
+1. Point your domain's DNS `A` or `AAAA` record (e.g., `mcp.example.com`) to your machine's public IP and forward `/mcp` to `127.0.0.1:18893` using Caddy (see [Installation & Networking — Option A](INSTALL.md#42-option-a--direct-proxy-with-caddy-public-domain-custom-port-ipv6-or-lan)).
+2. Open **ChatGPT Web → Plugins / Settings → + → Add custom MCP server** and enter `https://mcp.example.com/mcp`.
+
+### Configuring OAuth 2.0 in ChatGPT Web
+
+When using OAuth 2.0 browser sign-in with ChatGPT Web, first deploy Keycloak following **[Security & Authentication — OAuth 2.0](SECURITY.md#4-oauth-20--pkce-oauth-with-keycloak)**, then enter these values in ChatGPT:
+
+| ChatGPT Field | Value to Enter |
+| :--- | :--- |
+| **Authentication** | `OAuth` |
+| **Client registration** | `Custom / provided OAuth client` *(do not select DCR or CIMD)* |
+| **Callback URL** | Must match the `--callback` URL passed to `starmux auth oauth init-keycloak` |
+| **OAuth client ID** | `gateway-chatgpt` |
+| **OAuth client secret** | Paste the secret generated by Keycloak for `gateway-chatgpt` |
+| **Token endpoint authentication** | `client_secret_basic` |
+| **Base / Default scopes** | `gateway:access` |
+| **Authorization server base / Issuer** | `https://auth.example.com/realms/gateway` |
+| **Resource** | `https://auth.example.com/mcp` |
+| **PKCE** | `S256` |
+| **OIDC / domain claim** | Leave disabled |
+
+*(Authorization URL `{issuer}/protocol/openid-connect/auth` and Token URL `{issuer}/protocol/openid-connect/token` are populated automatically via discovery.)*
+
+#### Special Step for OAuth 2.0 + OpenAI Secure MCP Tunnel (`--resource-aliases`)
+When pairing OAuth 2.0 with `tunnel-client` (`0.0.16+`):
+1. Run `tunnel-client` with `--mcp.server-url url=https://auth.example.com/mcp` and `--mcp.oauth-trusted-origin https://auth.example.com`.
+2. In ChatGPT, select your Tunnel and trigger OAuth metadata discovery.
+3. Because Tunnel discovery rewrites the MCP resource identifier, copy the exact discovered **Resource** URL shown in ChatGPT:
+   - In Keycloak (`gateway` realm), create a bearer-only OIDC client (e.g., `gateway-tunnel-resource`) with attribute `resource_url` equal to that exact URL, and add an **Audience** mapper in client scope `gateway:access` granting `gateway-tunnel-resource`.
+   - Re-run `starmux auth oauth setup` with `--resource-aliases 'EXACT_DISCOVERED_RESOURCE_URL'` appended, then run `starmux auth oauth doctor`.
+
+---
+
+## 3. AI Coding Agents (Claude Code, Antigravity, Codex, Cursor, WorkBuddy, DSH-Harness, Kimi Code, Minimax Code, ZCode)
+
+All mainstream agentic coding clients—including **Claude Code**, **Antigravity**, **Codex**, **Cursor**, **WorkBuddy**, **DSH-Harness**, **Kimi Code**, **Minimax Code**, and **ZCode**—support Starmux's `streamable-http` MCP endpoint.
+
+### Fastest Setup: Ask Your AI Agent to Configure Itself (Prompt Auto-Setup)
+
+You don't even need to locate your client's config file manually. Just paste the following prompt into your AI coding agent's chat box (replacing `http://192.168.50.114/mcp` with your actual LAN IP, domain, or `http://127.0.0.1:18893/mcp`):
+
+```text
+Create this MCP Server connector:
+"starmux": {
+  "type": "streamable-http",
+  "url": "http://192.168.50.114/mcp"
+}
+```
+
+The AI agent will automatically write the configuration into its own `mcp.json` / MCP settings and connect to Starmux.
+
+---
+
+### Manual `mcp.json` Configuration Scenarios
+
+If you prefer editing your client's JSON configuration file directly (e.g., `~/.workbuddy/mcp.json` or `.cursor/mcp.json`), choose the template matching your network setup. Protect files containing API keys with owner-only permissions (`chmod 600`).
+
+#### Scenario A — Local Network (LAN) or Same Computer (`Auth: None`)
+
+- **On a Local Network (via Caddy forwarding `http://192.168.50.114` $\rightarrow$ `127.0.0.1:18893`):**
+  ```json
+  {
+    "mcpServers": {
+      "starmux": {
+        "type": "streamable-http",
+        "url": "http://192.168.50.114/mcp"
+      }
+    }
+  }
+  ```
+
+- **On the Same Computer (`localhost`):**
+  ```json
+  {
+    "mcpServers": {
+      "starmux": {
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:18893/mcp"
+      }
+    }
+  }
+  ```
+
+#### Scenario B — Laptop Client $\rightarrow$ Remote Linux / NVIDIA Jetson via SSH
+
+Many desktop AI clients only ship macOS and Windows apps. You can run your AI client on your laptop and develop directly on a **Linux (`x64`/`ARM64`)** server or **NVIDIA Jetson** device over SSH with zero domain or TLS setup:
+
+1. On the Linux / Jetson host, start Starmux:
+   ```sh
+   starmux up --code
+   ```
+2. On your laptop, forward local port `18894` to the remote host's `127.0.0.1:18893`:
+   ```sh
+   ssh -N -o ExitOnForwardFailure=yes \
+     -L 127.0.0.1:18894:127.0.0.1:18893 \
+     -p 2222 nvidia@192.168.1.2
+   ```
+3. In your laptop AI client's `mcp.json`, add:
+   ```json
+   {
+     "mcpServers": {
+       "nvidia-nx": {
+         "type": "streamable-http",
+         "url": "http://127.0.0.1:18894/mcp"
+       }
+     }
+   }
+   ```
+
+#### Scenario C — Internet / Public HTTPS or Tunnel (with Bearer API Key)
+
+1. On the target host running Starmux, generate a Bearer API key:
+   ```sh
+   starmux auth key "My AI Agent"
+   ```
+2. Expose Starmux via [Caddy HTTPS or a Tunnel](INSTALL.md#4-remote-network-forwarding--ingress-engineering).
+3. Merge this entry into your client's `mcp.json`:
+   ```json
+   {
+     "mcpServers": {
+       "starmux": {
+         "type": "streamable-http",
+         "url": "https://mcp.example.com/mcp",
+         "headers": {
+           "Authorization": "Bearer smx_REPLACE_WITH_YOUR_API_KEY"
+         }
+       }
+     }
+   }
+   ```
+
+---
+
+## 4. Codex CLI (`config.toml`)
+
+You can either ask Codex in chat to add the `starmux` MCP connector, or configure it in `config.toml`:
+
+- **Without API Key (LAN / SSH / Protected Tunnel):**
+  ```toml
+  [mcp_servers.starmux]
+  url = "http://192.168.50.114/mcp"
+  ```
+- **With Bearer API Key (Public HTTPS / Tunnel):**
+  ```toml
+  [mcp_servers.starmux]
+  url = "https://mcp.example.com/mcp"
+  bearer_token_env_var = "STARMUX_TOKEN"
+  ```
+  Export `STARMUX_TOKEN=smx_YOUR_GENERATED_API_KEY` in the shell environment where you launch Codex. See [official Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
+
+---
+
+## 5. Claude App & Doubao (豆包)
+
+- **Claude App:** Add a Remote MCP Custom Connector using Transport `Streamable HTTP` and your `https://mcp.example.com/mcp` URL (or `http://127.0.0.1:18893/mcp` locally). See [Claude's custom connector guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
+- **Doubao (豆包):** Connect via Direct HTTPS or a Secure Tunnel using `Streamable HTTP` and your `/mcp` endpoint URL.
+
+---
+
+[Documentation Index](README.md) · [Installation & Networking](INSTALL.md) · [Security & Authentication](SECURITY.md) · [Multi-Instance & Config](INSTANCES.md)

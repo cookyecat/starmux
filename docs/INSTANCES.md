@@ -1,131 +1,181 @@
-# Instances and configuration
+# Multiple Instances & JSONC Configuration
 
-Use one implicit default instance for everyday work. Add `-i NAME` when you want separate project contexts with separate ports, credentials, configuration and logs.
+For everyday work, Starmux manages a single implicit `default` instance—you never have to pass extra flags.
+
+When you want separate project contexts, ports, credentials, or permission modes running side by side on the same computer, pass `-i <name>` (or `--instance <name>`).
+
+---
+
+## Table of Contents
+
+1. [Running Multiple Instances (`-i`)](#1-running-multiple-instances--i)
+2. [Editing `config.jsonc` & Schema Reference](#2-editing-configjsonc--schema-reference)
+3. [Mounting Extra `stdio` MCP Upstreams & Secrets](#3-mounting-extra-stdio-mcp-upstreams--secrets)
+4. [Cloning, Archiving, Importing & Scripting](#4-cloning-archiving-importing--scripting)
+5. [Runtime State Machine & Durable Control Records](#5-runtime-state-machine--durable-control-records)
+
+---
+
+## 1. Running Multiple Instances (`-i`)
 
 ```sh
+# Start a coding instance for work and a read-only instance for a personal repo
 starmux up ~/work/repo-a -i work --code
 starmux up ~/personal/blog -i blog --read
-starmux ls
-starmux status -i work
-starmux logs -f -i blog
-starmux down -i work
-starmux rm blog
+
+# Inspect and manage instances
+starmux ls                  # List all active instances (mark '*' indicates default instance)
+starmux status -i work      # View detailed status and connection snippets for 'work'
+starmux logs -f -i blog     # Stream live logs for 'blog'
+starmux down -i work        # Stop 'work'
+starmux rm blog             # Stop and archive 'blog'
 ```
 
-Names such as `work` and `blog` are arbitrary labels. Names and stable IDs both work with `-i` / `--instance`, before or after the command. Instances share the OS account; coding mode uses that account's permissions.
+- **Selector Flexibility:** Both human-readable names (e.g., `work`) and stable UUIDs work with `-i` / `--instance`, placed before or after the subcommand.
+- **Port Allocation:** The first instance defaults to port `18893`; additional instances automatically pick the next available port in `18893–19892` (or you can specify `--port <N>`).
+- **OS Account Boundary:** Instances have separate ports, authentication settings, configurations, and logs, but run under the same OS user account (they are not OS-level filesystem sandboxes).
+- **macOS App Integration:** The native macOS menu bar app and the CLI manage the same instances. Quitting the App stops only App-launched instances; CLI background instances continue running.
 
-`up` and `status` put the instance name in the status heading and show its full stable UUID on the `Instance` line, including for the default instance. Read-only resolves relative file paths against `Project`; Coding preserves the upstream server's path behavior. Project is not an access boundary. `Mode` describes global Read-only or Coding access and shows the command to switch modes. A running instance's output uses its active configuration rather than unapplied configuration edits.
+---
 
-The connection guide and command list remain available below the compact status summary:
+## 2. Editing `config.jsonc` & Schema Reference
 
-```text
-● Starmux is running  (instance: default)
-  Instance        <instance UUID>
-  Listen          http://127.0.0.1:18893/mcp  (this computer only)
-  Project         /path/to/your/project
-  Mode            Read-only (global · OS account)  (run 'starmux up --code' to enable edits & shell)
-  Auth            None (no token required)
+Every instance stores its startup configuration in `~/.config/starmux/instances/<uuid>/config.jsonc` (JSON with Comments and trailing commas allowed).
 
-Connect an AI client (MCP settings)
-  Transport       Streamable HTTP
-  URL (Local)     http://127.0.0.1:18893/mcp  (AI client on this computer)
-  URL (Remote)    https://<your-domain-or-tunnel>/mcp  (via protected HTTPS proxy or tunnel -> 127.0.0.1:18893)
-  Authentication  None  (optional Bearer API key: starmux auth key "My AI Client")
-
-Commands
-  Verify          starmux verify
-  Auth & keys     starmux auth
-  Dashboard       starmux dashboard  (view & copy settings in browser)
-  Logs            starmux logs -f
-  Stop            starmux down
-```
-
-## Runtime state and stopping
-
-`status`, `ls`, `up`, `down`, and `doctor` use the same runtime inspection. `unknown` means that Starmux cannot confirm the current state, for example because the control channel is unreachable, its protocol is unsupported, or a service remains on a known port without a usable control record. It does not mean stopped. `up` refuses to start another supervisor in that state; `doctor` reports the problem instead of passing.
-
-Current permissions come only from the live supervisor. With pending changes, `status` shows **Active mode** and **Saved mode** separately. When state is unknown, active mode is unavailable and saved configuration is labelled explicitly. A stopped instance shows its saved settings for the next start. JSON status separates `active`, `saved`, `lastActive`, and `lastRun`; historical snapshots are for diagnostics and configuration recovery, not evidence of a live instance. `config show --effective` only reports confirmed active configuration.
-
-`down` first requests a stop, then waits for that run's cleanup. It prints `Stopped` only after confirmation, or `Already stopped` when no stop was needed. Control failures and timeouts return a nonzero exit code. If another command starts a new run concurrently, the result identifies that restart rather than claiming the instance is currently stopped. `rm` and `config archive` use the same stop confirmation and do not archive an unconfirmed or newly restarted instance.
-
-Stop instances before upgrading the installed package; see [upgrade instructions](INSTALL.md#upgrade). Runtime control addresses are separate from project paths. Instance IDs survive restarts, while each start has a new `runId`.
-
-Normal instances use two global permission modes. Read-only blocks writes and arbitrary execution while allowing file reads permitted by the OS account and upstream server. Coding forwards native operations with the account's permissions. Saved directory grants and path filters do not affect these modes, and remain on disk for legacy configurations.
-
-The MCP `health_check` reports the active mode as `mode: "read-only"` or `mode: "coding"`, alongside connection and diagnostic information. It no longer exposes the internal `workspaceMode`, `developerCommands`, `nativeAccess` or `permissionMode` fields. Read-only access can include paths outside Project, such as `/etc/hosts`, when the OS account and upstream server allow them.
-
-## Edit configuration
+### Everyday Configuration Commands
 
 ```sh
-starmux config path
-starmux config show
-starmux config edit
-starmux config diff
-starmux config apply
-starmux config show --effective
+starmux config path              # Print the absolute path to config.jsonc
+starmux config show              # View saved configuration and revision hash
+starmux config show --effective  # View confirmed active configuration of a running instance
+starmux config edit              # Open config.jsonc in $VISUAL or $EDITOR (validates on save)
+starmux config validate          # Validate config.jsonc syntax and schema
+starmux config diff              # Compare saved edits against the running instance
+starmux config apply             # Hot-reload: restart the running instance with saved settings
+starmux config schema            # Print the full JSON Schema (works even before creating an instance)
 ```
 
-Set `VISUAL` or `EDITOR` to your editor executable for `config edit`. JSONC supports comments and trailing commas. An edit is validated and saved with a revision check; `apply` restarts a running instance. Applying while stopped validates the next start. `up` also applies pending settings before returning success.
+### Complete `config.jsonc` Field Reference
 
-```text
-~/.config/starmux/
-  registry.json
-  gateway.schema.json
-  instances/<stable-id>/
-    config.jsonc
-    state/
-    logs/
-    snapshots/
+| Field | Type & Values | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `schemaVersion` | `1` | `1` | Required configuration schema version. |
+| `projectRoot` | `string` *(absolute path)* | Current directory | Base project directory for the instance. |
+| `port` | `integer` (`1024..65535`) | `18893` | Local loopback TCP port (`127.0.0.1:<port>`). |
+| `mode` | `"read-only"` \| `"read-write"` | `"read-only"` | Workspace read/write mode (`--code` sets `"read-write"`). |
+| `accessRole` | `"restricted"` \| `"trusted"` | `"restricted"` | Tool execution role (`--code` sets `"trusted"`). |
+| `writeScope` | `"unrestricted"` \| `"home-only"` | `"unrestricted"` | On macOS, `"home-only"` restricts native writes to `$HOME` (requires `accessRole: "trusted"`, `gitMode: "off"`, and empty `upstreams`). |
+| `connection` | `"local"` \| `"https"` \| `"tunnel"` | `"local"` | Connection profile metadata. |
+| `gitMode` | `"off"` \| `"review"` \| `"write"` \| `"push"` | `"off"` | Optional gateway-managed Git workflow tools (`gateway_git_*`). |
+| `worktreeMode` | `"off"` \| `"linked"` | `"off"` | Whether workspace-scoped policies follow linked Git worktrees. |
+| `upstreams` | `Array<Upstream>` *(0..12)* | `[]` | Additional local `stdio` MCP servers mounted behind the router. |
+
+---
+
+## 3. Mounting Extra `stdio` MCP Upstreams & Secrets
+
+Beyond the built-in Desktop Commander tools (which keep their native tool names on the `desktop` route), Starmux can mount up to **12 additional local `stdio` MCP servers** per instance.
+
+- **Namespaced Tool Names:** Tools from extra upstreams are exposed as `<id>__<toolName>` (for example, route `sqlite` with tool `read_query` becomes `sqlite__read_query`).
+- **Explicit Tool Allowlist (`allowTools`):** Only tools listed in `allowTools` can be invoked by AI clients.
+- **Fault Isolation:** Discovery has a 7-second timeout per child; an unavailable extra upstream does not prevent the primary Desktop Commander route from starting. Failed side-effecting tool calls are never retried automatically (`UPSTREAM_CALL_UNCERTAIN`).
+
+### Example `config.jsonc` with an Extra `stdio` Upstream
+
+```jsonc
+// Gateway startup settings. Save, then run 'starmux config apply' to restart.
+{
+  "schemaVersion": 1,
+  "projectRoot": "/Users/alice/work/repo-a",
+  "port": 18893,
+  // Read-only mode: mode="read-only", accessRole="restricted"
+  // Coding mode:    mode="read-write", accessRole="trusted"
+  "mode": "read-write",
+  "accessRole": "trusted",
+  "writeScope": "unrestricted",
+  "connection": "local",
+  "gitMode": "off",
+  "worktreeMode": "off",
+  "upstreams": [
+    {
+      "id": "sqlite",
+      "transport": "stdio",
+      "command": "/opt/homebrew/bin/npx",
+      "args": ["-y", "@modelcontextprotocol/server-sqlite", "/Users/alice/data/app.db"],
+      "allowTools": ["read_query", "list_tables", "describe_table"],
+      "envRefs": {
+        "DB_API_TOKEN": "my_service_token"
+      }
+    }
+  ]
+}
 ```
 
-Configuration holds project context, port, permission mode and optional upstream settings. Credentials and secrets live in private state. `config validate` and `config schema` provide diagnostics and the full schema. `starmux config schema` also works before creating an instance.
+### Managing Upstream Secrets (`envRefs`)
 
-## Import, bind and export
+Never store raw secret values inside `config.jsonc`. Instead, store the secret in the instance's private `state/secrets.json` and map environment variable names (`^[A-Z][A-Z0-9_]*$`) to secret names via `envRefs`:
 
 ```sh
-starmux config import ./gateway.jsonc -i work
-starmux config import ./project.jsonc -i blog --link
-starmux config relink -i blog --file /new/path/project.jsonc
-starmux config manage -i blog
-starmux config export -i blog --output ./export.jsonc
+# 1. Save a secret from stdin into private instance state
+starmux config secret set my_service_token -i work < /private/token-file
+
+# 2. Apply configuration so the child MCP server receives DB_API_TOKEN in its env
+starmux config apply -i work
+
+# 3. Remove a secret when no longer needed
+starmux config secret remove my_service_token -i work
 ```
 
-Import makes a private copy. `--link` keeps the external file authoritative. `manage` converts a linked source into a managed copy. External source files must be regular, owner-owned files with trustworthy parent directories. Export includes settings and secret references, not secret values.
+---
 
-## Manage instances
+## 4. Cloning, Archiving, Importing & Scripting
+
+### Copy, Rename, Default, Archive & Restore
 
 ```sh
-starmux config copy experiment -i work
-starmux config rename development -i work
-starmux config default development
-starmux rm experiment              # Alias for: starmux config archive -i experiment
-starmux ls --archived
-starmux config restore -i experiment
+starmux config copy experiment -i work      # Clone settings to a new instance & port (credentials/secrets are not copied)
+starmux config rename dev -i work           # Rename an instance
+starmux config default dev                  # Set the default instance used when '-i' is omitted
+starmux rm experiment                       # Stop and archive an instance (alias: starmux config archive -i experiment)
+starmux ls --archived                       # List archived instances
+starmux config restore -i experiment        # Restore an archived instance
 ```
 
-Copies receive a new identity and port, without credentials or private secrets. An authenticated copy needs its authentication configured before startup. Archive stops the instance and retains recoverable data. The first created instance is the CLI default; `config default` changes it explicitly.
-
-With no instances, `starmux ls` points to `starmux up` to get started. If all instances are archived, use `starmux ls --archived` and restore one with `starmux config restore -i NAME`. Instance operations reject missing or extra arguments; use `-i NAME` to select the instance to archive or restore.
-
-## Snapshots, secrets and automation
-
-Concurrent edits return `CONFIG_CONFLICT`; reload before saving again. A failed apply attempts to restore the last successful worker configuration. Credential revocations are never rolled back. `config recover` repairs a missing source from the last successful snapshot without replacing an existing file.
+### Import, Link, Manage & Export
 
 ```sh
-starmux config secret set service_token -i development < /private/token-file
-starmux config secret remove service_token -i development
-starmux config save --file ./config.jsonc --revision REVISION
-starmux config patch --patch '{"port":18894}' --revision REVISION
+starmux config import ./gateway.jsonc -i work          # Import a private managed copy
+starmux config import ./project.jsonc -i blog --link   # Bind directly to an external owner-owned JSONC file
+starmux config relink -i blog --file /new/project.jsonc # Point a linked instance to a new external file
+starmux config manage -i blog                          # Convert a linked external file into a managed copy
+starmux config export -i blog --output ./export.jsonc  # Export settings (secret values are never exported)
 ```
 
-Use `--json` for scripts and obtain the revision from `config show`. Configured stdio upstreams retain explicit executable/tool allowlists and private environment references. Apply after changing upstream secrets.
+### Optimistic Concurrency & Automation (`save`, `patch`, `recover`)
 
-The macOS App manages the same instances and configuration. Quitting it stops only App-owned instances; CLI background instances remain running.
+For automated scripts, obtain the current `revision` SHA-256 hash from `starmux config show --json` and pass `--revision` to prevent concurrent edit conflicts (`CONFIG_CONFLICT`):
 
-### Durable control records
+```sh
+starmux config save --file ./config.jsonc --revision REVISION -i dev
+starmux config patch --patch '{"port":18895}' --revision REVISION -i dev
+starmux config recover -i dev   # Restore a missing config.jsonc from the last known-good snapshot
+```
 
-Runtime identity records live in `~/.config/starmux/control`, with private permissions, independently of the project and package installation. Unix control sockets use short hashed addresses in a private temporary directory; Windows uses named pipes. Hashing the durable control address avoids Unix socket path limits with long home paths.
+---
 
-If a running supervisor detects that its control records or Unix sockets have disappeared or been replaced, it stops its own worker and records `INSTANCE_CONTROL_FILES_LOST` in `lastRun`. It does not invent replacement credentials or signal a PID discovered in a file. Missing records can be cleaned by their live owner only while the original directory identity still matches; changed ownership is reported as an error.
+## 5. Runtime State Machine & Durable Control Records
 
-Stop existing instances with their current CLI before switching to a build with the new durable control layout. Existing temporary control records are not migrated automatically.
+- **Live State Inspection (`running` / `stopped` / `unknown`):**
+  - `running`: The instance supervisor and worker are healthy and verified over the local control socket.
+  - `stopped`: No supervisor or port lease is active; `status` displays saved settings for the next start.
+  - `unknown`: Starmux cannot confirm live state (e.g., the control socket is unreachable, the control protocol version is unsupported, or a process remains on the port without a valid control record). In `unknown` state, `starmux up` refuses to start a duplicate supervisor, and `starmux doctor` fails closed.
+- **Active vs. Saved Configuration:**
+  - Only the live supervisor can confirm active permissions. When unapplied edits exist on disk, `starmux status` shows **Active mode** and **Saved mode (pending)** separately.
+  - In `--json` output, `status` separates `active`, `saved`, `lastActive`, and `lastRun`.
+- **Durable Control Directory (`~/.config/starmux/control`):**
+  - Instance and port-lease identities are persisted in `~/.config/starmux/control` with `0700`/`0600` owner-only permissions, while Unix control sockets use short hashed paths in a private temporary directory (avoiding POSIX `sun_path` length limits on deep home directories).
+  - If a running supervisor detects that its control record or socket was deleted or replaced externally, it immediately stops its owned worker and records `INSTANCE_CONTROL_FILES_LOST` in `lastRun`.
+
+---
+
+[Documentation Index](README.md) · [Installation & Networking](INSTALL.md) · [Security & Authentication](SECURITY.md) · [AI Client Guides](CLIENTS.md)

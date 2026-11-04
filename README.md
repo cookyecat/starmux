@@ -6,7 +6,7 @@
 
 **Self-hosted MCP Gateway · Built-in File, Shell & Git Tools · macOS Menu Bar App · MIT**
 
-[Why Starmux?](#why-starmux) · [Quick Start](#quick-start) · [Connecting AI Clients](#connecting-ai-clients) · [macOS App](#native-macos-app) · [Documentation](docs/README.md)
+[Why Starmux?](#why-starmux) · [Quick Start](#quick-start) · [Securing & Client Guides](#securing-remote-access--client-guides) · [macOS App](#native-macos-app) · [Documentation](docs/README.md)
 
 </div>
 
@@ -14,18 +14,18 @@
 
 ## Why Starmux?
 
-Cloud AI assistants (like **ChatGPT Web**, **Claude**, **Codex**, or **WorkBuddy**) are powerful, but they are trapped in the cloud—isolated from your local codebases, terminal, and development environment.
+AI assistants and coding agents (like **ChatGPT Web**, **Claude App / Code**, **Antigravity**, **Codex**, **Cursor**, **WorkBuddy**, **DSH-Harness**, **Kimi Code**, **Minimax Code**, **ZCode**, or **Doubao**) are powerful, but cloud clients are isolated in the browser and many desktop agents lack native Linux / ARM64 apps.
 
-**Starmux** (`Star` topology + `Multiplexer`) is a self-hosted MCP gateway that connects remote AI clients to the real tools on your own computers over Direct HTTPS or a Secure Tunnel:
+**Starmux** (`Star` topology + `Multiplexer`) is a self-hosted MCP gateway that connects any AI client to the real tools on your own computers:
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/cookyecat/starmux/main/docs/assets/starmux-architecture.svg" width="100%" alt="Starmux architecture: Many AI clients connecting to self-hosted computers via Direct HTTPS or Secure MCP Tunnel" />
 </div>
 
-- **Batteries-Included Workspace Tools:** Powered by a built-in [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) engine (installed automatically via npm). Out of the box, your AI can read/write files, search code, run Shell commands, and manage Git.
-- **Code on Any Host (macOS, Linux, Windows & Edge Devices):** Many AI clients (like **ChatGPT Desktop** or **WorkBuddy**) have no native Linux or ARM64 client. Because Starmux runs anywhere **Node.js 22.12+** runs—including **macOS**, **Linux (`x64` / `arm64`)**, **NVIDIA Jetson**, headless servers, and **Windows**—you can use your favorite AI client on your main computer or browser to develop directly on any target machine.
-- **Two Clear Permission Modes:** Starts in global **Read-Only** mode (`starmux up`): AI can read files your OS account and the upstream server permit, while writes and arbitrary execution are blocked. Explicitly opt into **Coding Mode** (`starmux up --code`) to use native tools with your OS account permissions.
-- **Your Network, Your Keys:** No vendor-hosted relay required. Protect your gateway with Bearer **API Keys**, browser-based **OAuth**, or your existing **Tunnel / Reverse Proxy** access controls. Revoke access instantly at any time.
+- **Give ChatGPT & Cloud AI Local "Computer Use":** Turn browser and chat AI into a local coding agent. Out of the box, your AI can read/edit local files, search code, run Shell commands, and manage Git via the built-in [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) engine.
+- **Code on Any Host (macOS, Linux, NVIDIA Jetson & Windows):** Desktop AI clients like **WorkBuddy** or **ChatGPT** have no native Linux or ARM64 app. Run Starmux on your target Linux server, **NVIDIA Jetson**, or workstation, and drive it remotely from your laptop or browser.
+- **Programmable MCP Multiplexer & Middleware:** Aggregate built-in workspace tools and your own local `stdio` MCP servers behind a single Streamable HTTP `/mcp` endpoint—complete with unified authentication, tool allowlists, and live activity logs.
+- **100% Self-Hosted — Your Network, Your Keys:** Totally self-hosted. No vendor-hosted relay required. Connect over Localhost, SSH, Direct HTTPS, or your own Tunnel, and lock down access with Bearer API Keys or OAuth 2.0 whenever you need.
 
 ---
 
@@ -39,132 +39,152 @@ Requires **Node.js 22.12+**.
 npm install -g starmux
 ```
 
-**Upgrading an existing installation?** Stop each running instance with the current CLI (`starmux down`, or `starmux down -i NAME`) before installing the new version, then run `starmux up` again. See the [upgrade instructions](https://github.com/cookyecat/starmux/blob/main/docs/INSTALL.md#upgrade) and [release notes](https://github.com/cookyecat/starmux/blob/main/CHANGELOG.md).
+*(Upgrading? Run `starmux down` before installing the new version—see the [Upgrade Guide](docs/INSTALL.md#upgrade).)*
 
 ### 2. Start in your project directory
 
 ```bash
 cd /path/to/your/project
 
-# Option A: Global read-only mode (default — inspect files & code)
+# Option 1: Read-only mode (default — safely inspect files & code)
 starmux up
 
-# Option B: Full coding mode (edit files, run Shell & Git)
+# or, Option 2: Coding mode (edit files, run Shell & Git)
 starmux up --code
 ```
 
-Starmux initializes itself and runs in the background on port `18893` (coding mode asks for confirmation the first time):
+Starmux starts in the background on `http://127.0.0.1:18893/mcp` with **Authentication: `None`** by default so you can connect immediately:
 
-Switch back from Coding mode with
-
-```
-starmux up --read
-```
-
-Add `-i NAME` for a named instance. Both `up` and `status` show the mode-switch command.
-
-`Project` provides context for relative file paths in Read-only mode; it does not restrict access to that directory. Read-only applies across the computer wherever the OS account and upstream server permit reading. Coding forwards native operations with the account's permissions. Neither mode uses Starmux directory grants or path exclusions.
-
-In Read-only mode, `read_multiple_files` supports up to 20 files and 4 MiB of combined file sizes per batch. Missing files retain Desktop Commander's per-file errors alongside successful contents. Oversized batches return `BATCH_READ_COUNT_LIMIT` or `BATCH_READ_SIZE_LIMIT` with guidance to split the request.
-
-### 3. Add Starmux to your AI client
-
-Need a Bearer API key for remote access? Generate one first (optional for local use):
-
-```bash
-starmux auth key "My AI Client"
+```text
+● Starmux is running  (instance: default)
+  Instance        <instance UUID>
+  Listen          http://127.0.0.1:18893/mcp  (this computer only)
+  Project         /path/to/your/project
+  Mode            Read-only (global · OS account)  (run 'starmux up --code' to enable edits & shell)
+  Auth            None (no token required)
 ```
 
-Depending on your AI client, configure the MCP server using either **Form UI** or **JSON**:
+*(Switch modes anytime with `starmux up --code` and `starmux up --read`.)*
 
-#### Option A — AI clients with a Form UI (e.g., ChatGPT Web, Claude)
+### 3. Expose for Remote / Cloud AI *(Skip if your AI client is on this same computer)*
 
-Copy the fields directly from `starmux up` (or open `starmux dashboard` in your browser):
+Because Starmux only listens on `127.0.0.1:18893`, forward traffic to it if your AI client is in the cloud (e.g., **ChatGPT Web**) or on another computer:
+
+- **Option 1: Reachable IP (Public or LAN) — Direct Proxy with [Caddy](https://caddyserver.com):**
+  Run in your terminal (replace `mcp.example.com` with your public domain, or `http://YOUR_LAN_IP` on a local network):
+  ```bash
+  caddy run --adapter caddyfile --config - << 'EOF'
+  mcp.example.com {
+  	handle /mcp {
+  		reverse_proxy 127.0.0.1:18893 {
+  			header_up Host 127.0.0.1:18893
+  		}
+  	}
+  }
+  EOF
+  ```
+
+- **Option 2: Behind NAT / Firewall — Use a Tunnel or SSH:**
+  - **[OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) (for ChatGPT Web / Codex):**
+    ```bash
+    tunnel-client run \
+      --control-plane.tunnel-id "tunnel_YOUR_TUNNEL_ID" \
+      --control-plane.api-key "env:MAC_MCP_TUNNEL_KEY" \
+      --mcp.server-url "http://127.0.0.1:18893/mcp" \
+      --health.listen-addr "127.0.0.1:18891" \
+      --log.level info
+    ```
+    *(Behind a proxy? Append `--control-plane.http-proxy "http://127.0.0.1:PROXY_PORT"`.)*
+  - **or, Cloudflare Quick Tunnel:** `cloudflared tunnel --url http://127.0.0.1:18893 --http-host-header 127.0.0.1:18893`
+  - **or, SSH Forwarding (Laptop $\rightarrow$ Linux / Jetson):** `ssh -N -L 127.0.0.1:18893:127.0.0.1:18893 user@remote-host` *(add `-p PORT` if SSH uses a non-default port; change the first `18893` to `18894` if port `18893` is already used on your laptop)*
+
+*(See [Installation & Networking](docs/INSTALL.md#4-remote-network-forwarding--ingress-engineering) for Tailscale, ngrok, and custom TLS ports.)*
+
+### 4. Connect your AI client
+
+With default settings (`Auth: None`), connect your AI client using any of the options below:
+
+#### Option 1 — Ask your AI coding agent to add it for you *(Zero manual config)*
+
+For agentic coding clients (**Claude Code**, **Antigravity**, **Codex**, **Cursor**, **WorkBuddy**, **DSH-Harness**, **Kimi Code**, **Minimax Code**, **ZCode**), simply send this prompt in the AI chat (replacing the URL with your LAN IP, domain, or `http://127.0.0.1:18893/mcp`):
+
+```text
+Create this MCP Server connector:
+"starmux": {
+  "type": "streamable-http",
+  "url": "http://192.168.50.114/mcp"
+}
+```
+
+Your AI agent will automatically update its own MCP configuration and connect.
+
+#### or, Option 2 — AI clients with a Form UI (e.g., ChatGPT Web, Claude, Doubao)
 
 | MCP Client Field | Value to Fill In |
 | :--- | :--- |
-| **Transport** | `Streamable HTTP` |
-| **URL (Local)** | `http://127.0.0.1:18893/mcp` *(when the AI client is on this same computer)* |
-| **URL (Remote)** | `https://<your-domain-or-tunnel>/mcp` *(forwarded to `127.0.0.1:18893` via Caddy or Tunnel)* |
-| **Authentication** | *Optional:* `None` *(default)*, `Bearer API key` (`Authorization: Bearer <YOUR_API_KEY>`), or `OAuth` |
+| **Transport** | `Streamable HTTP` *(or select your **Tunnel** in ChatGPT Web)* |
+| **URL** | `https://mcp.example.com/mcp` *(Remote HTTPS / Tunnel)* — or `http://127.0.0.1:18893/mcp` *(same computer)* |
+| **Authentication** | `None` *(default)* |
 
-#### Option B — AI clients with JSON config (e.g., WorkBuddy, Cursor, Windsurf)
+#### or, Option 3 — Manually paste into `mcp.json`
 
-Paste one of the blocks below into your client's `mcp.json` / `mcpServers` settings.
+If you prefer editing your client's `mcp.json` / `mcpServers` settings manually:
 
-**Without API key (default for local `127.0.0.1` or when your tunnel handles login — no `headers` needed):**
-
-```json
-{
-  "mcpServers": {
-    "starmux": {
-      "type": "streamable-http",
-      "url": "http://127.0.0.1:18893/mcp"
-    }
-  }
-}
-```
-
-**With Bearer API key (`headers` is optional — include it after running `starmux auth key`):**
-
-```json
-{
-  "mcpServers": {
-    "starmux": {
-      "type": "streamable-http",
-      "url": "https://<your-domain-or-tunnel>/mcp",
-      "headers": {
-        "Authorization": "Bearer smx_YOUR_GENERATED_API_KEY"
+- **Remote / LAN connection (via Direct Proxy or Tunnel — do NOT use `127.0.0.1` across separate machines):**
+  ```json
+  {
+    "mcpServers": {
+      "starmux": {
+        "type": "streamable-http",
+        "url": "https://mcp.example.com/mcp"
       }
     }
   }
-}
-```
+  ```
+
+- **or, Same-computer connection (or when using local `ssh -L` port forwarding):**
+  ```json
+  {
+    "mcpServers": {
+      "starmux": {
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:18893/mcp"
+      }
+    }
+  }
+  ```
 
 ---
 
-## Connecting AI Clients
+## Securing Remote Access & Client Guides
 
-By design, Starmux only listens on `127.0.0.1:18893/mcp` (loopback) and never exposes raw ports directly to external networks:
+Once your connection works, **lock down public HTTPS / Tunnel endpoints** so only you can access your gateway:
 
-- **Local AI Client (Same Computer):** Connects directly to `http://127.0.0.1:18893/mcp` with zero network configuration.
-- **Remote / Cloud AI Client:** Connects through an **HTTPS Reverse Proxy** or a **Tunnel Client** running on your machine, which receives external HTTPS traffic and forwards it locally to `127.0.0.1:18893/mcp`:
+### Add Authentication *(Recommended for Internet-Facing Endpoints)*
 
-```text
-Remote AI Client
-  ──(HTTPS)──▶ HTTPS Reverse Proxy (Caddy) or Tunnel Client
-                 ──(Loopback)──▶ Starmux (127.0.0.1:18893/mcp)
-                                   ──▶ Local Files, Shell & Git
-```
+1. **Bearer API Key (10-second setup for Antigravity, Cursor, WorkBuddy, Kimi Code, Codex, etc.):**
+   ```bash
+   starmux auth key "My AI Client"
+   ```
+   Then add `"headers": { "Authorization": "Bearer smx_YOUR_GENERATED_API_KEY" }` to your client's JSON config (or `Authorization: Bearer <key>` in Form UI).
+2. **OAuth 2.0 Browser Login (for ChatGPT Web):**
+   Supports full OAuth 2.0 + PKCE and instant session revocation. See [Security & Authentication — OAuth 2.0](docs/SECURITY.md#4-oauth-20--pkce-oauth-with-keycloak).
 
-### 1. Choose a Network Forwarder (for Remote / Cloud Access)
+### Tested AI Client Matrix
 
-| Network Method | Best For | Recommended Software & Official Docs | Starmux Guide |
+| AI Client | Recommended Setup | Status | Detailed Guide |
 | :--- | :--- | :--- | :--- |
-| **Direct HTTPS (Reverse Proxy)** | Hosts with a public IPv4 / IPv6 address and a domain name | [Caddy](https://caddyserver.com/docs/quick-starts/reverse-proxy) *(auto HTTPS)* · [Nginx](https://nginx.org/en/docs/http/ngx_http_proxy_module.html) | [Caddy HTTPS Setup](docs/REMOTE_SETUP.md#2-https--bearer-api-key) |
-| **Secure Tunnel** | Hosts behind NAT, home Wi-Fi, or office firewalls *(no inbound port needed)* | [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) · [Tailscale Funnel / Serve](https://tailscale.com/kb/1223/funnel) · [OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) · [ngrok](https://ngrok.com/docs) | [Tunnel Setup](docs/CONNECT_CHATGPT.md#2-secure-mcp-tunnel--no-inbound-port) |
-
-### 2. Choose an Authentication Mode
-
-Authentication is configured independently of how you expose the network:
-
-| Authentication Mode | When to Use | CLI Command |
-| :--- | :--- | :--- |
-| **None** *(default)* | Same-computer clients, or tunnels that already handle caller login | `starmux auth mode none` |
-| **Bearer API Key** *(recommended)* | Clients that support an `Authorization: Bearer <key>` header | `starmux auth key "My AI Client"` |
-| **OAuth 2.0** | Cloud clients that require browser sign-in (e.g., ChatGPT Web) | `starmux auth oauth setup ...` |
-
-### 3. Client Setup Guides
-
-| AI Client | Recommended Connection & Auth | Status | Setup Guide |
-| :--- | :--- | :--- | :--- |
-| **ChatGPT Web** | Secure Tunnel + OAuth (Browser Login) | ✅ Tested | [ChatGPT OAuth Guide](docs/OAUTH.md) |
-| **Claude App** | Remote MCP Custom Connector | 🎯 Target | [Client Compatibility](docs/CLIENTS.md) |
-| **Codex** | Protected Tunnel (No Starmux Token) | ✅ Tested | [Remote Setup Guide](docs/REMOTE_SETUP.md) |
-| **WorkBuddy** | Direct HTTPS + Bearer API Key | ✅ Tested | [HTTPS + API Key Guide](docs/REMOTE_SETUP.md#2-https--bearer-api-key) |
-| **Doubao (豆包)** | HTTPS / Tunnel | ✅ Community Verified | [Client Compatibility](docs/CLIENTS.md) |
-
-See [Client Compatibility](docs/CLIENTS.md) and [Remote Setup](docs/REMOTE_SETUP.md) for DNS, TLS, Caddy, OAuth, and tunnel configuration details.
+| **ChatGPT Web** | Direct HTTPS or OpenAI Tunnel (+ OAuth) | ✅ Tested | [ChatGPT Web Setup](docs/CLIENTS.md#2-chatgpt-web-tunnel-direct-https--oauth) |
+| **Claude App / Code** | Chat Prompt (`Claude Code`) or Remote MCP Custom Connector (`Claude App`) | ✅ Tested | [AI Coding Agents](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) · [Claude App](docs/CLIENTS.md#5-claude-app--doubao-豆包) |
+| **Antigravity** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Codex** | Chat Prompt / Tunnel or HTTPS + Bearer API Key | ✅ Tested | [Codex CLI Setup](docs/CLIENTS.md#4-codex-cli-configtoml) |
+| **Cursor** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **WorkBuddy** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **DSH-Harness** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Kimi Code** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Minimax Code** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **ZCode** | Chat Prompt / Local / LAN / SSH / HTTPS | ✅ Tested | [AI Coding Agents Setup](docs/CLIENTS.md#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Doubao (豆包)** | Direct HTTPS or Tunnel | ✅ Tested | [Claude & Doubao Setup](docs/CLIENTS.md#5-claude-app--doubao-豆包) |
 
 ---
 
@@ -174,6 +194,7 @@ Manage your gateway with simple, human-friendly commands:
 
 ```bash
 starmux status          # Check health, endpoints, and active permission mode
+starmux up .            # Switch active project context to current directory
 starmux auth            # View auth mode, active API keys, and OAuth sessions
 starmux verify          # Test local MCP handshake, tool discovery, and workspace read
 starmux doctor          # Run environment and configuration diagnostics
@@ -182,11 +203,9 @@ starmux logs -f         # Stream live gateway logs
 starmux down            # Stop the gateway (alias: stop)
 ```
 
-After initialization, `starmux up` reuses your instance's saved project context. Use `starmux up .` to change it to your current directory, or pass `--foreground` to keep the process in your terminal. Only a new instance defaults to the current directory when no path is supplied.
-
 ### Advanced: Running multiple instances (`-i`)
 
-*(Optional)* By default, Starmux manages a single `default` instance so you never have to pass extra flags. To use different project contexts or permission modes on the same machine, pass `-i <name>` to create instances with their own ports, credentials, configuration, and logs. Instances share the OS account; they are not filesystem sandboxes:
+*(Optional)* By default, Starmux manages a single `default` instance so you never have to pass extra flags. To use different project contexts or permission modes on the same machine, pass `-i <name>` to create instances with their own ports, credentials, configuration, and logs:
 
 ```bash
 starmux up ~/work/repo-a -i work --code
@@ -196,7 +215,7 @@ starmux down -i work    # Stop a specific instance
 starmux rm blog         # Stop and archive an instance
 ```
 
-See [Instances and Configuration](docs/INSTANCES.md) for advanced JSONC configuration (`starmux config edit` / `starmux config apply`) and hot-reload workflows.
+See [Instances and Configuration](docs/INSTANCES.md) for advanced JSONC configuration (`starmux config edit` / `starmux config apply`), mounting extra `stdio` MCP servers, and hot-reload workflows.
 
 ---
 
@@ -223,18 +242,12 @@ The App and CLI manage the same underlying instances. Quitting the App stops onl
 
 Starmux began with the [community request for a self-hosted Desktop Commander workbench](https://github.com/wonderwhy-er/DesktopCommanderMCP/issues/714) and is evolving into a universal MCP router and programmable middleware for multi-server environments.
 
-Explore the `docs/` guides by topic:
+Explore the [Documentation Index](docs/README.md) by category:
 
-- **🌐 Remote Networking & Auth**
-  - [Remote Setup (HTTPS & Tunnel)](docs/REMOTE_SETUP.md) — Step-by-step Caddy reverse proxy, custom TLS / port `8443`, IPv6, and Tunnel setup.
-  - [Access Control & API Keys](docs/ACCESS_CONTROL.md) — Creating/revoking Bearer API keys, expiration policies, and using the local Web Access Console.
-  - [ChatGPT Web & OAuth 2.0](docs/OAUTH.md) & [Connect ChatGPT](docs/CONNECT_CHATGPT.md) — Configuring Keycloak OAuth 2.0 + PKCE and OpenAI Secure MCP Tunnel.
-- **⚙️ Advanced Configuration & Security**
-  - [Multi-Instance & JSONC Config](docs/INSTANCES.md) — Managing instances, hot-reloading `config.jsonc`, mounting extra `stdio` MCP upstreams, and secrets.
-  - [Security & Permissions](docs/SECURITY.md) — Understanding global Read-Only vs. Coding Mode, upstream permissions, and macOS privacy boundaries.
-  - [Client Compatibility](docs/CLIENTS.md) & [Platform Details](docs/PLATFORMS.md) — Tested AI client matrix and macOS / Linux / Windows runtime specifics.
-- **🛠️ Reference & Project**
-  - [Documentation Index](docs/README.md) · [Installation](docs/INSTALL.md) · [Contributing](CONTRIBUTING.md)
+- **📦 [Installation, Platforms & Network Forwarding](docs/INSTALL.md)** — Supported hosts (`macOS`, `Linux`, `NVIDIA Jetson`, `Windows`), everyday CLI commands, upgrades, source builds, and advanced Caddy / Tunnel / SSH forwarding.
+- **🔒 [Security, Access Control & Authentication](docs/SECURITY.md)** — Global Read-Only vs. Coding permissions, Bearer API keys (`starmux auth key`), Web Access Console, and self-hosted Keycloak OAuth 2.0 + PKCE.
+- **🤖 [AI Client Configuration Guides](docs/CLIENTS.md)** — End-to-end setup (including 1-step Prompt Auto-Setup) for **ChatGPT Web**, **Claude App / Code**, **Antigravity**, **Codex**, **Cursor**, **WorkBuddy**, **DSH-Harness**, **Kimi Code**, **Minimax Code**, **ZCode**, and **Doubao (豆包)**.
+- **⚙️ [Multi-Instance & JSONC Configuration](docs/INSTANCES.md)** — Running multiple instances (`-i NAME`), hot-reloading `config.jsonc`, mounting extra local `stdio` MCP servers (`upstreams`), and managing secrets.
 
 ## License
 
