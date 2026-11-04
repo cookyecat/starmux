@@ -1,12 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.16.0
 
 - Keep instance and port-lease identities in the private, durable `~/.config/starmux/control` directory instead of temporary storage.
 - Use short hashed Unix socket paths and stop the owned worker if a control record or socket disappears, preserving a diagnostic reason.
 - Allow a supervisor to finish cleanup after its own metadata is deleted, while refusing to remove a replaced control directory or another run's records.
 - Add regression tests for deleting each instance/port owner record and Unix socket during a live run.
-- Stop instances before changing to this control layout. This change is GitHub-only for now; npm remains at 0.15.0.
+- Stop instances before changing to this control layout. 
 
 ## 0.15.0
 
