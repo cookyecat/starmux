@@ -99,6 +99,8 @@ When pairing OAuth 2.0 with `tunnel-client` (`0.0.16+`):
 
 ## 3. AI Coding Agents (Claude Code, Antigravity, Codex, Cursor, WorkBuddy, DSH-Harness, Kimi Code, Minimax Code, ZCode)
 
+**WorkBuddy + Linux / Jetson:** See the [WorkBuddy remote Linux / NVIDIA Jetson guide](use-cases/workbuddy-linux-jetson.md) for a quick Caddy setup, auto-configuration prompt, manual MCP JSON, and LAN versus public HTTPS access.
+
 All mainstream agentic coding clients—including **Claude Code**, **Antigravity**, **Codex**, **Cursor**, **WorkBuddy**, **DSH-Harness**, **Kimi Code**, **Minimax Code**, and **ZCode**—support Starmux's `streamable-http` MCP endpoint.
 
 ### Fastest Setup: Ask Your AI Agent to Configure Itself (Prompt Auto-Setup)

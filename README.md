@@ -162,6 +162,7 @@ If you prefer editing your client's `mcp.json` / `mcpServers` settings manually:
 - [How do I self-host a remote MCP gateway?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/self-hosted-remote-mcp-gateway.md)
 - [How can I use Desktop Commander remotely?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/remote-desktop-commander.md)
 - [Can ChatGPT access a Linux server or NVIDIA Jetson?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/chatgpt-linux-jetson.md)
+- [How can WorkBuddy operate Linux or NVIDIA Jetson remotely?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/workbuddy-linux-jetson.md)
 - [How do I connect an MCP server behind NAT — HTTPS or Tunnel?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/mcp-behind-nat-https-vs-tunnel.md)
 - [How can I secure a remote MCP endpoint with OAuth?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/self-hosted-mcp-oauth.md)
 
