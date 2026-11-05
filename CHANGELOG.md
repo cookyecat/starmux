@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.1
+
+### Discovery and documentation
+
+- Refine the npm package description to highlight the self-hosted remote MCP gateway, supported AI clients, Desktop Commander tools, and Linux / NVIDIA Jetson access.
+- Update npm search keywords for MCP gateways, remote computer access, and compatible AI coding clients.
+- Add task-focused use-case guides, including the tested WorkBuddy-to-Linux / NVIDIA Jetson connection and its verified `streamable-http` configuration.
+- No runtime behavior or dependency changes in this release.
+
 ## 0.16.0
 
 - Keep instance and port-lease identities in the private, durable `~/.config/starmux/control` directory instead of temporary storage.
