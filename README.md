@@ -6,7 +6,7 @@
 
 **Self-hosted MCP Gateway · Built-in File, Shell & Git Tools · macOS Menu Bar App · MIT**
 
-[Why Starmux?](#why-starmux) · [Quick Start](#quick-start) · [Securing & Client Guides](#securing-remote-access--client-guides) · [macOS App](#native-macos-app) · [Documentation](docs/README.md)
+[Why Starmux?](#why-starmux) · [Quick Start](#quick-start) · [Use Cases](#common-use-cases) · [Securing & Client Guides](#securing-remote-access--client-guides) · [macOS App](#native-macos-app) · [Documentation](docs/README.md)
 
 </div>
 
@@ -153,6 +153,14 @@ If you prefer editing your client's `mcp.json` / `mcpServers` settings manually:
     }
   }
   ```
+
+---
+
+## Common Use Cases
+
+- [How can ChatGPT access my local computer?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/chatgpt-access-local-computer.md)
+- [How do I self-host a remote MCP gateway?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/self-hosted-remote-mcp-gateway.md)
+- [How can I use Desktop Commander remotely?](https://github.com/cookyecat/starmux/blob/main/docs/use-cases/remote-desktop-commander.md)
 
 ---
 

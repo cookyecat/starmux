@@ -13,6 +13,12 @@ When you need deeper configuration, explore the four guides below by category:
 
 ---
 
+## Common Use Cases
+
+For task-first walkthroughs, start with [Use Cases](use-cases/README.md): ChatGPT to your computer, self-hosted Remote MCP, and Remote Desktop Commander.
+
+---
+
 ### Additional Project Docs
 - **[macOS Menu Bar App Build Guide](../app/README.md)** — Building the native SwiftUI menu bar app on Apple Silicon.
 - **[Contributing](../CONTRIBUTING.md)** — Repository layout, build scripts, and test suite.
