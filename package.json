@@ -1,7 +1,24 @@
 {
   "name": "starmux",
   "version": "0.16.0",
-  "description": "Connect AI clients to files, terminals and development tools on your own computer.",
+  "description": "Self-hosted MCP gateway connecting ChatGPT, WorkBuddy and AI agents to files, terminals and Desktop Commander tools on Linux, Jetson, macOS and Windows.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-gateway",
+    "mcp-server",
+    "remote-mcp",
+    "self-hosted",
+    "chatgpt",
+    "workbuddy",
+    "desktop-commander",
+    "ai-agents",
+    "computer-use",
+    "linux",
+    "nvidia-jetson",
+    "streamable-http",
+    "coding-agent"
+  ],
   "license": "MIT",
   "homepage": "https://github.com/cookyecat/starmux#readme",
   "repository": {
