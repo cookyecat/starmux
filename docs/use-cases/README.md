@@ -7,6 +7,9 @@
 | **How can ChatGPT access my local computer?** | [ChatGPT to local files and tools](chatgpt-access-local-computer.md) | Start Starmux, choose OpenAI Tunnel or HTTPS, and verify a ChatGPT tool call. |
 | **How do I self-host a remote MCP gateway?** | [Self-hosted remote MCP gateway](self-hosted-remote-mcp-gateway.md) | Run MCP on your own host, choose remote transport, secure access, and connect extra local MCP servers. |
 | **How can I use Desktop Commander remotely?** | [Remote Desktop Commander with Starmux](remote-desktop-commander.md) | Use Starmux's bundled Desktop Commander-derived tools remotely without using the official hosted plugin. |
+| **Can ChatGPT access a Linux server or NVIDIA Jetson?** | [ChatGPT to Linux / Jetson](chatgpt-linux-jetson.md) | Connect ChatGPT Web to a Linux or ARM64 tool host without a native ChatGPT app on that host. |
+| **How do I connect an MCP server behind NAT?** | [HTTPS vs Tunnel vs SSH](mcp-behind-nat-https-vs-tunnel.md) | Choose a secure transport for public IPs, NAT/CGNAT and laptop-based clients. |
+| **How can I secure an MCP endpoint with OAuth?** | [Self-hosted MCP OAuth](self-hosted-mcp-oauth.md) | Configure Keycloak, PKCE, protected-resource metadata and browser login for Starmux. |
 
 ## Technical reference
 
