@@ -23,12 +23,14 @@ Starmux exposes a standard **MCP Streamable HTTP** endpoint (`/mcp`). Choose you
 | **Antigravity** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **Codex** | ✅ Tested | **Prompt Auto-Setup**, **Protected Tunnel**, or **HTTPS + Bearer API Key** | [4. Codex CLI](#4-codex-cli-configtoml) |
 | **Cursor** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **WorkBuddy** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **WorkBuddy** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (LAN / HTTPS / SSH; `streamable-http`) | [WorkBuddy → Linux / Jetson](use-cases/workbuddy-linux-jetson.md) · [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **DSH-Harness** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **Kimi Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **Minimax Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **ZCode** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **Doubao (豆包)** | ✅ Tested | **Direct HTTPS** or **Secure Tunnel** | [5. Claude & Doubao](#5-claude-app--doubao-豆包) |
+
+**End-to-end validation (November 2026):** The project maintainer reports successful **read and write MCP operations** using **Antigravity, Cursor, Codex, DSH-Harness, ZCode, Minimax Code, WorkBuddy, and Kimi Code**. A separate WorkBuddy-to-Jetson test verified live tool discovery and read-only operations on Linux ARM64. The tested WorkBuddy desktop loader expects `"type": "streamable-http"`; remote entries accept only `type`, `url`, and optional `headers`. See the [WorkBuddy Linux / Jetson Use Case](use-cases/workbuddy-linux-jetson.md).
 
 ---
 

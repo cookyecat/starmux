@@ -39,7 +39,7 @@ For a WorkBuddy computer **on the same trusted LAN** as the Linux host, suppose 
 
 ~~~bash
 caddy run --adapter caddyfile --config - <<'EOF'
-http://192.168.1.2:8080 {
+http://192.168.1.2 {
     handle /mcp {
         reverse_proxy 127.0.0.1:18893 {
             header_up Host 127.0.0.1:18893
@@ -52,7 +52,7 @@ http://192.168.1.2:8080 {
 EOF
 ~~~
 
-The WorkBuddy MCP URL is `http://192.168.1.2:8080/mcp`. Replace the sample IP with the Linux host's actual LAN IP. Restrict port 8080 to trusted LAN clients in your firewall. **Never port-forward an unauthenticated endpoint to the public internet.** For private-network HTTPS, configure a certificate trusted by the WorkBuddy computer and retain network access restrictions.
+The WorkBuddy MCP URL is `http://192.168.1.2/mcp`. Replace the sample IP with the Linux host's actual LAN IP. Restrict port 80 to trusted LAN clients in your firewall. **Never port-forward an unauthenticated endpoint to the public internet.** For private-network HTTPS, configure a certificate trusted by the WorkBuddy computer and retain network access restrictions.
 
 ### B. Public Direct HTTPS — authentication required
 
@@ -86,18 +86,18 @@ See [Installation & Networking](../INSTALL.md) for Caddy, DNS, IPv6 and NAT, and
 
 ## 3. Configure MCP automatically in WorkBuddy
 
-WorkBuddy supports a user-wide config file at `~/.workbuddy/mcp.json`, or a project-level `.workbuddy/mcp.json`. **Its documented Streamable HTTP type is `"streamableHttp"`**.
+WorkBuddy supports a user-wide config file at `~/.workbuddy/mcp.json`, or a project-level `.workbuddy/mcp.json`. **Use `"type": "streamable-http"` in the tested WorkBuddy desktop build.** Its MCP loader was directly inspected and accepts remote transport types `"streamable-http"` or `"sse"`. The camelCase `"streamableHttp"` is unsupported and causes the server to be skipped, even though some online examples use it.
 
 For the **trusted LAN** example, send WorkBuddy this instruction:
 
-> Add the following MCP server to my WorkBuddy user-level MCP configuration (`~/.workbuddy/mcp.json`). Merge it with existing `mcpServers` entries—do not overwrite my other connections. Then check the connection status and discover available tools using read-only operations.
+> Add the following MCP server to my WorkBuddy user-level MCP configuration (`~/.workbuddy/mcp.json`). Merge it with existing `mcpServers` entries—**keep the two existing entries and all their settings (including Authorization headers and disabled flags) unchanged**. Only add the new `linux-jetson` entry with `type` and `url`. Then check the connection, discover tools and make a harmless read-only tool call.
 >
 > ~~~json
 > {
 >   "mcpServers": {
 >     "linux-jetson": {
->       "type": "streamableHttp",
->       "url": "http://192.168.1.2:8080/mcp"
+>       "type": "streamable-http",
+>       "url": "http://192.168.1.2/mcp"
 >     }
 >   }
 > }
@@ -107,7 +107,7 @@ If WorkBuddy cannot edit its own configuration in the current session, use the m
 
 ## 4. Or configure the connection manually
 
-Open WorkBuddy's **Connectors / MCP** configuration interface and add a custom MCP server, or edit `~/.workbuddy/mcp.json` directly. Menu labels can vary with WorkBuddy versions. **Merge** the entry below with any existing servers.
+Open WorkBuddy's **Connectors / MCP** configuration interface and add a custom MCP server, or edit `~/.workbuddy/mcp.json` directly. Menu labels can vary with WorkBuddy versions. **Merge** the entry below with any existing servers. In the tested WorkBuddy loader, a **remote** MCP entry accepts only `type`, `url` and optional `headers`; an unsupported extra key triggers `unknown remote field`. Leave other already-configured servers unchanged.
 
 **Trusted LAN, no token:**
 
@@ -115,8 +115,8 @@ Open WorkBuddy's **Connectors / MCP** configuration interface and add a custom M
 {
   "mcpServers": {
     "linux-jetson": {
-      "type": "streamableHttp",
-      "url": "http://192.168.1.2:8080/mcp"
+      "type": "streamable-http",
+      "url": "http://192.168.1.2/mcp"
     }
   }
 }
@@ -128,7 +128,7 @@ Open WorkBuddy's **Connectors / MCP** configuration interface and add a custom M
 {
   "mcpServers": {
     "linux-jetson": {
-      "type": "streamableHttp",
+      "type": "streamable-http",
       "url": "https://mcp.example.com/mcp",
       "headers": {
         "Authorization": "Bearer smx_REPLACE_WITH_YOUR_PRIVATE_KEY"
@@ -138,7 +138,7 @@ Open WorkBuddy's **Connectors / MCP** configuration interface and add a custom M
 }
 ~~~
 
-Configure the real key **privately** in WorkBuddy's MCP settings or local config file. Don't paste secrets into public repositories or shared AI conversations. Keep existing MCP entries when editing the file. The `streamableHttp` spelling follows [WorkBuddy's official connector documentation](https://open.workbuddy.cn/docs/connector); other MCP clients may use different names.
+Configure the real key **privately** in WorkBuddy's MCP settings or local config file. Don't paste secrets into public repositories or shared AI conversations. Keep existing MCP entries when editing the file. **Transport compatibility:** This guide follows the verified WorkBuddy desktop loader, which accepts `"streamable-http"` and `"sse"` as remote transports. Do **not** use `"streamableHttp"` in this tested build; it causes `Skipping MCP server linux-jetson: unsupported transport`. Other clients and older online examples may differ.
 
 ## 5. Verify that WorkBuddy can use the Linux host
 
@@ -153,11 +153,18 @@ A local Starmux health check does **not** prove that WorkBuddy has connected: ve
 | Problem | Check |
 | --- | --- |
 | WorkBuddy cannot connect | Use the Linux host's real LAN IP or public domain—not WorkBuddy's own `127.0.0.1`. Check Caddy, firewall and reachability from the WorkBuddy computer. |
-| WorkBuddy rejects the MCP config | Use `"type": "streamableHttp"` and ensure valid JSON, a reachable `/mcp` URL and merged `mcpServers` entries. |
+| MCP server is silently skipped | Use `"type": "streamable-http"` (not `"streamableHttp"`); the latter triggers `Skipping MCP server linux-jetson: unsupported transport`. |
+| `unknown remote field` | Remote server entries support only `type`, `url` and optional `headers` in the tested build. Remove extra properties from the new entry. |
 | HTTP 401 | Check Starmux's auth mode and the Bearer key in WorkBuddy's `headers`. |
 | HTTP 403 / invalid Host | Keep `header_up Host 127.0.0.1:18893` in Caddy. |
 | Reads work but commands fail | Starmux defaults to read-only. Only opt into `--code` when you intend to grant execution privileges. |
 | Public HTTPS is unreachable | Check DNS, TCP 443, NAT/CGNAT and IPv6 firewall rules. |
+
+## Validated on NVIDIA Jetson Orin (November 2026)
+
+In a real **WorkBuddy → Caddy → Starmux → NVIDIA Jetson Orin** LAN test, WorkBuddy added `linux-jetson` to `~/.workbuddy/mcp.json` while preserving two existing MCP server entries, and connected over `http://<jetson-lan-ip>/mcp`.
+
+WorkBuddy discovered **26 tools**. The `health_check` result reported `status: ok`, `mode: coding`, and **25 tools ready**; these are different reported counters, not necessarily equal totals. Read-only calls to `get_config`, `list_processes`, and `list_sessions` all succeeded on Linux ARM64. This trace verifies connection and read operations in Coding mode; exact tool counts can change by release.
 
 ## Related guides
 
