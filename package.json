@@ -1,7 +1,8 @@
 {
   "name": "starmux",
+  "mcpName": "io.github.cookyecat/starmux",
   "version": "0.16.1",
-  "description": "Self-hosted remote MCP gateway for ChatGPT, WorkBuddy, Codex and AI agents to access files, terminals and Desktop Commander tools on Linux, NVIDIA Jetson, macOS and Windows.",
+  "description": "All-in-one self-hosted remote MCP server and gateway for ChatGPT, Claude, WorkBuddy, Codex and Cursor: built-in filesystem, file editing, terminal, process management, Desktop Commander, auth and stdio MCP multiplexing over Streamable HTTP on Linux, NVIDIA Jetson, macOS and Windows.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -10,17 +11,28 @@
     "remote-mcp",
     "self-hosted",
     "chatgpt",
+    "claude",
     "workbuddy",
     "desktop-commander",
     "claude-code",
     "codex",
     "cursor",
+    "antigravity",
     "ai-agents",
     "computer-use",
+    "filesystem-mcp",
+    "terminal-mcp",
+    "process-management",
+    "remote-pc-mcp",
     "linux",
     "nvidia-jetson",
     "streamable-http",
-    "mcp-multiplexer"
+    "stdio-to-http",
+    "mcp-proxy",
+    "mcp-router",
+    "mcp-aggregator",
+    "mcp-multiplexer",
+    "oauth2"
   ],
   "license": "MIT",
   "homepage": "https://github.com/cookyecat/starmux#readme",
@@ -85,6 +97,7 @@
     "scripts/prepare.mjs",
     "LICENSE",
     "CHANGELOG.md",
-    "README.md"
+    "README.md",
+    "server.json"
   ]
 }

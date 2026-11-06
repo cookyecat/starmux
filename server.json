@@ -1,0 +1,24 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.cookyecat/starmux",
+  "title": "Starmux — All-in-One Self-Hosted Remote MCP Server & Gateway",
+  "description": "All-in-one remote MCP server & gateway: built-in file, terminal, process & stdio tools over HTTP.",
+  "version": "0.16.1",
+  "websiteUrl": "https://github.com/cookyecat/starmux#readme",
+  "repository": {
+    "url": "https://github.com/cookyecat/starmux",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "starmux",
+      "version": "0.16.1",
+      "transport": {
+        "type": "streamable-http",
+        "url": "http://127.0.0.1:18893/mcp"
+      }
+    }
+  ]
+}
