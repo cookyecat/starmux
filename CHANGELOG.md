@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.17.0 — 2026-11-08
+
+- Add an independent loopback-only management console with bilingual light/dark UI, instance lifecycle controls, JSONC configuration, credentials, OAuth and logs.
+- Preserve legacy instance owner tokens and expose separate dashboard service status/stop commands.
+- Add isolated manager integration and responsive browser smoke coverage.
+
+- Add persistent `--allow-lan` and `--local` (`--no-allow-lan`) networking modes, with live Worker restart and LAN MCP URLs in CLI status.
+- Accept valid original domain/IP Host headers on MCP, health and OAuth resource discovery routes; tunnels and proxies no longer need Host rewriting.
+- Keep every owner management route restricted to loopback peers and the exact local Host/port, including when LAN access is enabled.
+- Add HTTP, CLI, legacy-config and port-conflict regression coverage.
+- Make automatic port selection for new and copied LAN instances check all IPv4 interfaces; immediately close connections accepted by temporary port probes.
+
 ## 0.16.1
 
 ### Discovery and documentation

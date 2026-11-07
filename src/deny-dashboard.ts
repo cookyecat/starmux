@@ -1,3 +1,4 @@
+import {styleLegacyDashboard} from './dashboard-ui.js';
 import type { IncomingMessage } from "node:http";
 import type { DenyConfig,DenyRules,PostResult } from "./contracts.js";
 import { isSafeInteger } from "./validation.js";
@@ -28,7 +29,7 @@ export function renderDenyDashboard({rules,toolCatalog=[]}: {rules:DenyConfig;to
   const paths=rules.deniedDirectories.map(n=>
     '<tr><td><code>'+h(n)+'</code></td><td>'+
     controls("allow-directory",n,"移除过滤")+'</td></tr>').join("");
-  return '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'+
+  return styleLegacyDashboard('<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>Starmux · Tool Filters</title>'+
     '<style>body{font:15px system-ui,-apple-system,sans-serif;max-width:1000px;'+
@@ -63,7 +64,7 @@ export function renderDenyDashboard({rules,toolCatalog=[]}: {rules:DenyConfig;to
     '<a href="/permissions">目录授权</a></p>'+
     '<small>黑名单是防误操作护栏，不是抵御恶意 Shell 或提示注入的安全边界。'+
     '这里的管理密钥只由设备所有者在本机使用，不得发送给远程 AI。</small>'+
-    '</body></html>';
+    '</body></html>');
 }
 export async function applyDenyPost(req: IncomingMessage,ruleStore: DenyRules,authorize:(token:unknown)=>Promise<boolean>,host:string|undefined): Promise<PostResult>{
   if(req.headers.origin!=="http://"+host||

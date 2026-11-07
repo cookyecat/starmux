@@ -1,14 +1,14 @@
 import assert from 'node:assert/strict';
 import {fork} from 'node:child_process';
-import {randomBytes} from 'node:crypto';
+import {createHmac,randomBytes} from 'node:crypto';
 import {once} from 'node:events';
 import {mkdtemp, mkdir, readFile, realpath, rm, writeFile} from 'node:fs/promises';
-import {createServer} from 'node:net';
-import {tmpdir} from 'node:os';
+import {createServer,createConnection} from 'node:net';
+import {tmpdir, networkInterfaces} from 'node:os';
 import path from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import test from 'node:test';
-import {instanceStatus, runtimePaths, stopInstance} from '../dist/src/instance-runtime.js';
+import {instanceRequest, instanceStatus, runtimePaths, stopInstance} from '../dist/src/instance-runtime.js';
 import {atomicPrivate, availablePort, createInstance, instanceConfigSchema, instancePaths, loadInstanceConfig, patchInstanceConfig} from '../dist/src/instance-store.js';
 import {controlPaths} from '../dist/src/global-core-control.js';
 import {controlRoot, createPrivateDirectory} from '../dist/src/platform.js';
@@ -286,3 +286,62 @@ for (const target of ['instance owner', 'port owner', 'instance socket', 'port s
     await stopInstance(f.instance, f.home);
   });
 }
+
+
+test('network apply replaces the worker and rejects stops targeting an in-flight replacement', async t => {
+  const f = await fixture(t, {stopDelay: 400});
+  await f.start();
+  const before = await instanceStatus(f.instance, f.home);
+  const oldPid = await readFile(path.join(f.project, 'worker.pid'), 'utf8');
+  const oldOwner = JSON.parse(await readFile(runtimePaths(f.instance.id).meta, 'utf8'));
+  const loaded = await loadInstanceConfig(f.instance);
+  const next = await patchInstanceConfig(f.instance, {allowLan: true}, loaded.revision, f.home);
+  const applying = instanceRequest(f.instance, 'apply', next.revision);
+  await waitFor(async () => (await instanceStatus(f.instance, f.home)).phase === 'starting');
+  await assert.rejects(stopInstance(f.instance, f.home), /INSTANCE_APPLY_IN_PROGRESS/);
+  const applied = await applying;
+  assert.equal(applied.active.config.allowLan, true);
+  assert.notEqual(applied.runId, before.runtime.runId);
+  for (const method of ['stop', 'apply']) {
+    const nonce = randomBytes(24).toString('hex');
+    const body = JSON.stringify({protocolVersion: 1, method, revision: next.revision, runId: oldOwner.runId, nonce});
+    const proof = createHmac('sha256', oldOwner.token).update(body).digest('hex');
+    const reply = await new Promise((resolve, reject) => {
+      let raw = '';
+      const socket = createConnection(runtimePaths(f.instance.id).socket, () => socket.end(JSON.stringify({body, proof}) + '\n'));
+      socket.setTimeout(3000, () => socket.destroy(Error('CONTROL_TEST_TIMEOUT')));
+      socket.on('error', reject);socket.on('data', chunk => { raw += chunk; });socket.on('end', () => resolve(JSON.parse(raw)));
+    });
+    assert.equal(reply.proof, createHmac('sha256', oldOwner.token).update(nonce + reply.body).digest('hex'));
+    assert.equal(JSON.parse(reply.body).error, 'CONTROL_DENIED', 'stale authenticated requests must not stop or replace the new worker');
+  }
+  assert.notEqual(await readFile(path.join(f.project, 'worker.pid'), 'utf8'), oldPid);
+  assert.equal((await instanceStatus(f.instance, f.home)).health, 'ok');
+  // The periodic ownership check must recognize our atomically replaced record.
+  await delay(1100);
+  assert.equal((await instanceStatus(f.instance, f.home)).phase, 'running');
+  const stopped = await stopInstance(f.instance, f.home);
+  assert.equal(stopped.runId, applied.runId);
+});
+
+test('failed LAN rebind restores local worker and preserves confirmed configuration', async t => {
+  const lanIp = Object.values(networkInterfaces()).flat().find(entry => entry && !entry.internal && entry.family === 'IPv4')?.address;
+  if (!lanIp) { t.skip('No non-internal IPv4 interface'); return; }
+  const f = await fixture(t);
+  await f.start();
+  const before = await instanceStatus(f.instance, f.home);
+  const blocker = createServer();
+  t.after(() => new Promise(resolve => blocker.close(resolve)));
+  await new Promise((resolve, reject) => { blocker.once('error', reject); blocker.listen(f.port, lanIp, resolve); });
+  const loaded = await loadInstanceConfig(f.instance);
+  const next = await patchInstanceConfig(f.instance, {allowLan: true}, loaded.revision, f.home);
+  await assert.rejects(instanceRequest(f.instance, 'apply', next.revision), /APPLY_FAILED_RESTORED: PORT_IN_USE/);
+  const restored = await instanceStatus(f.instance, f.home);
+  assert.equal(restored.phase, 'running');
+  assert.equal(restored.health, 'ok');
+  assert.equal(restored.active.config.allowLan, false);
+  assert.equal(restored.saved.config.allowLan, true);
+  assert.equal(restored.configState, 'pending');
+  assert.equal(restored.runtime.runId, before.runtime.runId);
+  assert.equal((await stopInstance(f.instance, f.home)).result, 'STOPPED');
+});

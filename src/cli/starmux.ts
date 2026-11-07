@@ -1,3 +1,5 @@
+import {ensureManager,managerStatus,stopManager,startDetachedInstance} from '../dashboard-manager.js';
+import {GatewayError} from '../validation.js';
 import {parseArgs} from 'node:util';
 import {spawn} from 'node:child_process';
 import {createInterface} from 'node:readline/promises';
@@ -18,7 +20,7 @@ import {formatStarmuxStatus} from './starmux-status.js';
 
 const {version}=JSON.parse(await readFile(path.join(packageRoot,'package.json'),'utf8')) as {version:string};
 const strings=['instance','port','lines','expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','revision','patch','file','output','name','target','mode','app-parent-pid'];
-const booleans=['help','version','json','write','code','read','yes','foreground','follow','archived','all','effective','link','allow-loopback-http','token-stdin','no-open','token'];
+const booleans=['allow-lan','local','no-allow-lan','help','version','json','write','code','read','yes','foreground','follow','archived','all','effective','link','allow-loopback-http','token-stdin','no-open','token'];
 const options:Record<string,{type:'string'|'boolean';short?:string}>={};
 for(const k of strings)options[k]={type:'string',...(k==='instance'?{short:'i'}:{})};
 for(const k of booleans)options[k]={type:'boolean',...(k==='yes'?{short:'y'}:k==='follow'?{short:'f'}:k==='help'?{short:'h'}:k==='version'?{short:'v'}:{})};
@@ -36,11 +38,11 @@ function help(){
   const requested=command==='help'?positional[0]:command;
   const topic=requested==='stop'?'down':requested;
   const sections:Record<string,string>={
-    up:'up [path] [--read | --write | --code] [-y] [--port N] [--foreground]\n  Initialize and start. First use defaults to CWD; later starts reuse saved settings.',
-    init:'init [path] [--read | --write | --code] [-y] [--port N]\n  Save settings without starting. --write and --code enable full account coding permissions.',
+    up:'up [path] [--read | --write | --code] [--allow-lan | --local] [-y] [--port N] [--foreground]\n  Initialize and start. First use defaults to CWD; later starts reuse saved settings.',
+    init:'init [path] [--read | --write | --code] [--allow-lan | --local] [-y] [--port N]\n  Save settings without starting. --write and --code enable full account coding permissions.',
     auth:'auth\n  auth key "Client name" [--expires 30d]\n  auth mode none|ingress|api-key|oauth\n  auth revoke ID\n  auth oauth init-keycloak --resource URL --callback URL\n  auth oauth setup --issuer URL --resource URL --client-id ID --subject USER_ID\n  auth oauth doctor',
     config:'config [show] [--effective]\n  config edit | diff | apply | validate | path | schema | recover\n  config default NAME | rename NEW_NAME -i SOURCE | copy NEW_NAME -i SOURCE\n  config archive -i NAME | restore -i NAME | import FILE [-i NAME] [--link]\n  config export [--output FILE] | secret set|remove NAME',
-    dashboard:'dashboard [--no-open | --token]\n  Open the local Access console. --no-open prints a private login link.',
+    dashboard:'dashboard [--no-open | --token]\n  Open the local management console. status / stop manage the console service. --token prints the legacy instance owner token.',
     verify:'verify [--token-stdin]\n  Test MCP initialization, tool discovery and workspace read. Authenticated instances use STARMUX_TOKEN or stdin.',
     doctor:'doctor\n  Check Node, bundled dependencies, workspace, configuration, port and authentication.',
     logs:'logs [-f | --follow] [--lines 1..200]\n  Follow continues across restarts. Ctrl+C exits the follower only.',
@@ -56,7 +58,7 @@ function help(){
     'Connect AI clients to your computer’s files, shell and development tools.',
     '',
     'Workspace Lifecycle:',
-    '  starmux up [path] [--code]   Start in the background (default: Read-only)',
+    '  starmux up [path] [--code] [--allow-lan | --local]   Start in the background (default: Read-only)',
     '  starmux down                 Stop the running instance (alias: stop)',
     '  starmux status               Show health, endpoint and connection guide',
     '  starmux logs [-f]            View or stream gateway logs',
@@ -73,7 +75,7 @@ function help(){
     '  starmux init [path]          Save instance settings without starting',
     '  starmux config               Inspect, edit or apply configuration'
   ].join('\n');
-  process.stdout.write(`Starmux ${version}\n\n${sections[topic??'']??overview}\n\nGlobal: -i, --instance NAME_OR_ID   --json   -h, --help\nUse starmux COMMAND --help for details.\n`);
+  process.stdout.write(`Starmux ${version}\n\n${sections[topic??'']??overview}\n\nNetwork (up / init):\n  --allow-lan      Listen on 0.0.0.0 so LAN / Tailscale devices can connect directly to /mcp\n  --local          Listen on 127.0.0.1 only (default; alias: --no-allow-lan)\n\nGlobal: -i, --instance NAME_OR_ID   --json   -h, --help\nUse starmux COMMAND --help for details.\n`);
 }
 async function confirm(message:string){
   if(yes())return;
@@ -94,6 +96,7 @@ async function rememberConsent(instance:Instance,config:InstanceConfig){
 }
 async function selected(){return resolveInstance(string('instance'));}
 async function configure(){
+  if(flags['allow-lan']&&(flags.local||flags['no-allow-lan']))throw new GatewayError('CLI_CONFLICTING_NETWORK_FLAGS:Choose either --allow-lan or --local, not both.');
   if(positional.length>1)fail('Usage: starmux '+command+' [path]');
   const registry=await readRegistry();let instance:Instance|undefined;
   const selector=string('instance');
@@ -108,9 +111,11 @@ async function configure(){
   const writing=flags.write||flags.code;
   if(flags.read&&writing)fail('--read cannot be combined with --write or --code.');
   const project=positional[0]??loaded?.config.projectRoot??process.cwd();
+  const allowLan=flags['allow-lan']?true:flags.local||flags['no-allow-lan']?false:loaded?.config.allowLan??false;
   const config=await validateConfig(instanceConfigSchema.parse({...loaded?.config,
     projectRoot:await realpath(absolute(project)),schemaVersion:1,
-    port:string('port')?Number(string('port')):loaded?.config.port??(selector?await suggestPort():18893),
+    port:string('port')?Number(string('port')):loaded?.config.port??(selector?await suggestPort(homedir(),allowLan?'0.0.0.0':'127.0.0.1'):18893),
+    allowLan,
     ...(writing?{accessRole:'trusted',mode:'read-write',writeScope:'unrestricted'}:{}),
     ...(flags.read?{accessRole:'restricted',mode:'read-only',writeScope:'unrestricted',gitMode:'off',worktreeMode:'off',upstreams:[]}:{}),
   }));
@@ -148,23 +153,11 @@ async function start(instance:Instance){
   if(state.phase!=='stopped')fail(`Cannot start ${instance.name}: ${state.runtimeProblem??state.phase}. Run starmux doctor -i ${instance.id}.`);
   await ensureAccessReady(instance);
   const config=(await loadInstanceConfig(instance)).config;
-  if(!await availablePort(config.port))fail(`Port ${config.port} is in use. Inspect starmux doctor -i ${instance.id} before changing the port.`);
+  if(!await availablePort(config.port,config.allowLan?'0.0.0.0':'127.0.0.1'))fail(`Port ${config.port} is in use. Inspect starmux doctor -i ${instance.id} before changing the port.`);
   if(flags.foreground||string('app-parent-pid')){
     await runInstance(instance,{json,...(!json?{onReady:()=>show(instance)}:{}),...(string('app-parent-pid')?{appParentPid:Number(string('app-parent-pid'))}:{})});return;
   }
-  const log=path.join(instancePaths(instance).logs,'supervisor.log');
-  if(await exists(log))await readTrusted(log,true,32*1024*1024);
-  const fd=await open(log,'a',0o600);
-  const child=spawn(process.execPath,[fileURLToPath(new URL('./starmux-supervisor.js',import.meta.url)),instance.id],{detached:true,stdio:['ignore',fd.fd,fd.fd],env:process.env,windowsHide:true});
-  let launchError:Error|undefined;child.once('error',e=>{launchError=e;});await fd.close();child.unref();
-  for(let n=0;n<150;n++){
-    if(launchError)throw launchError;
-    const status=await instanceStatus(instance);
-    if(status.phase==='running'&&status.health==='ok'){await show(instance);return;}
-    if(child.exitCode!==null||child.signalCode!==null)fail('Startup failed. Inspect '+log);
-    await pause(200);
-  }
-  child.kill('SIGTERM');fail('Startup timed out. Inspect '+log);
+  await startDetachedInstance(instance);await show(instance);
 }
 async function bearer(){
   if(!flags['token-stdin'])return process.env.STARMUX_TOKEN;
@@ -386,7 +379,7 @@ async function main(){
   if(flags.version){process.stdout.write(version+'\n');return;}
   if(command==='help'||flags.help){help();return;}
   const allowed:Record<string,string[]>={
-    up:['port','read','write','code','yes','foreground','app-parent-pid'],init:['port','read','write','code','yes'],
+    up:['allow-lan','local','no-allow-lan','port','read','write','code','yes','foreground','app-parent-pid'],init:['allow-lan','local','no-allow-lan','port','read','write','code','yes'],
     status:['all'],ls:['archived'],rm:[],down:[],stop:[],logs:['lines','follow'],doctor:[],verify:['token-stdin'],dashboard:['token','no-open'],
     auth:['expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','allow-loopback-http'],
     config:['yes','archived','effective','link','name','revision','patch','file','output'],permissions:['target','mode'],privacy:['all','target']
@@ -394,7 +387,17 @@ async function main(){
   for(const key of Object.keys(flags))if(!['instance','json','help','version'].includes(key)&&!allowed[command]?.includes(key))fail('Option --'+key+' is not supported by '+command+'.');
   if(string('instance')!==undefined&&!string('instance')!.trim())fail('--instance requires a non-empty name or ID.');
   validateSubcommand();
-  if(['status','ls','down','stop','logs','doctor','verify','dashboard'].includes(command)&&positional.length)fail('Unexpected argument: '+positional[0]);
+  if(['status','ls','down','stop','logs','doctor','verify'].includes(command)&&positional.length)fail('Unexpected argument: '+positional[0]);
+  if(command==='dashboard'&&!flags.token){
+    if(positional.length>1||positional.length&&!['status','stop'].includes(positional[0]!))fail('Usage: starmux dashboard [status|stop]');
+    if(positional[0]==='stop'){await stopManager();if(json)print({result:'STOPPED'});else process.stdout.write('Dashboard stopped. Instances are unchanged.\n');return;}
+    if(positional[0]==='status'){const r=await managerStatus();const result={running:!!r,url:r?`http://127.0.0.1:${r.port}`:null};if(json)print(result);else process.stdout.write(JSON.stringify(result)+'\n');return;}
+    const target=string('instance')?await selected():null;const r=await ensureManager();const url=`http://127.0.0.1:${r.port}/${target?'?instance='+target.id:''}#token=${r.token}`;
+    if(flags['no-open']){if(json)print({url});else process.stdout.write(url+'\n');return;}
+    const executable=process.platform==='darwin'?'open':process.platform==='win32'?'rundll32.exe':'xdg-open';
+    await new Promise<void>((resolve,reject)=>{const child=spawn(executable,process.platform==='win32'?['url.dll,FileProtocolHandler',url]:[url],{stdio:'ignore'});child.once('error',reject);child.once('exit',code=>code===0?resolve():reject(Error('Browser unavailable. Use starmux dashboard --no-open.')));});
+    if(json)print({result:'OPENED'});else process.stdout.write('Opened local management console.\n');return;
+  }
   if(command==='rm'&&positional.length>1)fail('Usage: starmux rm [NAME]');
   if(command==='auth'&&['key','mode','revoke'].includes(positional[0]??'')&&positional.length!==2)fail('Usage: starmux auth '+positional[0]+' VALUE');
   if(command==='up'||command==='init'){
@@ -434,7 +437,7 @@ async function main(){
     if(state.phase!=='running'&&state.phase!=='stopped')fail('Instance state is '+state.phase+'. Inspect starmux logs -i '+instance.id);
     if(state.phase==='running'&&state.health!=='ok')fail('Instance health is '+state.health+'. Inspect starmux logs -i '+instance.id);
     await stat(desktopCommanderEntry);const loaded=await loadInstanceConfig(instance);await ensureAccessReady(instance);
-    if(state.phase==='stopped'&&!await availablePort(loaded.config.port))fail('Configured port is in use: '+loaded.config.port);
+    if(state.phase==='stopped'&&!await availablePort(loaded.config.port,loaded.config.allowLan?'0.0.0.0':'127.0.0.1'))fail('Configured port is in use: '+loaded.config.port);
     if(json)print({result:'PASS',node:process.version,instanceId:instance.id,configState:state.configState});
     else{
       const isDef=await isDefaultInstance(instance);
@@ -442,7 +445,7 @@ async function main(){
       const effective=state.phase==='running'?state.active?.config:loaded.config;
       const modeLabel=!effective?'Mode unavailable':effective.accessRole==='trusted'?'Coding mode':effective.mode==='read-write'?'File writes':'Read-only mode';
       const authLabel=access.mode==='ingress'?'None (no token required)':access.mode==='api-key'?`API key (${access.credentials.filter(c=>c.status==='active').length} active)`:'OAuth';
-      const portState=state.phase==='running'?`Running on 127.0.0.1:${state.port}`:`Stopped · port ${loaded.config.port} available`;
+      const portState=state.phase==='running'?`Running on ${effective?.allowLan?'0.0.0.0':'127.0.0.1'}:${state.port}`:`Stopped · port ${loaded.config.port} available`;
       process.stdout.write(
         `✓ Runtime            Node ${process.version} & Desktop Commander engine ready\n`+
         `✓ Service            ${portState}${isDef?'':` (instance: ${instance.name})`}\n`+

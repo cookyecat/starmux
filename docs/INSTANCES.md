@@ -61,7 +61,8 @@ starmux config schema            # Print the full JSON Schema (works even before
 | :--- | :--- | :--- | :--- |
 | `schemaVersion` | `1` | `1` | Required configuration schema version. |
 | `projectRoot` | `string` *(absolute path)* | Current directory | Base project directory for the instance. |
-| `port` | `integer` (`1024..65535`) | `18893` | Local loopback TCP port (`127.0.0.1:<port>`). |
+| `port` | `integer` (`1024..65535`) | `18893` | HTTP TCP port; the bind address depends on `allowLan`. |
+| `allowLan` | `boolean` | `false` | Listen on all IPv4 interfaces for direct MCP access. `up --allow-lan` enables it; `up --local` disables it. Owner management remains local. |
 | `mode` | `"read-only"` \| `"read-write"` | `"read-only"` | Workspace read/write mode (`--code` sets `"read-write"`). |
 | `accessRole` | `"restricted"` \| `"trusted"` | `"restricted"` | Tool execution role (`--code` sets `"trusted"`). |
 | `writeScope` | `"unrestricted"` \| `"home-only"` | `"unrestricted"` | On macOS, `"home-only"` restricts native writes to `$HOME` (requires `accessRole: "trusted"`, `gitMode: "off"`, and empty `upstreams`). |

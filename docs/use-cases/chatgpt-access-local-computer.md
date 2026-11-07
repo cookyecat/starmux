@@ -51,9 +51,7 @@ Point a domain at your reachable host and configure a reverse proxy such as Cadd
 ```caddyfile
 mcp.example.com {
     handle /mcp {
-        reverse_proxy 127.0.0.1:18893 {
-            header_up Host 127.0.0.1:18893
-        }
+        reverse_proxy 127.0.0.1:18893
     }
     handle {
         respond "Not found" 404

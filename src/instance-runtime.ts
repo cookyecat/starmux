@@ -37,16 +37,23 @@ async function exchange(instance:Instance,owner:Owner,method:'status'|'stop'|'ap
     socket.once('close',()=>clearTimeout(timer));
     socket.on('error',reject);socket.on('connect',()=>socket.end(JSON.stringify({body,proof:signature(owner.token,body)})+'\n'));
     socket.on('data',data=>{raw+=String(data);if(raw.length>524288)socket.destroy(Error('INSTANCE_CONTROL_REPLY_TOO_LARGE'));});
-    socket.on('end',()=>{try{
+    socket.on('end',()=>{void (async()=>{try{
       const reply=JSON.parse(raw) as {body:string;proof:string};
       if(typeof reply.body!=='string'||!equal(reply.proof,signature(owner.token,nonce+reply.body)))throw Error('INSTANCE_CONTROL_REPLY_UNTRUSTED');
       const parsed:unknown=JSON.parse(reply.body);checkInstanceProtocol(parsed);
       const data=controlReplySchema.parse(parsed);
       if(data.error)throw Error(data.error);
-      if(data.state.instanceId!==instance.id||data.state.runId!==owner.runId)throw Error('INSTANCE_CONTROL_IDENTITY_CHANGED');
+      if(data.state.instanceId!==instance.id)throw Error('INSTANCE_CONTROL_IDENTITY_CHANGED');
+      if(data.state.runId!==owner.runId){
+        // Only a successful authenticated apply may advance the run generation.
+        // Confirm it against the private owner record, never just a reply field.
+        const current=method==='apply'?await ownerFor(instance):null;
+        if(!current||current.runId!==data.state.runId||current.pid!==owner.pid||current.token!==owner.token)
+          throw Error('INSTANCE_CONTROL_IDENTITY_CHANGED');
+      }
       if(data.result!==(method==='stop'?'STOP_ACCEPTED':'STATE'))throw Error('INSTANCE_CONTROL_REPLY_INVALID');
       resolve(data);
-    }catch(e){reject(e);}});
+    }catch(e){reject(e);}})();});
   });
 }
 export async function instanceRequest(instance:Instance,method:'status'|'apply',revision?:string):Promise<RuntimeState|null>{
@@ -72,7 +79,8 @@ export async function instanceStatus(instance:Instance,home=homedir()){
     // authority to stop a process or claim a configuration is currently active.
     const ports=new Set([owner?.port,saved?.config.port,lastActive?.config.port].filter((p):p is number=>p!==undefined));
     for(const port of ports){
-      if(!await availablePort(port)){runtimeProblem='INSTANCE_CONTROL_UNAVAILABLE: port '+port+' is in use; ownership is unconfirmed';break;}
+      const allowLan=[saved?.config,lastActive?.config].some(config=>config?.port===port&&config.allowLan);
+      if(!await availablePort(port,allowLan?'0.0.0.0':'127.0.0.1')){runtimeProblem='INSTANCE_CONTROL_UNAVAILABLE: port '+port+' is in use; ownership is unconfirmed';break;}
       try{
         const lease=inspectControlOwner(port);
         if(lease&&alive(lease.pid)){runtimeProblem='INSTANCE_CONTROL_UNAVAILABLE: live port lease '+port;break;}
@@ -156,11 +164,13 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
   await atomicPrivate(p.meta,JSON.stringify(owner));
   },home);
   const ownsDirectory=sameFile(p.root);
-  const ownsMetadata=sameFile(p.meta);
+  let ownsMetadata=sameFile(p.meta);
+  let updatingIdentity=false;
   let controlTimer:ReturnType<typeof setInterval>|undefined;
   const state:RuntimeState={protocolVersion:INSTANCE_CONTROL_VERSION,instanceId:instance.id,runId:owner.runId,pid:process.pid,launcher:owner.launcher,appParentPid:parent??null,executionMode:options.background?'background':'foreground',phase:'starting',port:null,active:null,problem:null,...identity};
   let worker:ChildProcess|null=null;let portLease:Awaited<ReturnType<typeof acquireControl>>|null=null;let server:Server|null=null;
   let ending=false;let expectedWorkerExit=false;let sequence:Promise<unknown>=Promise.resolve();
+  let applying=false;
   let stopRequest:Promise<void>|null=null;
   const clients=new Set<import('node:net').Socket>();
   let finish!:()=>void;const finished=new Promise<void>(r=>{finish=r;});
@@ -199,9 +209,9 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     }
     return stopRequest;
   }
-  async function startWorker(config:ActiveConfig,lease:Awaited<ReturnType<typeof acquireControl>>){
+  async function startWorker(config:ActiveConfig,lease:Awaited<ReturnType<typeof acquireControl>>,announce=true){
     await ensureAccessReady(await resolveInstance(instance.id,home),home);
-    if(!await availablePort(config.config.port))throw Error('PORT_IN_USE: '+config.config.port);
+    if(!await availablePort(config.config.port,config.config.allowLan?'0.0.0.0':'127.0.0.1'))throw Error('PORT_IN_USE: '+config.config.port);
     const env:NodeJS.ProcessEnv={};for(const key of childEnvKeys)if(process.env[key])env[key]=process.env[key]!;
     Object.assign(env,instanceEnv(instance,config.config,home),{STARMUX_INTERNAL_SETUP_OWNER_PID:String(process.pid),STARMUX_INTERNAL_SETUP_RUN_ID:lease.owner.runId,STARMUX_INTERNAL_SETUP_TOKEN:lease.owner.token});
     const upstreamFile=await prepareUpstreams(instance,config.config,home);if(upstreamFile)env.STARMUX_UPSTREAMS_FILE=upstreamFile;
@@ -218,7 +228,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     state.active=config;state.permissionMode=env.STARMUX_PERMISSION_MODE==='global'?'global':'workspace';state.port=config.config.port;state.phase='running';lease.markRunning();
     await atomicPrivate(path.join(instancePaths(instance,home).snapshots,'active.json'),JSON.stringify(config,null,2));
     child.once('exit',()=>{if(!expectedWorkerExit&&!ending){state.phase='error';state.problem='INSTANCE_WORKER_EXITED';emit('INSTANCE_ERROR');void requestStop('INSTANCE_WORKER_EXITED');}});
-    emit('INSTANCE_RUNNING');
+    if(announce)emit('INSTANCE_RUNNING');
   }
   const active=(loaded:typeof initial):ActiveConfig=>({config:loaded.config,revision:loaded.revision,effectiveRevision:loaded.effectiveRevision,sourcePath:loaded.source.path});
   async function apply(revision:string|null){
@@ -229,12 +239,12 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     const previous=state.active;if(!previous||!portLease)throw Error('INSTANCE_NOT_RUNNING');
     const oldLease=portLease;let candidateLease=oldLease;
     if(next.config.port!==previous.config.port){
-      if(!await availablePort(next.config.port))throw Error('PORT_IN_USE: '+next.config.port);
+      if(!await availablePort(next.config.port,next.config.allowLan?'0.0.0.0':'127.0.0.1'))throw Error('PORT_IN_USE: '+next.config.port);
       candidateLease=await acquireControl(next.config.port,{launcher:owner.launcher});candidateLease.onStop(()=>requestStop());
     }
     state.phase='starting';await stopWorker();state.problem=null;
     try{
-      await startWorker(active(next),candidateLease);portLease=candidateLease;
+      await startWorker(active(next),candidateLease,false);portLease=candidateLease;
       if(candidateLease!==oldLease)await oldLease.release();
     }catch(error){
       await stopWorker();if(candidateLease!==oldLease)await candidateLease.release();portLease=oldLease;
@@ -244,6 +254,18 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
       }
       emit('INSTANCE_APPLY_FAILED');throw Error(state.problem!);
     }
+    // A replacement worker is a new run. Keep the supervisor and port lease,
+    // but invalidate stale instance-control requests from the previous run.
+    updatingIdentity=true;
+    try{
+      if(!ownsDirectory()||!ownsMetadata())throw Error('INSTANCE_CONTROL_CHANGED');
+      const nextOwner={...owner,port:next.config.port,runId:randomBytes(16).toString('hex')};
+      await atomicPrivate(p.meta,JSON.stringify(nextOwner));
+      Object.assign(owner,nextOwner);state.runId=owner.runId;ownsMetadata=sameFile(p.meta);
+    }catch(error){
+      void requestStop('INSTANCE_CONTROL_IDENTITY_UPDATE_FAILED');throw error;
+    }finally{updatingIdentity=false;}
+    emit('INSTANCE_RUNNING');
   }
   const signal=()=>{void requestStop();};
   const parentTimer=parent?setInterval(()=>{if(process.ppid!==parent)signal();},400):null;
@@ -264,11 +286,20 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
             if(parsed&&typeof parsed==='object'&&'nonce' in parsed&&typeof parsed.nonce==='string')nonce=parsed.nonce;
             checkInstanceProtocol(parsed);const req=controlRequestSchema.parse(parsed);
             if(req.runId!==owner.runId)throw Error('CONTROL_DENIED');
-            if(req.method==='apply')await serialize(()=>apply(req.revision));
-            const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,state,result:req.method==='stop'?'STOP_ACCEPTED':'STATE'});
-            socket.end(JSON.stringify({body,proof:signature(owner.token,nonce+body)})+'\n',()=>{
-              if(req.method==='stop')void requestStop();
+            if(req.method==='apply')await serialize(async()=>{
+              // Another queued apply may already have replaced this run.
+              if(req.runId!==owner.runId)throw Error('CONTROL_DENIED');
+              applying=true;
+              try{await apply(req.revision);}finally{applying=false;}
             });
+            if(req.method==='stop'){
+              if(applying)throw Error('INSTANCE_APPLY_IN_PROGRESS: retry stop after configuration applies');
+              // Reserve shutdown before acknowledging so a subsequent apply
+              // cannot replace the run that this stop request targets.
+              void requestStop();
+            }
+            const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,state,result:req.method==='stop'?'STOP_ACCEPTED':'STATE'});
+            socket.end(JSON.stringify({body,proof:signature(owner.token,nonce+body)})+'\n');
           }catch(error){const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,state,result:'STATE',error:(error as Error).message});socket.end(JSON.stringify({body,proof:signature(owner.token,nonce+body)})+'\n');}
         })();
       });
@@ -280,7 +311,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     portLease.onStop(()=>requestStop());
     await serialize(()=>startWorker(active(initial),portLease!));
     controlTimer=setInterval(()=>{
-      if(!ending&&(!ownsDirectory()||!ownsMetadata()||!ownsSocket()||portLease&&!portLease.intact()))void requestStop('INSTANCE_CONTROL_FILES_LOST');
+      if(!ending&&(!ownsDirectory()||!updatingIdentity&&!ownsMetadata()||!ownsSocket()||portLease&&!portLease.intact()))void requestStop('INSTANCE_CONTROL_FILES_LOST');
     },1000);
     controlTimer.unref();
     if(options.onReady)await options.onReady();

@@ -236,7 +236,7 @@ private struct InstanceDetail: View {
             Text(it("认证与网络路径分别配置。HTTPS/Tunnel 偏好不会自动部署远程服务。", "Authentication and network paths are configured separately. HTTPS/Tunnel preferences do not deploy remote services."))
             HStack {
                 Button(it("查看访问状态", "Inspect access")) { Task { if let data = await model.perform(["auth"] + target) { access = String(decoding: data, as: UTF8.self) } } }
-                if let endpoint = instance.endpoint, let url = URL(string: endpoint.replacingOccurrences(of: "/mcp", with: "/access")) { Link(it("打开访问管理", "Open access dashboard"), destination: url) }
+                Button(it("打开管理控制台", "Open management console")) { Task { _ = await model.perform(["dashboard", "-i", instance.id]) } }
             }
             HStack { TextField(it("客户端密钥名称", "Client key name"), text: $keyName); Button(it("创建密钥", "Create key")) { Task { if let data = await model.perform(["auth", "key", keyName] + target) { access = String(decoding: data, as: UTF8.self) } } }.disabled(keyName.isEmpty) }
             Text(it("新密钥仅显示一次；撤销对后续请求立即生效。", "New keys are shown once. Revocation affects subsequent requests immediately.")).font(.caption)

@@ -77,3 +77,44 @@ test('real CLI starts, applies permissions, confirms stop, and archives only a s
   assert.equal((await f.run('rm','--json')).code,0);
   assert.equal((await readRegistry(f.home)).instances[0].archived,true);
 });
+
+test('CLI network flags persist, apply live, and preserve idempotent runs', {timeout:90000},async t=>{
+  const f=await fixture(t);
+  for(const args of [['--allow-lan','--local'],['--local','--allow-lan'],['--allow-lan','--no-allow-lan'],['--no-allow-lan','--allow-lan']]){
+    const before=(await loadInstanceConfig(f.instance)).revision;
+    const conflict=await f.run('up',...args,'--json');
+    assert.equal(conflict.code,1);
+    assert.equal(JSON.parse(conflict.stdout).error,'CLI_CONFLICTING_NETWORK_FLAGS:Choose either --allow-lan or --local, not both.');
+    assert.equal((await loadInstanceConfig(f.instance)).revision,before);
+  }
+  const up=async(...flags)=>{
+    const result=await f.run('up',...flags,'--json');assert.equal(result.code,0,result.stdout+result.stderr);
+    const state=JSON.parse(result.stdout);assert.equal(state.health,'ok');return state;
+  };
+  const lan=await up('--allow-lan');
+  assert.equal(lan.active.config.allowLan,true);
+  assert.equal((await loadInstanceConfig(f.instance)).config.allowLan,true);
+  assert.equal((await up()).runtime.runId,lan.runtime.runId);
+  assert.equal((await up('--allow-lan')).runtime.runId,lan.runtime.runId);
+  assert.match((await f.run('status')).stdout,new RegExp(`0\\.0\\.0\\.0:${f.port}`));
+  assert.match((await f.run('ls')).stdout,new RegExp(`0\\.0\\.0\\.0:${f.port}`));
+  const status=(await f.run('status')).stdout;
+  assert.match(status,new RegExp(`Setup URL\\s+http://127\\.0\\.0\\.1:${f.port}/access`));
+  assert.match(status,new RegExp(`Dashboard URL\\s+http://127\\.0\\.0\\.1:${f.port}/dashboard`));
+  const local=await up('--local');
+  assert.equal(local.active.config.allowLan,false);
+  assert.notEqual(local.runtime.runId,lan.runtime.runId);
+  assert.equal(local.runtime.pid,lan.runtime.pid,'apply keeps the supervisor');
+  assert.equal((await up()).runtime.runId,local.runtime.runId);
+  const lanAgain=await up('--allow-lan');
+  assert.equal(lanAgain.active.config.allowLan,true);
+  const alias=await up('--no-allow-lan');assert.equal(alias.active.config.allowLan,false);
+  assert.notEqual(alias.runtime.runId,lanAgain.runtime.runId);
+  const stopped=await f.run('down','--json');assert.equal(stopped.code,0,stopped.stdout+stopped.stderr);
+  assert.equal(JSON.parse(stopped.stdout).runId,alias.runtime.runId,'stop confirms the new control generation');
+  assert.equal((await f.run('init','--allow-lan','--json')).code,0);
+  assert.equal((await f.run('init','--json')).code,0);
+  assert.equal((await loadInstanceConfig(f.instance)).config.allowLan,true);
+  assert.equal((await f.run('init','--no-allow-lan','--json')).code,0);
+  assert.equal((await loadInstanceConfig(f.instance)).config.allowLan,false);
+});

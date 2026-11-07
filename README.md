@@ -92,47 +92,40 @@ Starmux starts in the background on `http://127.0.0.1:18893/mcp` with **Authenti
 
 ### 3. Expose for Remote / Cloud AI *(Skip if your AI client runs on this same computer)*
 
-Because Starmux binds strictly to `127.0.0.1:18893` for local security, choose the forwarding method that matches your network when connecting from a cloud AI client (**ChatGPT Web**) or another computer (**WorkBuddy / Cursor on Mac $\rightarrow$ Linux / Jetson**):
+Starmux defaults to `127.0.0.1:18893`. Choose direct LAN access or a proxy/tunnel according to your network.
 
-| Network Scenario | Best For | Recommended Method | Quick Setup Command |
-| :--- | :--- | :--- | :--- |
-| **A. Reachable IP / LAN / VPN** *(Host IP or domain can be reached directly)* | • **All AI clients** over LAN (`http://LAN_IP/mcp`), Tailscale, or public domain (`https://mcp.example.com/mcp`)<br/>• **Desktop AI on Laptop** controlling a remote Linux / Jetson host over SSH | **Option A1:** [Caddy](https://caddyserver.com) Reverse Proxy<br/>**Option A2:** OpenSSH Port Forwarding (`ssh -L`, zero extra install on host) | • **A1 (Caddy):** See collapsible block below<br/>• **A2 (SSH):** `ssh -N -L 127.0.0.1:18893:127.0.0.1:18893 user@remote-host` |
-| **B. Behind NAT / CGNAT** *(No inbound port or connecting to Cloud AI)* | Home/office PC or lab server behind a firewall/CGNAT connecting to **ChatGPT Web** or remote agents without opening inbound ports | [OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) | See **Option B** in collapsible block below |
+| Network scenario | Setup | Client URL |
+| :--- | :--- | :--- |
+| **A1. Trusted LAN / Tailscale / WireGuard (Direct HTTP)** | `starmux up --allow-lan` | `http://<lan-or-tailscale-ip>:18893/mcp` |
+| **A2. Public Domain / Cloud AI Requiring HTTPS** | Keep `starmux up --local`; use Caddy or Tailscale Serve/Funnel for HTTPS | `https://mcp.example.com/mcp` |
+| **B. Behind NAT / CGNAT** | Keep `starmux up --local`; run an outbound tunnel | Your tunnel's HTTPS URL ending in `/mcp` |
 
-<details>
-<summary><b>Copy-paste commands for Option A1 (Caddy Reverse Proxy) & Option B (Outbound Tunnels)</b></summary>
+**A1 — Direct LAN / virtual-network access:**
 
-- **Option A1: Reachable IP (LAN or Public Domain) with [Caddy](https://caddyserver.com):**
-  Replace `mcp.example.com` with your public domain (or `http://YOUR_LAN_IP` on a trusted private LAN):
-  ```bash
-  caddy run --adapter caddyfile --config - << 'EOF'
-  mcp.example.com {
-  	handle /mcp {
-  		reverse_proxy 127.0.0.1:18893 {
-  			header_up Host 127.0.0.1:18893
-  		}
-  	}
-  }
-  EOF
-  ```
+```bash
+starmux up --allow-lan  # Listen on 0.0.0.0; no Caddy or tunnel needed
+starmux status          # Show detected LAN / Tailscale IPv4 MCP URLs
+starmux up --local      # Return to loopback only (alias: --no-allow-lan)
+```
 
-- **Option B: Behind NAT / CGNAT — Outbound Tunnel (No inbound port forwarding required):**
-  - **[OpenAI Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels) (for ChatGPT Web / Codex):**
-    ```bash
-    tunnel-client run \
-      --control-plane.tunnel-id "tunnel_YOUR_TUNNEL_ID" \
-      --control-plane.api-key "env:MAC_MCP_TUNNEL_KEY" \
-      --mcp.server-url "http://127.0.0.1:18893/mcp" \
-      --health.listen-addr "127.0.0.1:18891" \
-      --log.level info
-    ```
-  - **or, Cloudflare Quick Tunnel:**
-    ```bash
-    cloudflared tunnel --url http://127.0.0.1:18893 --http-host-header 127.0.0.1:18893
-    ```
+The network mode is saved per instance; a later `starmux up` keeps it. Switching modes on a running instance restarts its Worker. `--allow-lan` listens on all IPv4 interfaces, so limit network reachability to your intended clients. Authentication settings stay unchanged; use `starmux auth key "My AI Client"` for per-client credentials. `/access`, `/dashboard`, and all other management routes remain local to `127.0.0.1:<port>` or `localhost:<port>`.
 
-*(See [Installation & Networking](docs/INSTALL.md#4-remote-network-forwarding--ingress-engineering) for Tailscale, frp, rathole, ngrok, and IPv6 TLS setups.)*
-</details>
+**A2 — Public domain / HTTPS:**
+
+```bash
+starmux up --local
+caddy reverse-proxy --from mcp.example.com --to 127.0.0.1:18893
+```
+
+Caddy and Tailscale Serve/Funnel can forward the original domain Host without rewriting it. Enable API key, OAuth, or authenticated ingress for public access. Keep the original public Host so forwarded requests cannot reach local management pages.
+
+**B — Outbound tunnel behind NAT:**
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:18893
+```
+
+No Host rewrite option is needed. Other tunnels such as ngrok, frp, and SSH remote forwarding can also preserve the original Host on `/mcp`, `/healthz`, and OAuth resource discovery routes. For OpenAI Secure MCP Tunnel and other networking setups, see [Installation & Networking](docs/INSTALL.md#4-remote-network-forwarding--ingress-engineering).
 
 ### 4. Connect your AI client
 
@@ -172,7 +165,7 @@ Create this MCP Server connector:
   }
   ```
 
-- **Remote / LAN connection (via Direct Proxy or Tunnel — do NOT use `127.0.0.1` across separate machines):**
+- **Remote / LAN connection (via --allow-lan, Direct Proxy or Tunnel — do NOT use `127.0.0.1` across separate machines):**
   ```json
   {
     "mcpServers": {
@@ -240,6 +233,8 @@ starmux down -i work            # Stop a specific instance
 ## Everyday CLI Commands
 
 ```bash
+starmux up --allow-lan  # Enable direct LAN / Tailscale access (0.0.0.0)
+starmux up --local      # Restore loopback only (127.0.0.1)
 starmux status          # Check health, endpoints, active permission mode, and recent tool activity
 starmux up .            # Switch active project folder context to current directory
 starmux auth            # View auth mode, create/revoke per-client API keys, and inspect OAuth sessions
@@ -272,7 +267,7 @@ starmux down            # Stop the gateway (alias: stop)
 - **[How can ChatGPT access files and terminal tools on my local computer?](docs/use-cases/chatgpt-access-local-computer.md)**
   Run `starmux up` locally and expose `127.0.0.1:18893/mcp` via OpenAI Secure MCP Tunnel or Direct HTTPS so ChatGPT Web can inspect folders or run tools without manual file uploads.
 - **[How can WorkBuddy on Mac/Windows operate a headless Linux server or NVIDIA Jetson remotely?](docs/use-cases/workbuddy-linux-jetson.md)**
-  Install Starmux on the Linux `x64`/`ARM64` or NVIDIA Jetson Orin host, expose `/mcp` over LAN or HTTPS with Caddy, and add `"type": "streamable-http"` in WorkBuddy—no Linux desktop app required.
+  Install Starmux on the Linux `x64`/`ARM64` or NVIDIA Jetson Orin host, expose `/mcp` directly with `--allow-lan` or over HTTPS with Caddy, and add `"type": "streamable-http"` in WorkBuddy—no Linux desktop app required.
 - **[Is there a self-hosted, open-source alternative to the hosted Remote Desktop Commander service?](docs/use-cases/remote-desktop-commander.md)**
   Yes. Starmux bundles the open-source Desktop Commander tool engine with a built-in Streamable HTTP server, read-only controls, and self-hosted auth so your tools execute without a third-party cloud relay.
 - **[How do I aggregate multiple local `stdio` MCP servers behind one Streamable HTTP endpoint?](docs/use-cases/self-hosted-remote-mcp-gateway.md)**
@@ -282,7 +277,7 @@ starmux down            # Stop the gateway (alias: stop)
 - **[How can I secure a self-hosted remote MCP server with OAuth 2.0 or revocable API keys?](docs/use-cases/self-hosted-mcp-oauth.md)**
   Use `starmux auth key` for per-client Bearer tokens or configure Keycloak OAuth 2.0 + PKCE for browser-based AI connectors.
 
-> **中文场景速览（一站式自托管远程 MCP 服务与网关）：** Starmux 将 **Desktop Commander 风格的文件读写、代码搜索、Diff 编辑、交互式终端、进程管理与 Git 工具**、**`stdio` 转 `Streamable HTTP` 网关**、**多本地 `stdio` MCP 服务聚合**、**只读（Read-Only）与 Coding 权限切换**、以及 **API Key / OAuth 2.0 鉴权** 一体化内置于单个守护进程中。无需手工拼装 `DesktopCommanderMCP + supergateway`，即可让网页版 **ChatGPT**、**Claude**、**豆包** 或桌面端 **WorkBuddy**、**Cursor**、**Codex**、**Antigravity** 通过局域网 Caddy、Direct HTTPS（支持公网 IPv4/IPv6）、SSH 转发或内网穿透（NAT/CGNAT Tunnel）安全操作 **Linux (`x64`/`ARM64`)**、**NVIDIA Jetson**、**macOS** 与 **Windows** 上的本地文件与终端。
+> **中文场景速览（一站式自托管远程 MCP 服务与网关）：** Starmux 将 **Desktop Commander 风格的文件读写、代码搜索、Diff 编辑、交互式终端、进程管理与 Git 工具**、**`stdio` 转 `Streamable HTTP` 网关**、**多本地 `stdio` MCP 服务聚合**、**只读（Read-Only）与 Coding 权限切换**、以及 **API Key / OAuth 2.0 鉴权** 一体化内置于单个守护进程中。无需手工拼装 `DesktopCommanderMCP + supergateway + Caddy`，即可让网页版 **ChatGPT**、**Claude**、**豆包** 或桌面端 **WorkBuddy**、**Cursor**、**Codex**、**Antigravity** 通过局域网/Tailscale 原生直连（`--allow-lan`）、Direct HTTPS（支持公网 IPv4/IPv6）、SSH 转发或内网穿透（NAT/CGNAT Tunnel）安全操作 **Linux (`x64`/`ARM64`)**、**NVIDIA Jetson**、**macOS** 与 **Windows** 上的本地文件与终端。
 
 ---
 
@@ -317,3 +312,19 @@ Explore the [Documentation Index](docs/README.md) by topic:
 ## License
 
 Starmux original code is [MIT Licensed](LICENSE). [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) is bundled as a pinned dependency and retains its own license and notices. Starmux is an independent open-source project and is not endorsed by Desktop Commander or AI client vendors.
+
+
+### Local management console
+
+`starmux dashboard` opens the independent, owner-local control center, including when all MCP instances are stopped. It supports instance selection, lifecycle operations, saved configuration and JSONC editing, client credentials, OAuth, and bounded process logs. The interface offers English/Chinese and system/light/dark themes.
+
+```sh
+starmux dashboard                 # Start/reuse the local console and open it
+starmux dashboard -i work          # Select an instance
+starmux dashboard --no-open        # Print a private console login link
+starmux dashboard status           # Inspect the console service
+starmux dashboard stop             # Stop the console, leaving instances alone
+starmux dashboard --token -i work  # Legacy per-instance owner token
+```
+
+The console binds only to loopback on its own port. Its login credential grants management of all local instances and is separate from MCP keys and legacy instance owner tokens. Private login links must not be shared with AI clients. Closing the browser does not stop the console; it does not start automatically at login. Saved configuration is applied separately, and concurrent edits produce a revision conflict instead of overwriting newer changes.

@@ -169,7 +169,7 @@ struct UnifiedGatewayMenu: View {
         }
     }
     private func dashboard() {
-        guard let selected = instance, selected.ready else { return }
+        guard let selected = instance else { return }
         Task { _ = await model.perform(["dashboard", "-i", selected.id]) }
     }
     var body: some View {
@@ -245,7 +245,7 @@ struct UnifiedGatewayMenu: View {
             }.padding(12).background(RoundedRectangle(cornerRadius: 15).fill(LinearGradient(colors: [ProductPalette.blue.opacity(0.12), ProductPalette.aqua.opacity(0.065)], startPoint: .topLeading, endPoint: .bottomTrailing)).overlay(RoundedRectangle(cornerRadius: 15).strokeBorder(ProductPalette.blue.opacity(0.12), lineWidth: 1)))
             if let selected = instance {
                 HStack(spacing: 8) {
-                    QuickAction(title: text("访问控制台", "Access console"), caption: text("管理客户端", "Manage clients"), symbol: "rectangle.on.rectangle", disabled: !ready, action: dashboard)
+                    QuickAction(title: text("访问控制台", "Access console"), caption: text("管理客户端", "Manage clients"), symbol: "rectangle.on.rectangle", disabled: instance == nil, action: dashboard)
                     QuickAction(title: text("隐私与权限", "Permissions"), caption: mode, symbol: "lock.shield") { permissions = true }
                     QuickAction(title: selected.running ? text("停止连接", "Stop") : text("启动连接", "Start"), caption: text("本机服务", "Local gateway"), symbol: selected.running ? "stop.circle" : "play.circle", disabled: model.busy) {
                         Task {

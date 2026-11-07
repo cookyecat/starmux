@@ -25,7 +25,7 @@ Start read-only. Check local MCP health and tool discovery before attempting a r
 | Public IPv4/IPv6 and a domain | **Your own HTTPS reverse proxy** | Usually TCP 443 | You operate DNS, TLS, firewall and authentication. |
 | NAT/CGNAT or inbound ports unavailable | **Outbound tunnel** | No inbound port required | Depends on tunnel provider and client compatibility. |
 | Laptop AI coding client with SSH access | **SSH local forwarding** | SSH access only | Laptop-local forwarding is not reachable from ChatGPT Web. |
-| Two machines on a trusted LAN | LAN proxy or SSH | LAN-specific | Restrict access to authorized clients. |
+| Two machines on a trusted LAN | `starmux up --allow-lan` or SSH | LAN-specific | Restrict access to authorized clients. |
 
 NAT, TLS encryption and an obscure hostname are **not substitutes for caller authentication**.
 
@@ -39,9 +39,7 @@ Point `mcp.example.com` to your publicly reachable host and configure a reverse 
 }
 mcp.example.com {
     handle /mcp {
-        reverse_proxy 127.0.0.1:18893 {
-            header_up Host 127.0.0.1:18893
-        }
+        reverse_proxy 127.0.0.1:18893
     }
     handle {
         respond "Not found" 404
@@ -49,7 +47,7 @@ mcp.example.com {
 }
 ~~~
 
-The AI client's MCP URL is `https://mcp.example.com/mcp`. The `Host` rewrite matters because Starmux validates the HTTP authority. The example does not expose the local management dashboard.
+The AI client's MCP URL is `https://mcp.example.com/mcp`. Starmux accepts the original public Host on MCP and discovery routes; no Host rewrite is needed. The example does not expose the local management dashboard.
 
 **Secure the endpoint before publishing it.** Use a Starmux Bearer API key for clients that support one, OAuth for browser-login clients, or a trusted ingress that actually authenticates callers. If using OAuth, its public discovery/authorization routes need additional configuration; see [Security & Authentication](../SECURITY.md).
 

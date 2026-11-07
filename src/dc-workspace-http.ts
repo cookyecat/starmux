@@ -1,3 +1,4 @@
+import {styleLegacyDashboard} from './dashboard-ui.js';
 import {resourceMetadata,metadataUrl,oauthChallenge,OAuthError} from './oauth-resource.js';
 import {randomUUID} from 'node:crypto';
 import {createAccessControl} from './access-control.js';
@@ -7,8 +8,8 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 // The transport satisfies the runtime interface; keep the compatibility cast local.
 import type { AuditSink } from "./contracts.js";
 import { isSafeInteger } from "./validation.js";
-// Explicit project-root Desktop Commander MCP endpoint. Never exposed to public Caddy.
-// Start only with owner-approved STARMUX_PROJECT_ROOT; no default HOME traversal.
+// Explicit project-root Desktop Commander MCP endpoint. Client routes may be
+// exposed via LAN/proxy; owner routes always retain loopback and local Host checks.
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createServer } from "node:http";
 import { createAuthorizedWorkspacePolicy } from "./authorized-workspace-roots.js";
@@ -27,7 +28,7 @@ import { createGitWorkflow } from "./project-git-workflow.js";
 import { createProjectPolicy } from "./project-workspace-policy.js";
 import { createWorkspaceGrants } from "./workspace-grants.js";
 import { createAccountAccessPolicy } from './account-access-policy.js';
-import { isAllowedGatewayHost } from './http-host-policy.js';
+import { isAllowedGatewayHost,isClientFacingGatewayRoute,isLoopbackSocketAddress } from './http-host-policy.js';
 
 export interface RuntimeOptions {env?: NodeJS.ProcessEnv; audit?: AuditSink}
 export interface GatewayRuntime {start(): Promise<void>; close(): Promise<void>; readonly port: number|null}
@@ -57,7 +58,7 @@ export function createGatewayRuntime(options: RuntimeOptions={}): GatewayRuntime
 }
 async function initializeGateway({env=process.env,audit:externalAudit}: RuntimeOptions){
 const access=await createAccessControl(env.STARMUX_ACCESS_FILE);
-const page=(html:string)=>instancePage(html,env.STARMUX_INSTANCE_NAME,env.STARMUX_INSTANCE_ID);
+const page=(html:string)=>styleLegacyDashboard(instancePage(html,env.STARMUX_INSTANCE_NAME,env.STARMUX_INSTANCE_ID));
 const root=env.STARMUX_PROJECT_ROOT;
 if(!root)throw new Error("OWNER_APPROVED_PROJECT_ROOT_REQUIRED");
 const mode=env.STARMUX_WORKSPACE_MODE||"read-only";
@@ -80,6 +81,8 @@ if(globalPermissions&&(writeScope!=='unrestricted'||(!globalReadOnly&&nativeAcce
 const policy=globalPermissions?await createAccountAccessPolicy(root,mode):await createProjectPolicy({root,mode,developerCommands,
   allowTrustedHomeRoot:nativeAccessMode==="native"&&developerCommands==="trusted-project"});
 const desiredPort=Number(env.STARMUX_PROJECT_PORT||18893);
+const allowLan=env.STARMUX_ALLOW_LAN==='1';
+const listenHost=allowLan?'0.0.0.0':'127.0.0.1';
 if(!isSafeInteger(desiredPort)||desiredPort<0||desiredPort>65535)
   throw new Error("INVALID_PORT");
 let activity: ReturnType<typeof createPrivateMCPActivity>|null=null;
@@ -142,10 +145,12 @@ http=createServer(async(req,res)=>{
     audit({event:'HTTP_REQUEST_DENIED',reason});
     res.writeHead(403,{'content-type':'text/plain; charset=utf-8','cache-control':'no-store'}).end(reason);
   };
-  if(req.socket.remoteAddress!=="127.0.0.1"){denyRequest('LOOPBACK_REQUIRED');return;}
+  const isLoopback=isLoopbackSocketAddress(req.socket.remoteAddress);
+  if(!isLoopback&&!allowLan){denyRequest('LOOPBACK_REQUIRED');return;}
   let route: string;
   try{route=new URL(req.url||"/","http://localhost").pathname;}
   catch{res.writeHead(400).end('Invalid request target');return;}
+  if(!isLoopback&&!isClientFacingGatewayRoute(route)){denyRequest('LOOPBACK_REQUIRED');return;}
   const address=http?.address();
   const port=address&&typeof address!=="string"?address.port:null;
   if(!isAllowedGatewayHost(req,port,route)){denyRequest('HOST_NOT_ALLOWED');return;}
@@ -154,7 +159,7 @@ http=createServer(async(req,res)=>{
     res.end('Starmux uses global Read-only or Coding mode. Directory grants and tool filters do not apply. Use starmux up --read or starmux up --code.');
     return;
   }
-  if(route.startsWith('/.well-known/oauth-protected-resource')&&(req.method==='GET'||req.method==='OPTIONS')){
+  if((route==='/.well-known/oauth-protected-resource'||route.startsWith('/.well-known/oauth-protected-resource/'))&&(req.method==='GET'||req.method==='OPTIONS')){
     try{
       const config=await access.oauthSettings();
       if(!config||![new URL(metadataUrl(config)).pathname,'/.well-known/oauth-protected-resource'].includes(route)){
@@ -241,6 +246,10 @@ http=createServer(async(req,res)=>{
     }
     res.writeHead(405).end("Method not allowed");return;
   }
+  if(route==='/catalog.json'&&req.method==='GET'){
+    res.writeHead(200,{...dashboardHeaders,'content-type':'application/json; charset=utf-8'});
+    res.end(JSON.stringify({instanceId:env.STARMUX_INSTANCE_ID,tools:router.upstreamCatalog.map(tool=>({name:tool.name}))}));return;
+  }
   if((route==="/dashboard"||route==="/dashboard.json")&&req.method==="GET"){
     try{
       const snapshot={...await collectOperationsSnapshot(),configuredUpstreams:configured!.status(),
@@ -253,7 +262,7 @@ http=createServer(async(req,res)=>{
       const json=route.endsWith(".json");
       res.writeHead(200,{...dashboardHeaders,
         "content-type":json?"application/json; charset=utf-8":"text/html; charset=utf-8"});
-      res.end(json?JSON.stringify(snapshot):renderOperationsHtml(snapshot));
+      res.end(json?JSON.stringify(snapshot):styleLegacyDashboard(renderOperationsHtml(snapshot)));
     }catch{
       res.writeHead(503,{...dashboardHeaders,"content-type":"text/plain"});
       res.end("Dashboard temporarily unavailable");
@@ -283,7 +292,7 @@ http=createServer(async(req,res)=>{
     res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});
     const accessMode=await access.snapshot().then(s=>s.mode).catch(()=>"unavailable");
     res.end(JSON.stringify({status:"ok",service:"dc-project-workspace",mode,
-      writeScope,accessMode,...(env.STARMUX_INSTANCE_ID?{instanceId:env.STARMUX_INSTANCE_ID,instanceName:env.STARMUX_INSTANCE_NAME}:{})}));
+      writeScope,accessMode,allowLan,...(env.STARMUX_INSTANCE_ID?{instanceId:env.STARMUX_INSTANCE_ID,instanceName:env.STARMUX_INSTANCE_NAME}:{})}));
     return;
   }
   if(route!=="/mcp"){
@@ -324,11 +333,11 @@ http.requestTimeout=12000;
 http.headersTimeout=10000;
 await new Promise<void>((resolve,reject)=>{
   http!.once('error',reject);
-  http!.listen(desiredPort,'127.0.0.1',()=>{http!.off('error',reject);resolve();});
+  http!.listen(desiredPort,listenHost,()=>{http!.off('error',reject);resolve();});
 });
 const address=http.address();
 if(!address||typeof address==='string')throw Error('INVALID_LISTENER_ADDRESS');
-audit({event:'PROJECT_WORKSPACE_LISTENING',port:address.port,mode});
+audit({event:'PROJECT_WORKSPACE_LISTENING',port:address.port,host:listenHost,allowLan,mode});
 return {port:address.port,close};
 }catch(error){await close().catch(()=>{});throw error;}
 }

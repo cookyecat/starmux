@@ -69,7 +69,7 @@ Check these Starmux-specific requirements before publishing:
   `starmux up` as a stdio MCP entry point.
 - The regular `up` command backgrounds its supervisor. For a container process,
   use `node bin/starmux.mjs up --foreground` from a source checkout.
-- Starmux listens only on loopback and validates peers and Host headers. Confirm
+- Starmux defaults to loopback and validates peers and Host headers. Confirm
   how Glama's test connects before choosing a launch configuration. Merely
   adding `EXPOSE` or a Docker port mapping does not make loopback reachable.
   Do not relax these security boundaries just to satisfy a registry check.

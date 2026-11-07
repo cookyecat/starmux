@@ -51,15 +51,17 @@ export async function handle(command:string,args:string[]){
           const mode=s.phase==='stopped'?`${describe(saved)} (saved)`:s.phase==='unknown'?`unavailable / ${describe(saved)} (saved)`:s.configState==='pending'?`${describe(cfg)} / ${describe(saved)} (saved)`:describe(cfg);
           const port=String(s.port??'—');
           const workspace=cfg?.projectRoot??(saved?`${saved.projectRoot} (saved)`:s.source.path);
-          return {mark,name:s.name,state,mode,port,workspace};
+          const listen=cfg?`${cfg.allowLan?'0.0.0.0':'127.0.0.1'}:${cfg.port}${s.phase==='stopped'?' (saved)':''}`:'unavailable';
+          return {mark,name:s.name,state,mode,port,listen,workspace};
         });
         const wName=Math.max(4,...rows.map(r=>r.name.length));
         const wState=Math.max(6,...rows.map(r=>r.state.length));
         const wMode=Math.max(4,...rows.map(r=>r.mode.length));
         const wPort=Math.max(4,...rows.map(r=>r.port.length));
-        process.stdout.write(`  ${'NAME'.padEnd(wName)}  ${'STATUS'.padEnd(wState)}  ${'MODE'.padEnd(wMode)}  ${'PORT'.padEnd(wPort)}  WORKSPACE\n`);
+        const wListen=Math.max(6,...rows.map(r=>r.listen.length));
+        process.stdout.write(`  ${'NAME'.padEnd(wName)}  ${'STATUS'.padEnd(wState)}  ${'MODE'.padEnd(wMode)}  ${'PORT'.padEnd(wPort)}  ${'LISTEN'.padEnd(wListen)}  WORKSPACE\n`);
         for(const r of rows){
-          process.stdout.write(`${r.mark} ${r.name.padEnd(wName)}  ${r.state.padEnd(wState)}  ${r.mode.padEnd(wMode)}  ${r.port.padEnd(wPort)}  ${r.workspace}\n`);
+          process.stdout.write(`${r.mark} ${r.name.padEnd(wName)}  ${r.state.padEnd(wState)}  ${r.mode.padEnd(wMode)}  ${r.port.padEnd(wPort)}  ${r.listen.padEnd(wListen)}  ${r.workspace}\n`);
         }
       }return;
     }
@@ -71,7 +73,8 @@ export async function handle(command:string,args:string[]){
     }
     const instance=await resolveInstance(positional[1]??flags.get('--instance'),homedir(),op==='restore');
     if(op==='copy'){
-      const config={...(await loadInstanceConfig(instance)).config,port:await suggestPort()};
+      const source=(await loadInstanceConfig(instance)).config;
+      const config={...source,port:await suggestPort(homedir(),source.allowLan?'0.0.0.0':'127.0.0.1')};
       const access=await createAccessControl(instancePaths(instance).access);const mode=(await access.snapshot()).mode;
       const created=await createInstance(positional[2]??flags.get('--name')??instance.name+' copy',{config,requiredAccess:instance.requiredAccess!=='ingress'?instance.requiredAccess:mode});
       if(json)output({instance:created,message:'Copied settings only. Credentials and sessions were not copied.'});

@@ -1,9 +1,9 @@
 # How can I use WorkBuddy to control Linux or NVIDIA Jetson remotely?
 
-**Short answer:** Install [Starmux](https://github.com/cookyecat/starmux) and Caddy **on the Linux server or NVIDIA Jetson**, then add its remote MCP endpoint to **WorkBuddy**. WorkBuddy runs on your usual computer, while files and tools are accessed **on the Linux host**. You do not have to install the WorkBuddy desktop application on Linux.
+**Short answer:** Install [Starmux](https://github.com/cookyecat/starmux) **on the Linux server or NVIDIA Jetson** (`starmux up --allow-lan` for LAN / Tailscale, or behind Caddy for public HTTPS), then add its remote MCP endpoint to **WorkBuddy**. WorkBuddy runs on your usual computer, while files and tools are accessed **on the Linux host**. You do not have to install the WorkBuddy desktop application on Linux.
 
 ~~~text
-WorkBuddy (your desktop) -> Caddy (Linux / Jetson) -> Starmux MCP -> Files / Terminal / Tools
+WorkBuddy (your desktop) -> Starmux MCP on Linux / Jetson (--allow-lan or HTTPS) -> Files / Terminal / Tools
 ~~~
 
 This is a self-hosted MCP connection, not a hosted remote desktop service. The simplest **no-token** path is for a trusted private LAN; remote internet access should use **Direct HTTPS with authentication**.
@@ -29,30 +29,19 @@ starmux up --code
 
 Coding mode uses the Linux account's actual filesystem and process permissions. The project path is a working context, **not a filesystem sandbox**.
 
-## 2. Expose Starmux with Caddy
+## 2. Connect over LAN or HTTPS
 
-Install [Caddy](https://caddyserver.com/docs/install) on the Linux/Jetson host according to your distribution. Choose one of these network options.
+Choose direct LAN access or public HTTPS below. Only the HTTPS option needs [Caddy](https://caddyserver.com/docs/install) on the Linux/Jetson host.
 
 ### A. Trusted LAN — quickest, without an MCP token
 
-For a WorkBuddy computer **on the same trusted LAN** as the Linux host, suppose the Linux host IP is `192.168.1.2`. Run Caddy on **Linux**:
+For a WorkBuddy computer **on the same trusted LAN** as the Linux host, run on **Linux**:
 
 ~~~bash
-caddy run --adapter caddyfile --config - <<'EOF'
-http://192.168.1.2 {
-    handle /mcp {
-        reverse_proxy 127.0.0.1:18893 {
-            header_up Host 127.0.0.1:18893
-        }
-    }
-    handle {
-        respond "Not found" 404
-    }
-}
-EOF
+starmux up --allow-lan
 ~~~
 
-The WorkBuddy MCP URL is `http://192.168.1.2/mcp`. Replace the sample IP with the Linux host's actual LAN IP. Restrict port 80 to trusted LAN clients in your firewall. **Never port-forward an unauthenticated endpoint to the public internet.** For private-network HTTPS, configure a certificate trusted by the WorkBuddy computer and retain network access restrictions.
+Connect WorkBuddy to `http://192.168.1.2:18893/mcp`, replacing the IP with your Linux host's LAN or Tailscale address. No Caddy is needed. Restrict port 18893 to intended clients; use an API key for per-client authentication. Local management pages remain inaccessible over LAN.
 
 ### B. Public Direct HTTPS — authentication required
 
@@ -70,9 +59,7 @@ Save the generated `smx_...` key privately. Point the domain's DNS to the reacha
 }
 mcp.example.com {
     handle /mcp {
-        reverse_proxy 127.0.0.1:18893 {
-            header_up Host 127.0.0.1:18893
-        }
+        reverse_proxy 127.0.0.1:18893
     }
     handle {
         respond "Not found" 404
@@ -97,7 +84,7 @@ For the **trusted LAN** example, send WorkBuddy this instruction:
 >   "mcpServers": {
 >     "linux-jetson": {
 >       "type": "streamable-http",
->       "url": "http://192.168.1.2/mcp"
+>       "url": "http://192.168.1.2:18893/mcp"
 >     }
 >   }
 > }
@@ -116,7 +103,7 @@ Open WorkBuddy's **Connectors / MCP** configuration interface and add a custom M
   "mcpServers": {
     "linux-jetson": {
       "type": "streamable-http",
-      "url": "http://192.168.1.2/mcp"
+      "url": "http://192.168.1.2:18893/mcp"
     }
   }
 }
@@ -152,11 +139,11 @@ A local Starmux health check does **not** prove that WorkBuddy has connected: ve
 
 | Problem | Check |
 | --- | --- |
-| WorkBuddy cannot connect | Use the Linux host's real LAN IP or public domain—not WorkBuddy's own `127.0.0.1`. Check Caddy, firewall and reachability from the WorkBuddy computer. |
+| WorkBuddy cannot connect | Use the Linux host's real LAN IP or public domain—not WorkBuddy's own `127.0.0.1`. Check `--allow-lan` (or the HTTPS proxy), firewall and reachability from the WorkBuddy computer. |
 | MCP server is silently skipped | Use `"type": "streamable-http"` (not `"streamableHttp"`); the latter triggers `Skipping MCP server linux-jetson: unsupported transport`. |
 | `unknown remote field` | Remote server entries support only `type`, `url` and optional `headers` in the tested build. Remove extra properties from the new entry. |
 | HTTP 401 | Check Starmux's auth mode and the Bearer key in WorkBuddy's `headers`. |
-| HTTP 403 / invalid Host | Keep `header_up Host 127.0.0.1:18893` in Caddy. |
+| HTTP 403 / invalid Host | Use `/mcp` with a single valid Host. Management pages are local-only. |
 | Reads work but commands fail | Starmux defaults to read-only. Only opt into `--code` when you intend to grant execution privileges. |
 | Public HTTPS is unreachable | Check DNS, TCP 443, NAT/CGNAT and IPv6 firewall rules. |
 

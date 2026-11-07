@@ -135,7 +135,7 @@ Commands
 | :--- | :--- |
 | **Heading (`●` / `◐` / `○` / `!`)** | `●` Running & healthy · `◐` Starting/degraded · `○` Stopped · `!` Configuration, auth, or runtime problem detected. |
 | **`Instance`** | Stable UUID across restarts (whereas each start generates a fresh ephemeral `runId`). |
-| **`Listen`** | Local loopback MCP endpoint (`http://127.0.0.1:<PORT>/mcp`). Never binds to `0.0.0.0` or public interfaces. |
+| **`Listen`** | Local loopback MCP endpoint (`http://127.0.0.1:<PORT>/mcp`). `--allow-lan` binds `0.0.0.0:<PORT>` and displays LAN MCP URLs. |
 | **`Project`** | Base directory used to resolve relative file paths in Read-Only mode. It is **not** a chroot or filesystem sandbox boundary. |
 | **`Mode`** | Confirmed active permission mode enforced by the live supervisor (`Read-only` or `Coding`). If you have unapplied edits in `config.jsonc`, `status` displays both `Active mode` and `Saved mode (pending)`. |
 | **`Auth`** | Active authentication mode: `None (no token required)`, `API key (Bearer token; N active keys)`, or `OAuth (browser sign-in)`. |
@@ -157,8 +157,8 @@ Commands
 
 | Command | Description | Supported Flags |
 | :--- | :--- | :--- |
-| `starmux up [PATH]` | Initialize (if needed), apply pending config, and start the instance | `--code` (`--write`), `--read`, `-y`, `--port <N>`, `--foreground`, `-i <name>`, `--json` |
-| `starmux init [PATH]` | Create or update instance configuration without starting the service | `--code` (`--write`), `--read`, `-y`, `--port <N>`, `-i <name>`, `--json` |
+| `starmux up [PATH]` | Initialize (if needed), apply pending config, and start the instance | `--code` (`--write`), `--read`, `--allow-lan`, `--local` (`--no-allow-lan`), `-y`, `--port <N>`, `--foreground`, `-i <name>`, `--json` |
+| `starmux init [PATH]` | Create or update instance configuration without starting the service | `--code` (`--write`), `--read`, `--allow-lan`, `--local` (`--no-allow-lan`), `-y`, `--port <N>`, `-i <name>`, `--json` |
 | `starmux down` *(or `stop`)* | Stop the running instance and wait for confirmed resource cleanup | `-i <name>`, `--json` |
 | `starmux status` | Display live health, permission mode, auth summary, and client config snippets | `--all`, `--json`, `-i <name>` |
 | `starmux ls` | List all instances with status, mode, port, and project path | `--archived`, `--json` |
@@ -176,17 +176,21 @@ Commands
 
 ## 4. Remote Network Forwarding & Ingress Engineering
 
-### 4.1 Loopback Boundary & HTTP `Host` Header Validation
+### 4.1 Listener & HTTP `Host` Boundaries
 
-To prevent DNS rebinding attacks and accidental public exposure of local management pages, Starmux enforces two strict transport checks before MCP authentication even runs:
+- Default: `127.0.0.1:<port>`. Use `starmux up --allow-lan` for direct LAN / Tailscale / WireGuard access on `0.0.0.0:<port>`. Use `--local` (alias `--no-allow-lan`) to restore loopback. Omitted flags preserve the saved mode.
+- `/mcp`, `/healthz`, and `/.well-known/oauth-protected-resource` (including child paths) accept a single valid Host authority: IPv4, hostname or bracketed IPv6, with an optional port from 1 to 65535. Proxies and tunnels can preserve their original domain Host.
+- Every other path is owner-local: the socket peer must be `127.0.0.1` or `::ffff:127.0.0.1`, and Host must match `127.0.0.1:<listener-port>` or `localhost:<listener-port>`. LAN clients cannot bypass this with forged Host or forwarded headers.
+- Missing, duplicate or malformed Host headers are rejected. Existing Origin checks and MCP authentication remain enforced. Preserve the original public Host when proxying the whole server so management pages remain blocked.
 
-1. **Loopback TCP Peer Check (`403 LOOPBACK_REQUIRED`):**
-   The incoming TCP connection to Starmux must originate from the local machine (`127.0.0.1` or `::1`). External network traffic must terminate at a reverse proxy, tunnel client, or SSH daemon running on the same host.
-2. **Loopback `Host` Authority Check (`403 HOST_NOT_ALLOWED`):**
-   - Requests must contain exactly one `Host` header.
-   - On `/mcp`, the `Host` header must match `127.0.0.1[:<port>]` or `localhost[:<port>]` (any port `1–65535` is accepted on `/mcp` so SSH port forwarding works even when local and remote ports differ).
-   - On all other routes (`/healthz`, `/.well-known/oauth-protected-resource*`, `/dashboard`, `/access`), the `Host` header must match the exact listening port (`127.0.0.1:18893` or `localhost:18893`).
-   - Public domain names in `Host` are always rejected, and `X-Forwarded-Host` is not trusted as a substitute. **Your reverse proxy or tunnel must rewrite the upstream `Host` header to `127.0.0.1:18893`.**
+Direct access needs no proxy:
+
+```sh
+starmux up --allow-lan
+# AI client: http://<lan-or-tailscale-ip>:18893/mcp
+```
+
+`--allow-lan` binds all IPv4 interfaces; use your firewall and existing authentication settings to control reachability. Management URLs always use loopback.
 
 ---
 
@@ -205,11 +209,9 @@ To prevent DNS rebinding attacks and accidental public exposure of local managem
   ```bash
   caddy run --adapter caddyfile --config - << 'EOF'
   mcp.example.com {
-  	handle /mcp {
-  		reverse_proxy 127.0.0.1:18893 {
-  			header_up Host 127.0.0.1:18893
-  		}
-  	}
+    handle /mcp {
+        reverse_proxy 127.0.0.1:18893
+    }
   }
   EOF
   ```
@@ -221,9 +223,7 @@ To prevent DNS rebinding attacks and accidental public exposure of local managem
   }
   mcp.example.com {
       handle /mcp {
-          reverse_proxy 127.0.0.1:18893 {
-              header_up Host 127.0.0.1:18893
-          }
+          reverse_proxy 127.0.0.1:18893
       }
       handle {
           respond "Not found" 404
@@ -249,9 +249,7 @@ https://mcp.example.com:8443 {
     tls /absolute/path/to/cert.crt /absolute/path/to/cert.key
 
     handle /mcp {
-        reverse_proxy 127.0.0.1:18893 {
-            header_up Host 127.0.0.1:18893
-        }
+        reverse_proxy 127.0.0.1:18893
     }
     handle {
         respond "Not found" 404
@@ -260,22 +258,13 @@ https://mcp.example.com:8443 {
 ```
 *(Include `:8443` in your AI client URL: `https://mcp.example.com:8443/mcp`.)*
 
-#### 4. Trusted Local Network (LAN HTTP without a Domain)
+#### 4. Trusted Local Network (Direct HTTP)
 
-When connecting across two machines on a trusted home/office LAN (e.g., host IP `192.168.1.2` on port `8080`):
-
-```bash
-caddy run --adapter caddyfile --config - << 'EOF'
-http://192.168.1.2:8080 {
-	handle /mcp {
-		reverse_proxy 127.0.0.1:18893 {
-			header_up Host 127.0.0.1:18893
-		}
-	}
-}
-EOF
+```sh
+starmux up --allow-lan
 ```
-*(In your AI client on the LAN, set the URL to `http://192.168.1.2:8080/mcp`.)*
+
+Connect to `http://192.168.1.2:18893/mcp`, replacing the IP with your host's LAN or VPN address. Caddy is optional for HTTPS or a different external port; direct HTTP needs no proxy.
 
 ---
 
@@ -304,7 +293,7 @@ tunnel-client run \
 
 - **Temporary Quick Tunnel (`*.trycloudflare.com`):**
   ```sh
-  cloudflared tunnel --url http://127.0.0.1:18893 --http-host-header 127.0.0.1:18893
+  cloudflared tunnel --url http://127.0.0.1:18893
   ```
 - **Permanent Named Tunnel (`config.yml`):**
   ```yaml
@@ -314,8 +303,6 @@ tunnel-client run \
   ingress:
     - hostname: mcp.example.com
       service: http://127.0.0.1:18893
-      originRequest:
-        httpHostHeader: 127.0.0.1:18893
     - service: http_status:404
   ```
 
@@ -323,13 +310,13 @@ tunnel-client run \
 
 - **ngrok:**
   ```sh
-  ngrok http 18893 --host-header=127.0.0.1:18893
+  ngrok http 18893
   ```
 - **Tailscale Funnel / Serve:**
   ```sh
   tailscale funnel 18893
   ```
-  *(If your Tailscale version passes the public `.ts.net` hostname in `Host`, place Caddy in front to rewrite `header_up Host 127.0.0.1:18893`.)*
+  *(The public `.ts.net` Host is accepted directly; no intermediate Caddy or Host rewrite is needed.)*
 
 ---
 
@@ -392,8 +379,8 @@ ssh -N -o ExitOnForwardFailure=yes \
 
 | Symptom / Error Code | Root Cause | Resolution |
 | :--- | :--- | :--- |
-| **`HTTP 403` (`HOST_NOT_ALLOWED`)** | Reverse proxy or tunnel forwarded a public domain name (e.g., `mcp.example.com` or `*.trycloudflare.com`) in the HTTP `Host` header. | Configure `header_up Host 127.0.0.1:18893` in Caddy, `--http-host-header 127.0.0.1:18893` in `cloudflared`, or `--host-header=127.0.0.1:18893` in `ngrok`. |
-| **`HTTP 403` (`LOOPBACK_REQUIRED`)** | A non-loopback IP connected directly to Starmux's TCP port. | Run Caddy, `tunnel-client`, or `sshd` on the same host as Starmux so the TCP peer is `127.0.0.1`. |
+| **`HTTP 403` (`HOST_NOT_ALLOWED`)** | Host is missing, duplicated or malformed, or a public Host targets an owner route. | Use a valid single Host for `/mcp`; management pages require `127.0.0.1:<port>` or `localhost:<port>` from the same machine. |
+| **`HTTP 403` (`LOOPBACK_REQUIRED`)** | Non-loopback access to an owner route or a local-only listener. | Use `starmux up --allow-lan` for direct MCP access. Owner pages remain local in every mode. |
 | **`HTTP 401 Unauthorized` on `/mcp`** | Client omitted the `Authorization` header, sent a revoked/expired token, or the instance's active auth mode does not match. | Run `starmux auth` to inspect the active mode (`none`, `api-key`, `oauth`) and active credentials. |
 | **Instance status shows `unknown`** | The CLI cannot verify live worker state (e.g., control socket in `~/.config/starmux/control` was removed or an older supervisor holds the port). | Run `starmux doctor` and `starmux status` to inspect `runtimeProblem`. Resolve or stop the conflicting process before running `starmux up`. |
 | **Port `18893` is already in use** | Another process or instance owns the port. | First run `starmux doctor` to check if an existing Starmux run owns it; to switch ports, run `starmux up --port 18894` (or `starmux config edit`) and update your proxy/client port. |

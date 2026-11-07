@@ -2,6 +2,12 @@ import {createAccessControl} from '../access-control.js';
 import type {instanceStatus} from '../instance-runtime.js';
 import {exists,instancePaths,usesGlobalPermissions,type Instance,type InstanceConfig} from '../instance-store.js';
 import {shellQuote} from '../platform.js';
+import {networkInterfaces} from 'node:os';
+
+export function lanIpv4Addresses():string[]{
+  return [...new Set(Object.values(networkInterfaces()).flatMap(entries=>
+    (entries??[]).filter(entry=>!entry.internal&&entry.family==='IPv4').map(entry=>entry.address)))];
+}
 
 type Status=Awaited<ReturnType<typeof instanceStatus>>;
 type AuthMode='ingress'|'api-key'|'oauth';
@@ -64,7 +70,15 @@ export async function formatStarmuxStatus(instance:Instance,status:Status,config
   const title=`${indicator} Starmux is ${status.phase}  (instance: ${instance.name})`;
   const lines=['',title,row('Instance',instance.id)];
   if(ready&&status.port){
-    lines.push(row('Listen',`http://127.0.0.1:${status.port}/mcp  (this computer only)`));
+    if(config?.allowLan){
+      lines.push(row('Listen',`0.0.0.0:${status.port} (LAN / Tailscale enabled)`),
+        row('MCP URL',`http://127.0.0.1:${status.port}/mcp`),
+        ...lanIpv4Addresses().map(ip=>row('LAN MCP URL',`http://${ip}:${status.port}/mcp`)),
+        row('Setup URL',`http://127.0.0.1:${status.port}/access`),
+        row('Dashboard URL',`http://127.0.0.1:${status.port}/dashboard`));
+    }else lines.push(row('Listen',`http://127.0.0.1:${status.port}/mcp  (this computer only)`));
+  }else if(status.phase==='stopped'&&config){
+    lines.push(row('Saved listen',`${config.allowLan?'0.0.0.0':'127.0.0.1'}:${config.port}${config.allowLan?' (LAN / Tailscale)':''} (next start)`));
   }
   lines.push(
     row(status.phase==='stopped'?'Saved project':'Project',config?.projectRoot??'Unavailable'),
@@ -73,6 +87,7 @@ export async function formatStarmuxStatus(instance:Instance,status:Status,config
   );
   if(status.phase!=='stopped'&&(status.configState==='pending'||!status.active)){
     const savedConfig=status.saved?.config;
+    if(savedConfig)lines.push(row('Saved listen',`${savedConfig.allowLan?'0.0.0.0':'127.0.0.1'}:${savedConfig.port} (saved; not confirmed active)`));
     lines.push(row('Saved mode',describeMode(savedConfig,!!savedConfig&&usesGlobalPermissions(savedConfig))+(status.configState==='pending'?' (pending)':'')));
     if(!status.active)lines.push(row('Saved project',savedConfig?.projectRoot??'Unavailable'));
   }

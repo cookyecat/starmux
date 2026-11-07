@@ -10,12 +10,13 @@ const server = createServer((request, response) => {
   response.end(JSON.stringify(request.url === '/activity.json' ? {lastToolCallAt: null} : {
     status: 'ok',
     instanceId: process.env.STARMUX_INSTANCE_ID,
-    accessMode: 'ingress'
+    accessMode: 'ingress',
+    allowLan: process.env.STARMUX_ALLOW_LAN === '1'
   }));
 });
 await new Promise((resolve, reject) => {
   server.once('error', reject);
-  server.listen(Number(process.env.STARMUX_PROJECT_PORT), '127.0.0.1', resolve);
+  server.listen(Number(process.env.STARMUX_PROJECT_PORT), process.env.STARMUX_ALLOW_LAN === '1' ? '0.0.0.0' : '127.0.0.1', resolve);
 });
 let closing = false;
 function close(delay = 0) {

@@ -28,7 +28,7 @@ Every Starmux instance operates in one of two global permission modes:
 - **Batch Read Limits in Read-Only Mode:** To prevent resource exhaustion, `read_multiple_files` in Read-Only mode enforces a limit of **20 files** and **4 MiB** of combined file size per batch. Exceeding either limit returns `BATCH_READ_COUNT_LIMIT` or `BATCH_READ_SIZE_LIMIT` with guidance to split the request. Missing files in a batch report `ENOENT` individually without discarding successful files in the same batch.
 - **Multi-Instance Isolation:** Multiple instances (`-i NAME`) use separate TCP ports, API keys, OAuth settings, and logs, but share the same OS user account.
 - **Custom Workspace Policies:** While standard instances use global Read-Only or Coding mode, explicit custom `config.jsonc` setups can retain workspace-scoped policies, including the macOS `home-only` write sandbox (see [`INSTANCES.md`](INSTANCES.md)).
-- **Loopback-Only Network Listener:** Starmux listens exclusively on `127.0.0.1` and rejects non-loopback `Host` headers (`403 HOST_NOT_ALLOWED`) or non-loopback TCP peers (`403 LOOPBACK_REQUIRED`). **Never expose the raw loopback port directly to the public internet.**
+- **Network and Owner Boundaries:** The default listener is `127.0.0.1`; `--allow-lan` opts into `0.0.0.0` for direct LAN / VPN MCP access. This does not change authentication. `/mcp`, `/healthz`, and OAuth resource discovery accept valid original tunnel/domain Host headers. All other routes require both a loopback socket peer and `127.0.0.1:<port>` or `localhost:<port>` Host. Forwarded headers never grant owner access. Preserve the original public Host when proxying the whole server.
 
 ---
 
@@ -153,9 +153,7 @@ Use this `Caddyfile` to expose `/mcp` and OAuth Protected Resource metadata alon
 auth.example.com {
     @mcp path /mcp /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/mcp
     handle @mcp {
-        reverse_proxy 127.0.0.1:18893 {
-            header_up Host 127.0.0.1:18893
-        }
+        reverse_proxy 127.0.0.1:18893
     }
     @oauth path /realms/gateway/.well-known/* /realms/gateway/protocol/openid-connect/* /realms/gateway/login-actions/* /resources/*
     handle @oauth {

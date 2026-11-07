@@ -40,3 +40,6 @@ DerivedData/
 
 # Local internal working material
 /.internal/
+
+# Browser visual verification artifacts
+/output/playwright/

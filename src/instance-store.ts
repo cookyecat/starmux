@@ -2,7 +2,7 @@ import {withPrivateLock as withLock} from './private-store-lock.js';
 export {withPrivateLock as withLock} from './private-store-lock.js';
 import {randomUUID,createHash} from 'node:crypto';
 import {lstat,readFile,writeFile,rename,rm,mkdir,realpath} from 'node:fs/promises';
-import {homedir} from 'node:os';
+import {homedir,networkInterfaces} from 'node:os';
 import path from 'node:path';
 import {createServer} from 'node:net';
 import {parse,modify,applyEdits,printParseErrorCode,type ParseError} from 'jsonc-parser';
@@ -25,7 +25,7 @@ type Registry=z.infer<typeof registrySchema>;
 const upstream=z.object({id:z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),transport:z.literal('stdio'),command:z.string().min(1),args:z.array(z.string()),
   allowTools:z.array(z.string()),envRefs:z.record(z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,79}$/)).default({})}).strict();
 export const instanceConfigSchema=z.object({$schema:z.string().optional(),schemaVersion:z.literal(1),projectRoot:z.string(),
-  port:z.number().int().min(1024).max(65535),mode:z.enum(['read-only','read-write']).default('read-only'),
+  port:z.number().int().min(1024).max(65535),allowLan:z.boolean().default(false),mode:z.enum(['read-only','read-write']).default('read-only'),
   accessRole:z.enum(['restricted','trusted']).default('restricted'),writeScope:z.enum(['home-only','unrestricted']).default('unrestricted'),
   connection:z.enum(['local','https','tunnel']).default('local'),gitMode:z.enum(['off','review','write','push']).default('off'),
   worktreeMode:z.enum(['off','linked']).default('off'),upstreams:z.array(upstream).default([])}).strict();
@@ -116,13 +116,27 @@ export async function loadInstanceConfig(instance:Instance){
   const config=await validateConfig(parseConfig(text));
   return {text,config,revision:sourceRevision(instance.source.path,text),effectiveRevision:fingerprint(JSON.stringify({...config,$schema:undefined})),source:instance.source};
 }
-export async function availablePort(port:number){
-  return new Promise<boolean>(resolve=>{const server=createServer();server.once('error',()=>resolve(false));server.listen(port,'127.0.0.1',()=>server.close(()=>resolve(true)));});
+export async function availablePort(port:number,host:'127.0.0.1'|'0.0.0.0'='127.0.0.1'){
+  // macOS can permit a wildcard bind alongside a specific-interface listener.
+  // Probe those interfaces as well so a LAN listener cannot hide a conflict.
+  const addresses=host==='0.0.0.0'?['127.0.0.1',...Object.values(networkInterfaces()).flatMap(entries=>
+    (entries??[]).filter(entry=>!entry.internal&&entry.family==='IPv4').map(entry=>entry.address)),'0.0.0.0']:['127.0.0.1'];
+  for(const address of new Set(addresses)){
+    const free=await new Promise<boolean>(resolve=>{
+      // This is only a bind probe, never a service. An idle peer must not keep
+      // close() pending and hang startup/status now that we probe LAN interfaces.
+      const server=createServer(socket=>socket.destroy());
+      server.once('error',()=>resolve(false));
+      server.listen(port,address,()=>server.close(()=>resolve(true)));
+    });
+    if(!free)return false;
+  }
+  return true;
 }
-export async function suggestPort(home=homedir()){
+export async function suggestPort(home=homedir(),host:'127.0.0.1'|'0.0.0.0'='127.0.0.1'){
   const used=new Set<number>();
   for(const instance of (await readRegistry(home)).instances){if(!instance.archived)try{used.add((await loadInstanceConfig(instance)).config.port);}catch{}}
-  for(let port=18893;port<19893;port++)if(!used.has(port)&&await availablePort(port))return port;
+  for(let port=18893;port<19893;port++)if(!used.has(port)&&await availablePort(port,host))return port;
   throw Error('NO_AVAILABLE_INSTANCE_PORT');
 }
 export function configTemplate(config:InstanceConfig){return '// Gateway startup settings. Save, then apply to restart this instance.\n// Credentials and grants live in the private instance state directory.\n'+JSON.stringify(config,null,2)+'\n';}
@@ -176,7 +190,7 @@ export function usesGlobalPermissions(config:InstanceConfig){
 }
 export function instanceEnv(instance:Instance,config:InstanceConfig,home=homedir()):NodeJS.ProcessEnv{
   const p=instancePaths(instance,home);
-  return {STARMUX_PROJECT_ROOT:config.projectRoot,STARMUX_PROJECT_PORT:String(config.port),
+  return {STARMUX_PROJECT_ROOT:config.projectRoot,STARMUX_PROJECT_PORT:String(config.port),STARMUX_ALLOW_LAN:config.allowLan?'1':'0',
     STARMUX_WORKSPACE_MODE:config.mode,STARMUX_DEV_COMMANDS:config.accessRole==='trusted'?'trusted-project':'presets',
     STARMUX_DC_ACCESS_MODE:config.accessRole==='trusted'?'native':'workspace',STARMUX_DC_WRITE_SCOPE:config.writeScope,
     STARMUX_ACCESS_FILE:p.access,STARMUX_GRANTS_FILE:p.grants,STARMUX_DENY_FILE:p.deny,
