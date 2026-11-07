@@ -69,13 +69,13 @@
     "sync:upstream": "npm install --save-dev --save-exact @wonderwhy-er/desktop-commander@latest --ignore-scripts && npm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.32.1",
-    "@opendocsg/pdf2md": "0.3.4",
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@opendocsg/pdf2md": "0.3.5",
     "@vscode/ripgrep": "1.18.0",
     "exceljs": "4.4.0",
     "fastest-levenshtein": "1.0.16",
     "isbinaryfile": "5.0.7",
-    "jose": "6.2.12",
+    "jose": "6.2.15",
     "jsonc-parser": "3.3.1",
     "pdf-lib": "1.17.1",
     "pizzip": "3.3.0",
