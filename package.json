@@ -88,7 +88,7 @@
   "devDependencies": {
     "@types/node": "22.20.5",
     "@wonderwhy-er/desktop-commander": "0.3.1",
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "files": [
     "dist/src/**/*.js",
