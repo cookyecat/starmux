@@ -24,7 +24,7 @@ try{
  await page.locator('#menu').click();await page.locator('aside.open').waitFor();assert.equal(await page.locator('#menu').getAttribute('aria-expanded'),'true');
  await page.keyboard.press('Escape');assert.equal(await page.locator('aside').evaluate(el=>el.classList.contains('open')),false);
  await page.locator('#menu').click();await page.locator('#menu-close').click();assert.equal(await page.locator('#menu').getAttribute('aria-expanded'),'false');
- await page.locator('#menu').click();await page.locator('[data-page="overview"]').click();assert.equal(await page.locator('aside').evaluate(el=>el.classList.contains('open')),false);
+ await page.locator('#menu').click();await page.locator('[data-page="overview"]').click();await page.getByRole('heading',{name:'概览',exact:true}).waitFor();await page.locator('aside.open').waitFor({state:'hidden'});assert.equal(await page.locator('aside').evaluate(el=>el.classList.contains('open')),false);
  await page.screenshot({path:'output/playwright/dashboard-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.setViewportSize({width:320,height:740});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.setViewportSize({width:1024,height:900});await page.screenshot({path:'output/playwright/dashboard-tablet.png',fullPage:true});assert.deepEqual(errors,[]);console.log('Browser smoke passed: themes, bilingual UI, config draft, key creation, responsive layout.');
