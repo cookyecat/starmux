@@ -1,3 +1,4 @@
+import {mcpHttpBodyLimit} from './mcp-http-limits.js';
 import {resourceMetadata,metadataUrl,oauthChallenge,OAuthError} from './oauth-resource.js';
 import {randomUUID} from 'node:crypto';
 import {createAccessControl} from './access-control.js';
@@ -289,7 +290,7 @@ http=createServer(async(req,res)=>{
   if(route!=="/mcp"){
     res.writeHead(404).end("Not found");return;
   }
-  if(Number(req.headers["content-length"]||0)>65536){
+  if(Number(req.headers["content-length"]||0)>mcpHttpBodyLimit){
     res.writeHead(413).end("Too large");return;
   }
   let identity: import('./contracts.js').RequestContext['identity'];
@@ -307,7 +308,9 @@ http=createServer(async(req,res)=>{
   audit({event:'MCP_REQUEST_ACCEPTED',requestId:request.requestId,identityKind:identity.kind,
     ...(identity.kind==='verified-api-key'?{credentialId:identity.credentialId}:identity.kind==='verified-oauth'?{connectionId:identity.connectionId}:{})});
   const transport=new StreamableHTTPServerTransport({
-    enableJsonResponse:true
+    enableJsonResponse:true,
+    // Enforce the same bound while reading chunked bodies, not just the header.
+    maxRequestBodySize:mcpHttpBodyLimit
   });
   const gateway=createDesktopCommanderBridge(router,audit,{
     request,...(oauth?{oauthScope:oauth.scope}:{}),workspacePolicy,upstreamRouter:router,
