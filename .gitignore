@@ -41,6 +41,7 @@ DerivedData/
 
 # Local internal working material
 /.internal/
+AGENTS.md
 
 # Browser visual verification artifacts
 /output/playwright/

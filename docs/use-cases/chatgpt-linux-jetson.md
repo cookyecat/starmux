@@ -75,18 +75,31 @@ A local health check does **not** prove ChatGPT's remote connection is working. 
 
 ## Alternative: an AI coding client on your laptop
 
-For Cursor, Claude Code or another laptop-based MCP client, SSH can avoid public ingress. Run **on your laptop**:
+For **Cursor**, **Claude Code**, **Codex**, **WorkBuddy**, or another laptop-based MCP client:
 
-~~~bash
-ssh -N -o ExitOnForwardFailure=yes \
-  -L 127.0.0.1:18894:127.0.0.1:18893 \
-  user@linux-host
-~~~
+- **Direct over LAN / Tailscale (simplest):** Run `starmux up --code --allow-lan` on the Linux/Jetson host and connect your laptop client directly to `http://<linux-or-jetson-ip>:18893/mcp` (run `starmux status` to see the detected IP).
+- **Via SSH port forwarding (without opening `0.0.0.0`):** Keep `starmux up --code` on the Linux/Jetson host and run **on your laptop**:
+  ~~~bash
+  ssh -N -o ExitOnForwardFailure=yes \
+    -L 127.0.0.1:18894:127.0.0.1:18893 \
+    user@linux-host
+  ~~~
+  Then connect your laptop client to `http://127.0.0.1:18894/mcp`.
 
-Connect that laptop client to `http://127.0.0.1:18894/mcp`. This does **not** make the forwarded localhost port reachable from ChatGPT Web.
+*(Neither LAN IPs nor laptop-local SSH forwards are directly reachable from ChatGPT Web in the cloud.)*
+
+## Common Questions (FAQ)
+
+### Q: Does Starmux run natively on `ARM64` (`aarch64`) Linux boards like NVIDIA Jetson Orin or Raspberry Pi?
+Yes. Starmux Core and CLI (`npm install -g starmux`) support both Linux `x64` (`amd64`) and `ARM64` (`aarch64`)—including **NVIDIA Jetson Orin / AGX / Nano** running Ubuntu/JetPack and Raspberry Pi OS (64-bit)—with Node.js `22.12+`.
+
+### Q: Do I need `--allow-lan` on my Linux or Jetson machine when connecting ChatGPT Web via OpenAI Tunnel or Caddy?
+No. Because `tunnel-client` and Caddy run locally on the Linux/Jetson host and forward traffic to `127.0.0.1:18893`, you only need `starmux up` (or `starmux up --code`). Use `--allow-lan` only when connecting a desktop AI client (like Codex, Cursor, or WorkBuddy) directly across your LAN or Tailscale network.
 
 ## Related guides
 
+- [Codex, Cursor & Claude Code to Linux / NVIDIA Jetson](codex-cursor-linux-jetson.md)
+- [WorkBuddy to Linux / NVIDIA Jetson](workbuddy-linux-jetson.md)
 - [ChatGPT accessing a local computer](chatgpt-access-local-computer.md)
 - [MCP behind NAT: HTTPS vs Tunnel](mcp-behind-nat-https-vs-tunnel.md)
 - [AI Client Setup Guides](../CLIENTS.md)

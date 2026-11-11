@@ -6,15 +6,18 @@
 | --- | --- | --- |
 | **How can ChatGPT access my local computer?** | [ChatGPT to local files and tools](chatgpt-access-local-computer.md) | Start Starmux, choose OpenAI Tunnel or HTTPS, and verify a ChatGPT tool call. |
 | **How do I self-host a remote MCP gateway?** | [Self-hosted remote MCP gateway](self-hosted-remote-mcp-gateway.md) | Run MCP on your own host, choose remote transport, secure access, and connect extra local MCP servers. |
-| **How can I use Desktop Commander remotely?** | [Remote Desktop Commander with Starmux](remote-desktop-commander.md) | Use Starmux's bundled Desktop Commander-derived tools remotely without using the official hosted plugin. |
+| **How do I expose `stdio` MCP servers over HTTP & aggregate multiple servers?** | [`stdio`-to-HTTP bridge & multi-MCP gateway](stdio-to-http-multi-mcp-gateway.md) | Bridge local `stdio` servers to `Streamable HTTP`, import `mcp.json`, and configure programmable middleware. |
+| **How can I use Desktop Commander remotely (with zero telemetry)?** | [Remote Desktop Commander with Starmux](remote-desktop-commander.md) | Use Starmux's purified, zero-telemetry Desktop Commander engine remotely without the hosted cloud plugin. |
+| **How can Codex, Cursor, or Claude Code develop on Linux / NVIDIA Jetson?** | [Codex, Cursor & Claude Code to Linux / Jetson](codex-cursor-linux-jetson.md) | Connect macOS/Windows AI coding agents to headless Linux (`x64`/`ARM64`) or NVIDIA Jetson over LAN (`--allow-lan`), SSH, or HTTPS. |
+| **Can WorkBuddy control Linux or NVIDIA Jetson remotely?** | [WorkBuddy to Linux / Jetson](workbuddy-linux-jetson.md) | Run `starmux up --allow-lan` on Linux/Jetson (or HTTPS via Caddy), then connect WorkBuddy automatically or manually. |
 | **Can ChatGPT access a Linux server or NVIDIA Jetson?** | [ChatGPT to Linux / Jetson](chatgpt-linux-jetson.md) | Connect ChatGPT Web to a Linux or ARM64 tool host without a native ChatGPT app on that host. |
-| **Can WorkBuddy control Linux or NVIDIA Jetson remotely?** | [WorkBuddy to Linux / Jetson](workbuddy-linux-jetson.md) | Set up Starmux and Caddy on Linux, then configure WorkBuddy automatically or manually. |
 | **How do I connect an MCP server behind NAT?** | [HTTPS vs Tunnel vs SSH](mcp-behind-nat-https-vs-tunnel.md) | Choose a secure transport for public IPs, NAT/CGNAT and laptop-based clients. |
 | **How can I secure an MCP endpoint with OAuth?** | [Self-hosted MCP OAuth](self-hosted-mcp-oauth.md) | Configure Keycloak, PKCE, protected-resource metadata and browser login for Starmux. |
 
 ## Technical reference
 
 - [Installation, networking and tunnels](../INSTALL.md)
+- [Gateway services, upstream OAuth and middleware](../GATEWAY.md)
 - [Security, permissions and OAuth](../SECURITY.md)
 - [ChatGPT, Claude and other client configuration](../CLIENTS.md)
 - [Multiple instances and additional MCP upstreams](../INSTANCES.md)

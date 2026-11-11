@@ -20,14 +20,14 @@ Starmux exposes a standard **MCP Streamable HTTP** endpoint (`/mcp`). Choose you
 | :--- | :--- | :--- | :--- |
 | **ChatGPT Web** | ✅ Tested | **OpenAI Secure MCP Tunnel** or **Direct HTTPS** (+ `None` or `OAuth 2.0`) | [2. ChatGPT Web](#2-chatgpt-web-tunnel-direct-https--oauth) |
 | **Claude App / Code** | ✅ Tested | **Prompt Auto-Setup** (`Claude Code`) or **Remote MCP Custom Connector** (`Claude App`) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) · [5. Claude App](#5-claude-app--doubao-豆包) |
-| **Antigravity** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **Codex** | ✅ Tested | **Prompt Auto-Setup**, **Protected Tunnel**, or **HTTPS + Bearer API Key** | [4. Codex CLI](#4-codex-cli-configtoml) |
-| **Cursor** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **WorkBuddy** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (LAN / HTTPS / SSH; `streamable-http`) | [WorkBuddy → Linux / Jetson](use-cases/workbuddy-linux-jetson.md) · [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **DSH-Harness** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **Kimi Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **Minimax Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
-| **ZCode** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / LAN / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Antigravity** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / Direct LAN `--allow-lan` / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Codex** | ✅ Tested | **Prompt Auto-Setup**, **Direct LAN (`--allow-lan`)**, **OpenAI Tunnel**, or **HTTPS + Bearer API Key** | [4. Codex CLI](#4-codex-cli-configtoml) |
+| **Cursor** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / Direct LAN `--allow-lan` / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **WorkBuddy** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Direct LAN `--allow-lan` / HTTPS / SSH; `streamable-http`) | [WorkBuddy → Linux / Jetson](use-cases/workbuddy-linux-jetson.md) · [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **DSH-Harness** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / Direct LAN `--allow-lan` / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Kimi Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / Direct LAN `--allow-lan` / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **Minimax Code** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / Direct LAN `--allow-lan` / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
+| **ZCode** | ✅ Tested | **Prompt Auto-Setup** or `mcp.json` (Local / Direct LAN `--allow-lan` / SSH / HTTPS) | [3. AI Coding Agents](#3-ai-coding-agents-claude-code-antigravity-codex-cursor-workbuddy-dsh-harness-kimi-code-minimax-code-zcode) |
 | **Doubao (豆包)** | ✅ Tested | **Direct HTTPS** or **Secure Tunnel** | [5. Claude & Doubao](#5-claude-app--doubao-豆包) |
 
 **End-to-end validation (November 2026):** The project maintainer reports successful **read and write MCP operations** using **Antigravity, Cursor, Codex, DSH-Harness, ZCode, Minimax Code, WorkBuddy, and Kimi Code**. A separate WorkBuddy-to-Jetson test verified live tool discovery and read-only operations on Linux ARM64. The tested WorkBuddy desktop loader expects `"type": "streamable-http"`; remote entries accept only `type`, `url`, and optional `headers`. See the [WorkBuddy Linux / Jetson Use Case](use-cases/workbuddy-linux-jetson.md).
@@ -36,13 +36,13 @@ Starmux exposes a standard **MCP Streamable HTTP** endpoint (`/mcp`). Choose you
 
 ## 2. ChatGPT Web (Tunnel, Direct HTTPS & OAuth)
 
-ChatGPT Web runs in the cloud and cannot connect to `http://127.0.0.1:18893/mcp` directly. Choose either **Path A (OpenAI Secure MCP Tunnel)** or **Path B (Direct HTTPS)**:
+ChatGPT Web runs in the cloud and cannot connect to `http://127.0.0.1:18893/mcp` directly. Because both `tunnel-client` and Caddy run on your host and forward traffic to `127.0.0.1:18893` locally, Starmux itself only needs `starmux up` (or `starmux up --code`—no `--allow-lan` required). Choose either **Path A (Tunnel)** or **Path B (Direct HTTPS / Server URL)**:
 
-| | **Path A: OpenAI Secure MCP Tunnel** *(No Inbound Port)* | **Path B: Direct HTTPS** *(Your Own Domain)* |
+| | **Path A: OpenAI Secure MCP Tunnel** *(No Domain / Behind NAT)* | **Path B: Direct HTTPS or Cloudflare Tunnel** *(Server URL)* |
 | :--- | :--- | :--- |
-| **Best for** | Home Wi-Fi, NAT/CGNAT, or restrictive firewalls | Hosts with a public IPv4/IPv6 address and a domain name |
-| **Inbound ports** | ❌ None *(outbound connection from your host)* | ✅ Inbound `TCP 443` (or `8443`) |
-| **ChatGPT Connection field** | Select **Tunnel** (`tunnel_id`) | Enter `https://mcp.example.com/mcp` |
+| **Best for** | Home Wi-Fi, NAT/CGNAT, or hosts without a domain name | Hosts with a public IPv4/IPv6 + domain (Caddy), or Cloudflare Tunnel |
+| **Inbound ports** | ❌ None *(outbound connection from your host to `127.0.0.1:18893`)* | ✅ Inbound `TCP 443` for Caddy *(or none for Cloudflare Tunnel)* |
+| **ChatGPT "Connection" tab** | Switch to **Tunnel (隧道)** and select/enter `tunnel_<ID>` | Keep **Server URL (服务器 URL)** and enter `https://mcp.example.com/mcp` |
 
 ### Path A — Connect ChatGPT Web via OpenAI Secure MCP Tunnel
 
@@ -107,13 +107,13 @@ All mainstream agentic coding clients—including **Claude Code**, **Antigravity
 
 ### Fastest Setup: Ask Your AI Agent to Configure Itself (Prompt Auto-Setup)
 
-You don't even need to locate your client's config file manually. Just paste the following prompt into your AI coding agent's chat box (replacing `http://192.168.50.114/mcp` with your actual LAN IP, domain, or `http://127.0.0.1:18893/mcp`):
+You don't even need to locate your client's config file manually. Just paste the following prompt into your AI coding agent's chat box (replace `127.0.0.1:18893` with your LAN/Tailscale IP or domain if connecting remotely):
 
 ```text
 Create this MCP Server connector:
 "starmux": {
   "type": "streamable-http",
-  "url": "http://192.168.50.114/mcp"
+  "url": "http://127.0.0.1:18893/mcp"
 }
 ```
 
@@ -125,27 +125,27 @@ The AI agent will automatically write the configuration into its own `mcp.json` 
 
 If you prefer editing your client's JSON configuration file directly (e.g., `~/.workbuddy/mcp.json` or `.cursor/mcp.json`), choose the template matching your network setup. Protect files containing API keys with owner-only permissions (`chmod 600`).
 
-#### Scenario A — Local Network (LAN) or Same Computer (`Auth: None`)
+#### Scenario A — Same Computer (`localhost`) or Direct LAN / Tailscale (`--allow-lan`)
 
-- **On a Local Network (via Caddy forwarding `http://192.168.50.114` $\rightarrow$ `127.0.0.1:18893`):**
-  ```json
-  {
-    "mcpServers": {
-      "starmux": {
-        "type": "streamable-http",
-        "url": "http://192.168.50.114/mcp"
-      }
-    }
-  }
-  ```
-
-- **On the Same Computer (`localhost`):**
+- **On the Same Computer (`starmux up`):**
   ```json
   {
     "mcpServers": {
       "starmux": {
         "type": "streamable-http",
         "url": "http://127.0.0.1:18893/mcp"
+      }
+    }
+  }
+  ```
+
+- **Across LAN / Tailscale / WireGuard (`starmux up --allow-lan` — no Caddy or tunnel needed):**
+  ```json
+  {
+    "mcpServers": {
+      "starmux": {
+        "type": "streamable-http",
+        "url": "http://192.168.50.114:18893/mcp"
       }
     }
   }
@@ -205,10 +205,10 @@ Many desktop AI clients only ship macOS and Windows apps. You can run your AI cl
 
 You can either ask Codex in chat to add the `starmux` MCP connector, or configure it in `config.toml`:
 
-- **Without API Key (LAN / SSH / Protected Tunnel):**
+- **Without API Key (Local / Direct LAN `--allow-lan` / Tailscale / SSH):**
   ```toml
   [mcp_servers.starmux]
-  url = "http://192.168.50.114/mcp"
+  url = "http://192.168.50.114:18893/mcp"
   ```
 - **With Bearer API Key (Public HTTPS / Tunnel):**
   ```toml
@@ -227,4 +227,4 @@ You can either ask Codex in chat to add the `starmux` MCP connector, or configur
 
 ---
 
-[Documentation Index](README.md) · [Installation & Networking](INSTALL.md) · [Security & Authentication](SECURITY.md) · [Multi-Instance & Config](INSTANCES.md)
+[Documentation Index](README.md) · [Installation & Networking](INSTALL.md) · [Gateway & Middleware](GATEWAY.md) · [Security & Authentication](SECURITY.md) · [Multi-Instance & Config](INSTANCES.md)

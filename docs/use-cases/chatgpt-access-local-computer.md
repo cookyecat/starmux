@@ -69,6 +69,18 @@ After connecting the MCP server, ask ChatGPT:
 
 A successful local `starmux verify` is **not** proof that ChatGPT can reach the remote endpoint; confirm both the ChatGPT connection and an actual read-only tool call.
 
+## Common Questions (FAQ)
+
+### Q: Can ChatGPT Web connect directly to `http://127.0.0.1:18893/mcp` or my private `192.168.x.x` LAN IP?
+No. ChatGPT Web runs in OpenAI's cloud, so `127.0.0.1` and private LAN IPs are not reachable from its servers. Use **OpenAI Secure MCP Tunnel** (`tunnel-client`), **Cloudflare Tunnel** (`cloudflared`), or **Caddy Direct HTTPS** to forward traffic to your local `127.0.0.1:18893/mcp` endpoint.
+
+### Q: In ChatGPT Web's "Add custom MCP server" dialog, what is the difference between "Server URL" and "Tunnel"?
+- **Tunnel (隧道):** Used with **OpenAI Secure MCP Tunnel** (`tunnel-client`). Instead of a URL, you select or enter your registered `tunnel_<ID>` (e.g., `tunnel_6ace727bb4f8...`).
+- **Server URL (服务器 URL):** Used with **Caddy Direct HTTPS** or **Cloudflare Tunnel**. You enter the full HTTPS endpoint `https://mcp.example.com/mcp`.
+
+### Q: Does `starmux up` need `--allow-lan` when connecting ChatGPT Web?
+No. Both `tunnel-client` and Caddy run on your computer and forward requests to `127.0.0.1:18893`, so plain `starmux up` (for read-only inspection) or `starmux up --code` (for file edits, terminal, and Git) is sufficient.
+
 ## Where to go next
 
 - [ChatGPT Web setup: Tunnel, HTTPS and OAuth](../CLIENTS.md) — full client-specific instructions.

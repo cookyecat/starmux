@@ -103,6 +103,15 @@ starmux auth revoke SESSION_ID
 
 Revocation blocks subsequent requests from that session. To stop the same identity signing in again, also update the allowed `--subject` / `--subjects` configuration.
 
+## Common Questions (FAQ)
+
+### Q: When should I use OAuth 2.0 + PKCE instead of a Starmux Bearer API key (`starmux auth key`)?
+- **Use a Bearer API key (`smx_...`)** for AI coding clients (`Codex`, `Cursor`, `Claude Code`, `Antigravity`, `WorkBuddy`, etc.) that support `"headers": { "Authorization": "Bearer smx_..." }` or `bearer_token_env_var`. It takes one command (`starmux auth key "Client"`) and requires no external identity server.
+- **Use OAuth 2.0 + PKCE (Keycloak)** for cloud browser AI connectors (such as **ChatGPT Web** custom MCP connectors) that require interactive browser sign-in and OAuth Protected Resource Metadata discovery (`/.well-known/oauth-protected-resource`).
+
+### Q: Why does ChatGPT OAuth over OpenAI Secure MCP Tunnel require `--resource-aliases`?
+When ChatGPT discovers an MCP server through an OpenAI Secure MCP Tunnel, the tunnel rewrites the public MCP resource URL. Passing `--resource-aliases 'EXACT_DISCOVERED_RESOURCE_URL'` to `starmux auth oauth setup` (and mapping that audience in Keycloak) allows Starmux to validate access tokens minted for the tunnel-rewritten resource URL.
+
 ## Related guides
 
 - [Full Keycloak and OAuth configuration](../SECURITY.md)

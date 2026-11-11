@@ -20,12 +20,12 @@ Start read-only. Check local MCP health and tool discovery before attempting a r
 
 ## 2. Pick the right remote access path
 
-| Situation | Connection | Inbound access | Tradeoff |
-| --- | --- | --- | --- |
-| Public IPv4/IPv6 and a domain | **Your own HTTPS reverse proxy** | Usually TCP 443 | You operate DNS, TLS, firewall and authentication. |
-| NAT/CGNAT or inbound ports unavailable | **Outbound tunnel** | No inbound port required | Depends on tunnel provider and client compatibility. |
-| Laptop AI coding client with SSH access | **SSH local forwarding** | SSH access only | Laptop-local forwarding is not reachable from ChatGPT Web. |
-| Two machines on a trusted LAN | `starmux up --allow-lan` or SSH | LAN-specific | Restrict access to authorized clients. |
+| Situation | Starmux Command | Connection | Inbound access | Tradeoff |
+| --- | --- | --- | --- | --- |
+| Two of your own machines (LAN or **Tailscale / WireGuard**) | `starmux up --allow-lan` | **Direct HTTP over LAN / Tailscale IP** (`http://<ip>:18893/mcp`) | LAN / Tailscale interface only | Simplest cross-machine setup; no Caddy or tunnel needed. |
+| Laptop AI coding client with SSH access | `starmux up` | **SSH local forwarding** (`http://127.0.0.1:18894/mcp`) | SSH access only | Laptop-local forwarding is not reachable from ChatGPT Web. |
+| Cloud AI (ChatGPT Web) behind NAT/CGNAT (no domain) | `starmux up` | **Outbound tunnel** (OpenAI Tunnel `tunnel_...` or Cloudflare Tunnel) | No inbound port required | Forwards to `127.0.0.1:18893` locally; depends on tunnel provider. |
+| Cloud AI; public IPv4/IPv6 and a domain | `starmux up` | **Your own HTTPS reverse proxy** (`https://mcp.example.com/mcp`) | Usually TCP 443 | Caddy forwards to `127.0.0.1:18893` locally; you operate DNS, TLS and auth. |
 
 NAT, TLS encryption and an obscure hostname are **not substitutes for caller authentication**.
 
@@ -94,6 +94,18 @@ Connect your **laptop** AI client's MCP configuration to `http://127.0.0.1:18894
 4. From that client, discover tools and perform a harmless read-only operation.
 
 If local verification succeeds but remote tool calls fail, first inspect the transport and authentication boundary, not just Starmux's process status.
+
+## Common Questions (FAQ)
+
+### Q: Why don't OpenAI Tunnel (`tunnel-client`), Cloudflare Tunnel (`cloudflared`), or Caddy require `--allow-lan`?
+Because `tunnel-client`, `cloudflared`, and Caddy run on the same machine as Starmux and connect to `http://127.0.0.1:18893/mcp` over local loopback (`127.0.0.1`). You only need `starmux up --allow-lan` when a remote desktop AI client connects directly to your machine's LAN or Tailscale IP (`http://<lan-or-tailscale-ip>:18893/mcp`) without a local forwarder.
+
+### Q: In ChatGPT Web, when should I choose the "Tunnel (隧道)" tab vs. the "Server URL (服务器 URL)" tab?
+- Choose **Tunnel (隧道)** when using **OpenAI Secure MCP Tunnel** (`tunnel-client`)—then select or enter your `tunnel_<ID>` identifier.
+- Choose **Server URL (服务器 URL)** when using **Caddy Direct HTTPS** or **Cloudflare Tunnel (`cloudflared`)**—then enter the full `https://<your-domain-or-tunnel>/mcp` URL.
+
+### Q: Does Starmux require rewriting the HTTP `Host` header behind Caddy or a tunnel?
+No. Starmux's client-facing routes (`/mcp`, `/healthz`, and `/.well-known/oauth-protected-resource*`) accept any single valid HTTP `Host` header (IPv4, domain name, or bracketed IPv6). Meanwhile, owner-only management routes (`/access`, `/dashboard`) strictly require both a `127.0.0.1` loopback socket peer and a localhost `Host` header, so they are never exposed by reverse proxies or tunnels.
 
 ## Related guides
 

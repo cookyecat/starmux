@@ -170,6 +170,8 @@ Commands
 | `starmux logs` | View or stream instance execution logs (continues across restarts) | `-f` (`--follow`), `--lines <1..200>`, `-i <name>` |
 | `starmux permissions` | Display the selected instance's active permission mode | `-i <name>`, `--json` |
 | `starmux privacy` | Check OS privacy/filesystem access through the running instance | `--all`, `--target <PATH>`, `-i <name>`, `--json` |
+| `starmux server ...` | Add, import, test, enable/disable, or authenticate upstream MCP servers | See [`GATEWAY.md`](GATEWAY.md) |
+| `starmux middleware ...` | Add, order, test, enable/disable, or reload MCP middleware pipelines | See [`GATEWAY.md`](GATEWAY.md#middleware) |
 | `starmux auth ...` | Manage authentication modes, Bearer API keys, and OAuth sessions | See [`SECURITY.md`](SECURITY.md) |
 | `starmux config ...` | Edit, diff, apply, clone, import, or export `config.jsonc` and secrets | See [`INSTANCES.md`](INSTANCES.md) |
 
@@ -177,21 +179,22 @@ Commands
 
 ## 4. Remote Network Forwarding & Ingress Engineering
 
-### 4.1 Listener & HTTP `Host` Boundaries
+### 4.1 Network Scenarios & HTTP `Host` Boundaries
 
-- Default: `127.0.0.1:<port>`. Use `starmux up --allow-lan` for direct LAN / Tailscale / WireGuard access on `0.0.0.0:<port>`. Use `--local` (alias `--no-allow-lan`) to restore loopback. Omitted flags preserve the saved mode.
-- `/mcp`, `/healthz`, and `/.well-known/oauth-protected-resource` (including child paths) accept a single valid Host authority: IPv4, hostname or bracketed IPv6, with an optional port from 1 to 65535. Proxies and tunnels can preserve their original domain Host.
-- Every other path is owner-local: the socket peer must be `127.0.0.1` or `::ffff:127.0.0.1`, and Host must match `127.0.0.1:<listener-port>` or `localhost:<listener-port>`. LAN clients cannot bypass this with forged Host or forwarded headers.
-- Missing, duplicate or malformed Host headers are rejected. Existing Origin checks and MCP authentication remain enforced. Preserve the original public Host when proxying the whole server so management pages remain blocked.
+Because SSH port forwarding, tunnel clients (`tunnel-client` / `cloudflared`), and Caddy all run on the Starmux host and forward traffic to `127.0.0.1:18893` over local loopback, **only direct LAN / Tailscale connections across machines require `--allow-lan`**:
 
-Direct access needs no proxy:
+| Scenario | When to Use | Starmux Command | Extra Forwarding Tool (if any) | What to Enter in AI Client |
+| :--- | :--- | :--- | :--- | :--- |
+| **1. Same Computer (`localhost`)** | AI client and Starmux run on the **same machine** | `starmux up --code`<br/>*(or `starmux up` for read-only)* | ❌ **None** | **URL:** `http://127.0.0.1:18893/mcp` |
+| **2. Direct LAN / Tailscale / WireGuard** | Connecting across **two machines** on the same Wi-Fi/LAN or virtual LAN (e.g., Mac/PC $\rightarrow$ Linux or Jetson) | `starmux up --code --allow-lan`<br/>*(only case that needs `--allow-lan`)* | ❌ **None** | **URL:** `http://<lan-or-tailscale-ip>:18893/mcp`<br/>*(run `starmux status` to see detected IP)* |
+| **3. Over SSH Port Forwarding** | Connecting across machines via SSH without exposing `0.0.0.0` | `starmux up --code` | On client laptop:<br/>`ssh -N -L 127.0.0.1:18894:127.0.0.1:18893 user@host` | **URL:** `http://127.0.0.1:18894/mcp` |
+| **4A. Cloud AI via Tunnel (No Domain / NAT)** | Connecting **ChatGPT Web / Codex** or cloud AI behind NAT without a public IP or domain | `starmux up --code`<br/>*(receives tunnel traffic from `127.0.0.1`)* | • **OpenAI Tunnel:** `tunnel-client run ... --mcp.server-url http://127.0.0.1:18893/mcp`<br/>• **Cloudflare:** `cloudflared tunnel --url http://127.0.0.1:18893` | • **OpenAI Tunnel ("Tunnel" tab):** Select `tunnel_<ID>`<br/>• **Cloudflare ("Server URL" tab):** `https://<tunnel-host>/mcp` |
+| **4B. Cloud AI via Public Domain HTTPS** | Connecting cloud browser AI (**ChatGPT Web, Claude, Doubao**) with your own public IP & domain | `starmux up --code`<br/>*(receives Caddy traffic from `127.0.0.1`)* | `caddy reverse-proxy --from mcp.example.com --to 127.0.0.1:18893` | **Server URL:** `https://mcp.example.com/mcp` |
 
-```sh
-starmux up --allow-lan
-# AI client: http://<lan-or-tailscale-ip>:18893/mcp
-```
-
-`--allow-lan` binds all IPv4 interfaces; use your firewall and existing authentication settings to control reachability. Management URLs always use loopback.
+#### Listener & HTTP `Host` Security Rules
+- **Listener mode:** Defaults to `127.0.0.1:<port>`. Use `starmux up --allow-lan` for direct LAN / Tailscale / WireGuard access on `0.0.0.0:<port>`. Use `--local` (alias `--no-allow-lan`) to restore loopback. Omitted flags preserve the saved mode.
+- **Client-facing routes (`/mcp`, `/healthz`, `/.well-known/oauth-protected-resource`):** Accept any single valid `Host` authority (IPv4, hostname, or bracketed IPv6, with an optional port `1–65535`). Proxies, SSH forwards, and tunnels preserve their original `Host` header without any rewrite flag.
+- **Owner-local management routes (all other paths, including `/access` and `/dashboard`):** Require the TCP socket peer to be `127.0.0.1` (or `::ffff:127.0.0.1`) **and** `Host` to match `127.0.0.1:<listener-port>` or `localhost:<listener-port>`. LAN clients and public reverse proxies cannot reach management pages even if the whole server port is forwarded.
 
 ---
 

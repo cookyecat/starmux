@@ -153,6 +153,17 @@ In a real **WorkBuddy → Caddy → Starmux → NVIDIA Jetson Orin** LAN test, W
 
 WorkBuddy discovered **26 tools**. The `health_check` result reported `status: ok`, `mode: coding`, and **25 tools ready**; these are different reported counters, not necessarily equal totals. Read-only calls to `get_config`, `list_processes`, and `list_sessions` all succeeded on Linux ARM64. This trace verifies connection and read operations in Coding mode; exact tool counts can change by release.
 
+## Common Questions (FAQ)
+
+### Q: Why does WorkBuddy skip my MCP server with `unsupported transport`?
+The tested WorkBuddy desktop loader accepts `"type": "streamable-http"` (kebab-case) or `"type": "sse"`. Using camelCase `"streamableHttp"` causes WorkBuddy to log `Skipping MCP server: unsupported transport`.
+
+### Q: Why did WorkBuddy report `unknown remote field` in `mcp.json`?
+For remote HTTP MCP servers, WorkBuddy's config schema strictly accepts only `type`, `url`, and optional `headers`. Remove `command`, `args`, `env`, or custom fields from remote server entries.
+
+### Q: Do I need Caddy on my Linux or NVIDIA Jetson host when connecting WorkBuddy over LAN or Tailscale?
+No. Run `starmux up --code --allow-lan` on the Linux/Jetson host and connect WorkBuddy directly to `http://<linux-or-tailscale-ip>:18893/mcp`. You only need Caddy when exposing Starmux over public HTTPS (`https://mcp.example.com/mcp`).
+
 ## Related guides
 
 - [WorkBuddy official MCP guide](https://www.codebuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/MCP-Guide)
