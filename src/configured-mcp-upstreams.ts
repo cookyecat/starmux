@@ -188,9 +188,9 @@ export class ConfiguredUpstream implements UpstreamAdapter {
       context?.trace?.('upstreamRequest',{serverId:this.id,request:invocation});
       const result=toolResult(await activeClient.callTool(invocation,undefined,options));await progressSent;context?.trace?.('upstreamResponse',result);return result;
     }catch{
-      if(!this.#closed){this.#state="UNAVAILABLE";this.#lastError="UPSTREAM_CALL_UNCERTAIN";}
-      if(this.#client===activeClient)this.#client=null;
-      await activeClient.close().catch(()=>{});
+      // Cancellation, request timeouts and protocol errors belong to this call.
+      // Transport onclose owns connection health; closing a shared Client here
+      // would cancel unrelated requests on an otherwise healthy connection.
       // Crucial: never retry a call with possibly completed side effects.
       invalid("UPSTREAM_CALL_UNCERTAIN");
     }

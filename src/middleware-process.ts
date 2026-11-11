@@ -35,11 +35,26 @@ export class MiddlewareProcess {
   });
   try{const hooks=await this.submit('initialize',[]);if(!Array.isArray(hooks))throw Error('MIDDLEWARE_INVALID_OUTPUT');this.hooks.clear();for(const hook of hooks)this.hooks.add(String(hook));this.#live=true;}catch(error){if(!this.#live)await this.close();throw error;}
  }
- call(stage:MiddlewareStage,args:unknown[]){const signal=mcpCallContext.getStore()?.signal;const abort=()=>this.fail('MIDDLEWARE_FAILED');if(signal?.aborted)return Promise.reject(new MiddlewareError('MIDDLEWARE_FAILED',this.config.id,stage));signal?.addEventListener('abort',abort,{once:true});return this.submit(stage,args).finally(()=>signal?.removeEventListener('abort',abort));}
- private submit(stage:string,args:unknown[]):Promise<unknown>{
+ call(stage:MiddlewareStage,args:unknown[]){return this.submit(stage,args,mcpCallContext.getStore()?.signal);}
+ private submit(stage:string,args:unknown[],signal?:AbortSignal):Promise<unknown>{
+  const cancelled=()=>new MiddlewareError('MIDDLEWARE_FAILED',this.config.id,stage,'not_started','CALL_CANCELLED');
+  if(signal?.aborted)return Promise.reject(cancelled());
   if(this.#dead)return Promise.reject(new MiddlewareError('MIDDLEWARE_FAILED',this.config.id,stage));
   if(this.#pending.size>=(this.config.concurrency??16)&&this.#queue.length>=(this.config.queueLimit??64))return Promise.reject(new MiddlewareError('MIDDLEWARE_BUSY',this.config.id,stage));
-  return new Promise((resolve,reject)=>{this.#queue.push({stage,args,resolve,reject});this.drain();});
+  return new Promise((resolve,reject)=>{
+   const cleanup=()=>signal?.removeEventListener('abort',abort);
+   const item={stage,args,resolve:(value:unknown)=>{cleanup();resolve(value);},reject:(error:Error)=>{cleanup();reject(error);}};
+   const abort=()=>{
+    const index=this.#queue.indexOf(item);
+    if(index>=0)this.#queue.splice(index,1);
+    // A dispatched hook cannot be forcibly interrupted independently of its
+    // shared worker. Ignore its result, but retain its slot and timeout until
+    // completion so cancellation cannot bypass concurrency/resource limits.
+    item.reject(cancelled());
+   };
+   signal?.addEventListener('abort',abort,{once:true});
+   this.#queue.push(item);this.drain();
+  });
  }
  private drain(){
   while(!this.#dead&&this.#pending.size<(this.config.concurrency??16)&&this.#queue.length){

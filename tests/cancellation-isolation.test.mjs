@@ -1,0 +1,34 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import {MiddlewareProcess} from '../dist/src/middleware-process.js';
+import {ConfiguredUpstream} from '../dist/src/configured-mcp-upstreams.js';
+import {mcpCallContext} from '../dist/src/mcp-call-context.js';
+const context=(id,signal)=>({sessionId:id,capabilities:{},signal,progress:async()=>{},interact:async()=>{throw Error('unexpected interaction');}});
+const plugin=path.resolve('tests/fixtures/middleware-plugin.mjs');
+for(const concurrency of [1,2])test(`plugin cancellation isolates ${concurrency===1?'queued':'running'} calls and retains worker state`,async t=>{
+ const worker=new MiddlewareProcess({id:'shared',module:plugin,options:{},concurrency,timeoutMs:3000},plugin);await worker.start();t.after(()=>worker.close());
+ const generation=worker.generation,controller=new AbortController();
+ const invoke=(name,signal,delay=150)=>mcpCallContext.run(context(name,signal),()=>worker.call('request',[{options:{delay,counter:true},arguments:{name}}]));
+ const b=invoke('B',new AbortController().signal);
+ const a=invoke('A',controller.signal);const rejected=assert.rejects(a,e=>e.reason==='CALL_CANCELLED');
+ assert.equal(worker.status.pending,concurrency);assert.equal(worker.status.queued,2-concurrency);
+ controller.abort();await rejected;
+ assert.equal(worker.status.pending,concurrency,'dispatched cancellation must not free a slot while code is still running');
+ assert.equal(worker.status.queued,0);
+ assert.equal((await b).arguments.name,'B');
+ const c=await invoke('C',new AbortController().signal,0);
+ assert.equal(c.arguments.sequence,concurrency+1,'queued canceled hooks must not execute; running hooks may finish');
+ assert.equal(worker.generation,generation);assert.equal(worker.status.restarts,0);
+ const pre=new AbortController();pre.abort();await assert.rejects(invoke('pre',pre.signal),e=>e.reason==='CALL_CANCELLED');
+});
+for(const failure of ['cancel','timeout'])test(`shared upstream ${failure} does not close other requests or replay calls`,async t=>{
+ const upstream=new ConfiguredUpstream({id:'shared',transport:'stdio',command:process.execPath,args:[path.resolve('tests/fixtures/gateway-upstream.mjs')],allowTools:['wait','echo']});await upstream.connect();t.after(()=>upstream.close());
+ const controller=new AbortController();
+ const a=mcpCallContext.run(context('A',controller.signal),()=>upstream.forwardWorkspaceInvocation({name:'wait',arguments:{delay:5000}},failure==='timeout'?{timeout:40}:undefined));
+ const rejected=assert.rejects(a,e=>e.code==='UPSTREAM_CALL_UNCERTAIN');
+ const b=mcpCallContext.run(context('B',new AbortController().signal),()=>upstream.forwardWorkspaceInvocation({name:'wait',arguments:{delay:150}}));
+ if(failure==='cancel')controller.abort();
+ await rejected;assert.equal((await b).content[0].text,'first');assert.equal(upstream.status.status,'READY');
+ assert.equal((await upstream.forwardWorkspaceInvocation({name:'echo'})).content[0].text,'first');
+});
