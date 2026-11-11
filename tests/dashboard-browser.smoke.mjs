@@ -71,6 +71,9 @@ try{
  await page.locator('[data-action="show-calls"]').click();await page.locator('[data-id="two"]').waitFor();
  await page.locator('[data-page="servers"]').click();await page.locator('[name="serverId"]').fill('browser-fixture');
  await page.locator('[name="serverInput"]').fill(JSON.stringify({command:process.execPath,args:[path.resolve('tests/fixtures/gateway-upstream.mjs'),'browser']}));
+ await page.route('**/api/v1/instances/*/servers',async route=>{if(route.request().method()==='POST')await route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'CONFIG_REVISION_CONFLICT'})});else await route.continue();});
+ await page.locator('[data-action="server-preview"]').click();await page.waitForFunction(()=>document.querySelector('#notice')?.textContent.includes('复制保留未保存的修改'));assert.ok((await page.locator('#notice').textContent()).includes('CONFIG_REVISION_CONFLICT'));
+ await page.unroute('**/api/v1/instances/*/servers');
  await page.locator('[data-action="server-preview"]').click();await page.waitForFunction(()=>document.querySelector('#server-preview')?.textContent.includes('previewId'));
  await page.locator('[data-action="server-test-preview"]').click();await page.waitForFunction(()=>document.querySelector('#server-preview')?.textContent.includes('READY'));
  await page.locator('[data-action="server-save"]').click();await page.locator('[data-server-test="browser-fixture"]').waitFor();
@@ -78,7 +81,7 @@ try{
  await page.locator('[data-server-toggle="browser-fixture"]').click();await page.waitForFunction(()=>document.querySelector('[data-server-toggle="browser-fixture"]')?.getAttribute('data-enabled')==='false');
  await page.locator('[data-server-remove="browser-fixture"]').click();await page.locator('[data-server-test="browser-fixture"]').waitFor({state:'detached'});
  await page.locator('[data-page="middlewares"]').click();await page.locator('[name="middlewareId"]').fill('defaults');await page.locator('[name="middlewareOptions"]').fill('{"defaults":{"example":"value"}}');
- await page.locator('[data-action="middleware-save"]').click();await page.locator('[data-middleware-edit="defaults"]').waitFor();
+ await page.locator('[data-action="middleware-save"]').click();await page.locator('[data-middleware-edit="defaults"]').waitFor();await page.getByText('已保存；实例启动时生效。',{exact:true}).waitFor();
  await page.locator('[data-action="middleware-test"]').click();await page.waitForFunction(()=>document.querySelector('#middleware-result')?.textContent.includes('sampleOnly'));
  await page.screenshot({path:'.internal/playwright/gateway-middleware-zh.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'.internal/playwright/gateway-middleware-mobile.png',fullPage:true});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

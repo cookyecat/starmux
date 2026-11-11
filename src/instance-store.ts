@@ -90,6 +90,18 @@ export async function changeRegistry<T>(action:(registry:Registry)=>Promise<T>,h
 export async function resolveInstance(selector?:string,home=homedir(),includeArchived=false){
   const registry=await readRegistry(home);const rows=registry.instances.filter(i=>includeArchived||!i.archived);
   const result=selector?rows.find(i=>i.id===selector||i.name===selector):rows.find(i=>i.id===registry.defaultInstanceId)??(rows.length===1?rows[0]:undefined);
+  if(!result&&selector){
+    const hints=['The -i / --instance option accepts an instance name or ID, not a project directory.','Run starmux ls to see instance names and IDs; starmux status without -i shows only the default instance.'];
+    if(path.isAbsolute(selector)){
+      const matches=await Promise.all(rows.map(async instance=>{
+        try{const {config}=await loadInstanceConfig(instance);return path.resolve(config.projectRoot)===path.resolve(selector)?instance:null;}catch{return null;}
+      }));
+      for(const instance of matches)if(instance)hints.push('This project belongs to instance '+JSON.stringify(instance.name)+'. Check it with: starmux status -i '+instance.id);
+    }
+    const archived=registry.instances.find(i=>i.archived&&(i.id===selector||i.name===selector));
+    if(archived)hints.push('This instance is archived. View archived instances with: starmux ls --archived');
+    throw Error('INSTANCE_NOT_FOUND: '+JSON.stringify(selector)+'\n'+hints.join('\n'));
+  }
   if(!result)throw Error(selector?'INSTANCE_NOT_FOUND: '+selector:registry.instances.length
     ?'INSTANCE_REQUIRED: select an instance with -i NAME or set a default with starmux config default NAME'
     :'INSTANCE_REQUIRED: no instances. Run starmux up in your project.');

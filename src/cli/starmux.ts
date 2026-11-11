@@ -1,3 +1,4 @@
+import {formatUserError,withErrorGuidance} from '../user-feedback.js';
 import {MiddlewareManagement} from '../middleware-management.js';
 import {ServerManagement,applySavedGateway} from '../server-management.js';
 import {ensureManager,managerStatus,stopManager,startDetachedInstance} from '../dashboard-manager.js';
@@ -33,7 +34,7 @@ try{parsed=parseArgs({args:process.argv.slice(2),options,allowPositionals:true,s
 const flags=parsed.values;const positional=parsed.positionals;const command=positional.shift()??'help';
 const string=(key:string)=>typeof flags[key]==='string'?flags[key] as string:undefined;
 const yes=()=>flags.yes===true;const json=flags.json===true;
-const print=(value:unknown)=>{if(value&&typeof value==='object'&&'application' in value&&value.application==='pending'&&'error' in value)process.exitCode=1;process.stdout.write(JSON.stringify(value,null,2)+'\n');};
+const print=(value:unknown)=>{if(value&&typeof value==='object'&&'application' in value&&value.application==='pending'&&'error' in value)process.exitCode=1;process.stdout.write(JSON.stringify(withErrorGuidance(value),null,2)+'\n');};
 function fail(message:string):never{throw Error(message);}
 const absolute=(value:string)=>path.resolve(value==='~'?homedir():value.startsWith('~/')?path.join(homedir(),value.slice(2)):value);
 const pause=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -532,4 +533,4 @@ async function main(){
     const args=[...positional,'--instance',instance.id];for(const [key,value] of Object.entries(flags))if(key!=='instance'&&value!==undefined)args.push('--'+key,...(typeof value==='string'?[value]:[]));await handle(command,args);
   }
 }
-try{await main();}catch(error){const message=error instanceof Error?error.message:String(error);if(json)print({schemaVersion:1,error:message});else process.stderr.write(message+'\n');process.exitCode=1;}
+try{await main();}catch(error){const message=error instanceof Error?error.message:String(error);if(json)print({schemaVersion:1,error:message});else process.stderr.write(formatUserError(message)+'\n');process.exitCode=1;}

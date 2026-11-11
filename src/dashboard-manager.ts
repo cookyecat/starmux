@@ -62,7 +62,7 @@ export async function runManager(){
    if(req.headers.origin&&req.headers.origin!=='http://'+req.headers.host){send(403,{error:'ORIGIN_REJECTED'});return;}
    const url=new URL(req.url??'/',`http://${req.headers.host}`),route=url.pathname;
    if(req.method==='GET'&&route==='/'){res.writeHead(200,{...headers,'content-type':'text/html; charset=utf-8'});res.end(dashboardHtml);return;}
-   if(req.method==='GET'&&route==='/app.js'){res.writeHead(200,{...headers,'content-type':'text/javascript'});res.end(await readFile(new URL('./dashboard-browser.js',import.meta.url)));return;}
+   if(req.method==='GET'&&(route==='/app.js'||route==='/user-feedback.js')){res.writeHead(200,{...headers,'content-type':'text/javascript'});res.end(await readFile(new URL(route==='/app.js'?'./dashboard-browser.js':'./user-feedback.js',import.meta.url)));return;}
    if(!equal(req.headers.authorization??'','Bearer '+token)){send(401,{error:'MANAGER_LOGIN_REQUIRED'});return;}
    if(req.method==='GET'&&route==='/api/v1/identity'){send(200,{runId});return;}
    if(req.method!=='GET'&&(req.method!=='POST'||req.headers.origin!=='http://'+req.headers.host||req.headers['content-type']!=='application/json')){send(403,{error:'INVALID_ORIGIN_OR_CONTENT_TYPE'});return;}
