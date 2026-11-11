@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0 - 2026-11-11
 
 - Add unified stdio, Streamable HTTP and explicit legacy SSE service management, with configuration/command/URL imports, bounded discovery, API-key references and independent outbound OAuth accounts. Manage services through the Web console or `starmux server` commands.
 - Add the versioned `starmux/middleware` ESM and TypeScript API, isolated trusted plugin processes, built-in transformations, sample tests, explicit read caching and four-stage invocation diagnostics. Preserve canonical permission checks across aliases, routes and synthetic responses.

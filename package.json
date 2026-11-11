@@ -1,7 +1,7 @@
 {
   "name": "starmux",
   "mcpName": "io.github.cookyecat/starmux",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "All-in-one self-hosted remote MCP server and gateway for ChatGPT, Claude, WorkBuddy, Codex and Cursor: built-in filesystem, file editing, terminal, process management, Desktop Commander, auth and stdio MCP multiplexing over Streamable HTTP on Linux, NVIDIA Jetson, macOS and Windows.",
   "keywords": [
     "mcp",
