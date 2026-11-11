@@ -33,7 +33,15 @@ try{
  assert.ok(!(await client.listTools()).tools.some(t=>t.name==='fixture__inspect'));assert.equal((await client.callTool({name:'fixture__inspect'})).isError,true);
  assert.equal((await run('server','disable','fixture')).application,'applied');assert.equal((await run('server','remove','fixture')).application,'applied');assert.equal((await run('status')).runtime.runId,before.runtime.runId);
  const denied=await client.callTool({name:'start_process',arguments:{command:'echo should-not-execute'}});assert.equal(denied.isError,true);
+ await client.close();client=undefined;
+ await run('up','--code','-y');
+ client=new Client({name:'package-coding-acceptance',version:'1'},{capabilities:{}});await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`)));
+ const command=await client.callTool({name:'start_process',arguments:{command:'echo production-command-smoke',timeout_ms:2000}});
+ assert.notEqual(command.isError,true);assert.ok(JSON.stringify(command).includes('production-command-smoke'));
+ const written=path.join(project,'utf8.txt'),content='中文“我”🙂\n';
+ const write=await client.callTool({name:'write_file',arguments:{path:written,content,mode:'rewrite'}});
+ assert.notEqual(write.isError,true);assert.equal(await readFile(written,'utf8'),content);
  await client.close();client=undefined;await run('down');
  assert.equal((await run('status')).phase,'stopped');
- console.log('PASS: production install, CLI start/stop, complete catalog, read-only call, plugin runtime and public export.');
+ console.log('PASS: production install, CLI start/stop, complete catalog, read-only enforcement, command execution, UTF-8 writes, plugin runtime and public export.');
 }finally{await client?.close();await run('down').catch(()=>{});}

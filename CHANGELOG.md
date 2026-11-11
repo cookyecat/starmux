@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.18.2 - 2026-11-11
+
+- Bundle Desktop Commander 0.3.2 with the existing telemetry/cloud removal and add its retained command parser dependency, `unbash`, to production installations.
+- Preserve `dist` links into `.internal/` during clean builds, recreate missing targets, and verify command execution and UTF-8 writes in production-package acceptance.
+- Verify the embedded MCP runtime stays offline for telemetry even with a pre-existing opt-in configuration, including tool failures and UI events. Check UI assets as well as server modules for known telemetry endpoints.
+- Disable upstream installation scripts in source-install instructions and CI, preventing the original development dependency from reporting installation telemetry.
+- Add end-to-end UTF-8 byte-boundary write regressions for Chinese text and emoji across fixed-length/chunked requests and rewrite/append operations.
+
 ## 0.18.1 - 2026-11-11
 
 - Isolate request cancellation from shared middleware workers and upstream connections; retain bounded accounting for already dispatched plugin hooks.

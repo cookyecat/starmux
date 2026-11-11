@@ -391,6 +391,7 @@ http=createServer(async(req,res)=>{
     ...(identity.kind==='verified-api-key'?{credentialId:identity.credentialId}:identity.kind==='verified-oauth'?{connectionId:identity.connectionId}:{})});
   let parsedBody:unknown;
   if(req.method==='POST'){
+    // HTTP chunks may split a UTF-8 character; decode only after joining bytes.
     const chunks:Buffer[]=[];let bytes=0;
     for await(const chunk of req){const data=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);bytes+=data.length;if(bytes>MCP_REQUEST_BODY_LIMIT){res.writeHead(413).end('Request too large');return;}chunks.push(data);}
     try{parsedBody=JSON.parse(Buffer.concat(chunks,bytes).toString('utf8'));}catch{res.writeHead(400).end('Invalid JSON');return;}

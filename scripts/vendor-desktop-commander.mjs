@@ -376,7 +376,7 @@ const forbiddenPatterns = [
 
 const violations = [];
 for (const file of remainingFiles) {
-  if (!file.endsWith('.js') && !file.endsWith('.json')) continue;
+  if (!/\.(js|json|html|css)$/.test(file)) continue;
   const content = readFileSync(file, 'utf8');
   for (const pattern of forbiddenPatterns) {
     if (content.includes(pattern)) {
@@ -393,5 +393,5 @@ if (violations.length > 0) {
 let totalBytes = 0;
 for (const file of remainingFiles) totalBytes += statSync(file).size;
 console.log(
-  `[vendor-desktop-commander] Sterilized @wonderwhy-er/desktop-commander@${upstreamPkg.version} -> dist/vendor/desktop-commander (${remainingFiles.length} files, ${(totalBytes / 1024).toFixed(1)} KiB, 0 telemetry/cloud endpoints)`
+  `[vendor-desktop-commander] Sterilized @wonderwhy-er/desktop-commander@${upstreamPkg.version} -> dist/vendor/desktop-commander (${remainingFiles.length} files, ${(totalBytes / 1024).toFixed(1)} KiB, 0 known telemetry/cloud pattern matches)`
 );

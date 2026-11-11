@@ -63,8 +63,8 @@ Glama-hosted build still need validation before publication.
 
 Check these Starmux-specific requirements before publishing:
 
-- Use Node.js 22.12 or newer. `npm ci` installs locked dependencies and builds
-  the runtime; `npm run build` can rebuild it explicitly.
+- Use Node.js 22.12 or newer. `npm ci --ignore-scripts` installs locked dependencies
+  without upstream installation telemetry; then `npm run build` builds the runtime.
 - Starmux exposes **Streamable HTTP**, not stdio. Do not configure
   `starmux up` as a stdio MCP entry point.
 - The regular `up` command backgrounds its supervisor. For a container process,

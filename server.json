@@ -3,7 +3,7 @@
   "name": "io.github.cookyecat/starmux",
   "title": "Starmux — All-in-One Self-Hosted Remote MCP Server & Gateway",
   "description": "All-in-one remote MCP server & gateway: built-in file, terminal, process & stdio tools over HTTP.",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "websiteUrl": "https://github.com/cookyecat/starmux#readme",
   "repository": {
     "url": "https://github.com/cookyecat/starmux",
@@ -14,7 +14,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "starmux",
-      "version": "0.18.1",
+      "version": "0.18.2",
       "transport": {
         "type": "streamable-http",
         "url": "http://127.0.0.1:18893/mcp"

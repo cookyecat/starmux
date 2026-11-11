@@ -65,13 +65,14 @@ When installing from source or testing local modifications:
 ```sh
 git clone https://github.com/cookyecat/starmux.git
 cd starmux
-npm ci
+npm ci --ignore-scripts
 npm run build
 npm install --global .
 starmux --version
 ```
 
 - `npm run build` compiles TypeScript sources into `dist/src/` and vendors Desktop Commander into `dist/vendor/`.
+- `--ignore-scripts` prevents the original upstream development package from running installation telemetry and browser downloads.
 - If `starmux` is not found after global installation, ensure your npm global bin directory (`$(npm prefix -g)/bin`) is in your shell `PATH` (in `zsh`, run `rehash`).
 
 <a id="upgrade"></a>

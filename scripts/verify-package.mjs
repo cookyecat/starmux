@@ -30,5 +30,9 @@ writeFileSync(path.join(consumer,'plugin.mjs'),`import {defineMiddleware} from '
 cpSync(path.join(root,'tests/package-smoke.mjs'),path.join(consumer,'smoke.mjs'));
 const env={...process.env,NODE_OPTIONS:`--require ${JSON.stringify(path.join(consumer,'guard.cjs'))} --experimental-loader ${JSON.stringify(path.join(consumer,'guard.mjs'))}`};
 run(process.execPath,['smoke.mjs'],consumer,env);
-writeFileSync(path.join(work,'receipt.json'),JSON.stringify({tarball,sha512:packed[0].integrity,platform:process.platform,arch:process.arch,node:process.version,productionOnly:true,publicTypes:true,passed:true},null,2));
+mkdirSync(path.join(consumer,'tests/fixtures'),{recursive:true});
+cpSync(path.join(root,'tests/vendor-telemetry.test.mjs'),path.join(consumer,'tests/vendor-telemetry.test.mjs'));
+cpSync(path.join(root,'tests/fixtures/deny-network.cjs'),path.join(consumer,'tests/fixtures/deny-network.cjs'));
+run(process.execPath,['--test','tests/vendor-telemetry.test.mjs'],consumer,{...env,STARMUX_TEST_VENDOR_ROOT:path.join(consumer,'node_modules/starmux/dist/vendor/desktop-commander')});
+writeFileSync(path.join(work,'receipt.json'),JSON.stringify({tarball,sha512:packed[0].integrity,platform:process.platform,arch:process.arch,node:process.version,productionOnly:true,publicTypes:true,telemetryOffline:true,passed:true},null,2));
 console.log(`Exact package acceptance passed: ${work}`);

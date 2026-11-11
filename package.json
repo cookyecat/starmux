@@ -1,7 +1,7 @@
 {
   "name": "starmux",
   "mcpName": "io.github.cookyecat/starmux",
-  "version": "0.18.1",
+  "version": "0.18.2",
   "description": "All-in-one self-hosted remote MCP server and gateway for ChatGPT, Claude, WorkBuddy, Codex and Cursor: built-in filesystem, file editing, terminal, process management, Desktop Commander, auth and stdio MCP multiplexing over Streamable HTTP on Linux, NVIDIA Jetson, macOS and Windows.",
   "keywords": [
     "mcp",
@@ -83,13 +83,14 @@
     "pizzip": "3.3.0",
     "proper-lockfile": "4.1.2",
     "sharp": "0.35.5",
+    "unbash": "6.0.1",
     "unpdf": "1.8.0",
     "zod": "3.25.76",
     "zod-to-json-schema": "3.25.2"
   },
   "devDependencies": {
     "@types/node": "22.20.5",
-    "@wonderwhy-er/desktop-commander": "0.3.1",
+    "@wonderwhy-er/desktop-commander": "0.3.2",
     "typescript": "5.9.3"
   },
   "files": [
