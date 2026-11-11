@@ -6,7 +6,7 @@ import { toolResult } from "./mcp-results.js";
 import { desktopCommanderEntry } from "./runtime-paths.js";
 // Embedded Desktop Commander transport. The dispatcher authorizes every invocation.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { ManagedStdioTransport } from './managed-stdio-transport.js';
 import { access,constants } from "node:fs/promises";
 import { sandboxedDesktopSpawn } from "./home-write-sandbox.js";
 
@@ -34,7 +34,7 @@ function assertNoCredentials(env: Record<string,string>) {
 
 export class LocalDesktopReadProbe {
   #client: Client|null = null;
-  #transport:StdioClientTransport|null=null;
+  #transport:ManagedStdioTransport|null=null;
   #toolNames: string[] = [];
   #upstreamCatalog: Tool[] = [];
   #writeScope: string;
@@ -58,7 +58,7 @@ export class LocalDesktopReadProbe {
       {command:process.execPath,args:desktopCommanderSpawnArgs()};
     // The sandbox follows DC and every shell/process launched from DC.
     // A failed sandbox launch must never fall back to unrestricted native DC.
-    const transport = new StdioClientTransport({
+    const transport = new ManagedStdioTransport({
       ...executable,env,stderr:"pipe"
     });
     const client = new Client({ name: "starmux-local-read-probe", version: "0.1.0" },

@@ -139,7 +139,7 @@ For agentic coding clients (**Claude Code**, **Antigravity**, **Codex**, **Curso
 Create this MCP Server connector:
 "starmux": {
   "type": "streamable-http",
-  "url": "http://192.168.50.114/mcp"
+  "url": "http://192.168.50.114:18893/mcp"
 }
 ```
 
@@ -328,3 +328,7 @@ starmux dashboard --token -i work  # Legacy per-instance owner token
 ```
 
 The console binds only to loopback on its own port. Its login credential grants management of all local instances and is separate from MCP keys and legacy instance owner tokens. Private login links must not be shared with AI clients. Closing the browser does not stop the console; it does not start automatically at login. Saved configuration is applied separately, and concurrent edits produce a revision conflict instead of overwriting newer changes.
+
+### Programmable gateway
+
+Add local or remote MCP services from the **MCP servers** page or `starmux server add`. Use **Middleware** or `starmux middleware` to configure transforms and trusted local ESM plugins. Existing startup, `none` authentication and tool names remain compatible. See [Gateway services, middleware and troubleshooting](docs/GATEWAY.md).

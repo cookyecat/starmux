@@ -7,6 +7,7 @@ export interface ToolCallContext {
   readonly request: DeepReadonly<RequestContext>;
   readonly invocation: DeepReadonly<ToolInvocation>;
 }
+export type InvocationObserver = (invocation: ToolInvocation, requestId?:string) => (result?: CallToolResult, failure?: string) => void;
 export interface InvocationMiddleware {
   beforeCall?(context: ToolCallContext): void | Promise<void>;
   afterCall?(context: ToolCallContext, result: DeepReadonly<CallToolResult>): void | Promise<void>;
@@ -23,12 +24,12 @@ export function authorizeInvocation(invocation: ToolInvocation): AuthorizedInvoc
   authorized.set(capability, structuredClone(invocation));
   return capability;
 }
-export function createInvocationExecutor(upstream: McpUpstream) {
+export function createInvocationExecutor(upstream: McpUpstream, observer?:InvocationObserver) {
   return async (capability: AuthorizedInvocation): Promise<CallToolResult> => {
     const invocation = authorized.get(capability);
     if (!invocation) throw new GatewayError('INVOCATION_NOT_AUTHORIZED_OR_CONSUMED');
     authorized.delete(capability); // consume before awaiting; uncertain calls cannot replay
-    return upstream.forwardWorkspaceInvocation(invocation);
+    const done=observer?.(invocation);try{const result=await upstream.forwardWorkspaceInvocation(invocation);done?.(result);return result;}catch(error){done?.(undefined,errorCode(error)||'UPSTREAM_CALL_UNCERTAIN');throw error;}
   };
 }
 export function safeAuditSink(audit: AuditSink): AuditSink {
@@ -50,6 +51,7 @@ function frozenCopy<T>(value: T): DeepReadonly<T> {
   return copy as DeepReadonly<T>;
 }
 export function createInvocationPipeline(options: {
+  observer?: InvocationObserver;
   dispatch: (invocation: ToolInvocation, context: RequestContext) => Promise<CallToolResult>;
   audit?: AuditSink;
   denyRules?: Pick<DenyRules, 'check'>;
@@ -60,9 +62,13 @@ export function createInvocationPipeline(options: {
   const hooks = [...(options.middleware || [])];
   return async (params: ToolInvocation): Promise<CallToolResult> => {
     const invocation = structuredClone(params);
+    const request: RequestContext = options.request ?? {requestId: randomUUID(), identity: {kind: 'unverified-local'}};
+    let complete: ReturnType<InvocationObserver>|undefined;
+    try { complete=options.observer?.(invocation,request.requestId); } catch { /* Logging cannot block a tool. */ }
+    const observed=(result:CallToolResult)=>{try{complete?.(result);}catch{}return result;};
     // Only the authenticated HTTP boundary supplies identity. Direct internal calls
     // remain unverified; loopback and caller-supplied identity headers are not proof.
-    const request: RequestContext = options.request ?? {requestId: randomUUID(), identity: {kind: 'unverified-local'}};
+
     const context = frozenCopy({request, invocation});
     try {
       await options.denyRules?.check(invocation.name, invocation.arguments || {});
@@ -70,14 +76,16 @@ export function createInvocationPipeline(options: {
     } catch (error) {
       const reason = errorCode(error) || 'DENY_RULE_CHECK_FAILED';
       audit({event:'TOOL_EXPLICITLY_DENIED',requestId:request.requestId,tool:invocation.name,reason});
-      return {isError:true,content:[{type:'text',text:reason+': Review filters on the local owner Dashboard /filters'}]};
+      return observed({isError:true,content:[{type:'text',text:reason+': Review filters on the local owner Dashboard /filters'}]});
     }
-    const result = await options.dispatch(invocation, request);
+    let result:CallToolResult;
+    try { result = await options.dispatch(invocation, request); }
+    catch(error){try{complete?.(undefined,errorCode(error)||'TOOL_DISPATCH_FAILED');}catch{}throw error;}
     for (const hook of hooks) {
       if (!hook.afterCall) continue;
       try { await hook.afterCall(context, frozenCopy(result)); }
       catch { audit({event:'TOOL_OBSERVER_FAILED',requestId:request.requestId}); }
     }
-    return result; // original MCP result, including unknown extension fields
+    return observed(result); // original MCP result, including unknown extension fields
   };
 }

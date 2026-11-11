@@ -11,7 +11,8 @@ __pycache__/
 secrets/
 logs/
 
-dist/
+# Build output or local link to an isolated .internal build
+/dist
 .codegraph/
 *.tgz
 

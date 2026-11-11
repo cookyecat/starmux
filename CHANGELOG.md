@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+- Add unified stdio, Streamable HTTP and explicit legacy SSE service management, with configuration/command/URL imports, bounded discovery, API-key references and independent outbound OAuth accounts. Manage services through the Web console or `starmux server` commands.
+- Add the versioned `starmux/middleware` ESM and TypeScript API, isolated trusted plugin processes, built-in transformations, sample tests, explicit read caching and four-stage invocation diagnostics. Preserve canonical permission checks across aliases, routes and synthetic responses.
+- Apply service and middleware changes without restarting the instance, validate candidates before replacing the active snapshot, and retain old generations for in-flight calls. Add namespaced resources/prompts and originating-client routing for supported server interactions.
+- Verify production-only npm tarball installation and the public middleware interface in the platform CI matrix, including Node 22.12.0. Keep default `none` authentication, LAN behavior and ordinary startup unchanged.
+
+- Add a structured Web console tool-call history with statuses, timings, search and filters. Record summaries by default and allow owner-local opt-in argument/result previews with bounded in-memory retention, credential-field masking and binary omission. Preserve the system log viewer.
+
+- Preserve configured MCP services and Git/worktree compatibility values when switching Read-only/Coding modes.
+- Cancel and await in-flight upstream connections during shutdown. Return actionable `UPSTREAM_CLOSED` feedback for undispatched calls and preserve uncertain-result feedback for interrupted calls.
+- Copy client configurations for each displayed local, LAN or public endpoint; correct the README LAN port example.
+- Show saved-configuration notices in the native macOS App and align Read-only/Coding labels.
+
+- Omit inactive compatibility defaults from ordinary config templates and summaries. Keep existing JSONC values and workspace-scoped behavior compatible, and show mode-specific, nonblocking notices for explicit ignored Git/worktree settings in config commands and the local console.
+
+- Rotate Core logs at 8 MiB with three backups, retain the recent tail of oversized legacy logs, and follow rotation in CLI log output. Flush worker output before confirming normal shutdown.
+- Record private store lock ownership atomically and recover locks left by exited processes, including authentication store locks. Preserve live and unconfirmed legacy locks.
+- Discover optional MCP upstreams concurrently with a shared per-child initialization/catalog deadline, alongside the built-in engine, so optional startup delays do not accumulate.
+- Clarify that `gitMode` and `worktreeMode` are compatibility settings for workspace-scoped user projects, not Starmux build/development flags or requirements for ordinary Read-only/Coding use.
+- Keep default authentication (`none`), LAN authentication behavior, and ordinary startup commands unchanged.
+
 ## 0.17.0 — 2026-11-08
 
 - Add an independent loopback-only management console with bilingual light/dark UI, instance lifecycle controls, JSONC configuration, credentials, OAuth and logs.

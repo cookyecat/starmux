@@ -1,3 +1,5 @@
+import {MiddlewareManagement} from '../middleware-management.js';
+import {ServerManagement,applySavedGateway} from '../server-management.js';
 import {ensureManager,managerStatus,stopManager,startDetachedInstance} from '../dashboard-manager.js';
 import {GatewayError} from '../validation.js';
 import {parseArgs} from 'node:util';
@@ -17,10 +19,12 @@ import {handle} from './instances.js';
 import {packageRoot,desktopCommanderEntry} from '../runtime-paths.js';
 import {shellQuote} from '../platform.js';
 import {formatStarmuxStatus} from './starmux-status.js';
+import {readProcessLogTail} from '../process-log.js';
+import {trustedFileStat} from '../instance-store.js';
 
 const {version}=JSON.parse(await readFile(path.join(packageRoot,'package.json'),'utf8')) as {version:string};
-const strings=['instance','port','lines','expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','revision','patch','file','output','name','target','mode','app-parent-pid'];
-const booleans=['allow-lan','local','no-allow-lan','help','version','json','write','code','read','yes','foreground','follow','archived','all','effective','link','allow-loopback-http','token-stdin','no-open','token'];
+const strings=['instance','port','lines','expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','revision','patch','file','output','name','target','mode','app-parent-pid','input','page'];
+const booleans=['allow-lan','local','no-allow-lan','help','version','json','write','code','read','yes','foreground','follow','archived','all','effective','link','allow-loopback-http','token-stdin','no-open','token','prepare','preview','replace'];
 const options:Record<string,{type:'string'|'boolean';short?:string}>={};
 for(const k of strings)options[k]={type:'string',...(k==='instance'?{short:'i'}:{})};
 for(const k of booleans)options[k]={type:'boolean',...(k==='yes'?{short:'y'}:k==='follow'?{short:'f'}:k==='help'?{short:'h'}:k==='version'?{short:'v'}:{})};
@@ -29,7 +33,7 @@ try{parsed=parseArgs({args:process.argv.slice(2),options,allowPositionals:true,s
 const flags=parsed.values;const positional=parsed.positionals;const command=positional.shift()??'help';
 const string=(key:string)=>typeof flags[key]==='string'?flags[key] as string:undefined;
 const yes=()=>flags.yes===true;const json=flags.json===true;
-const print=(value:unknown)=>process.stdout.write(JSON.stringify(value,null,2)+'\n');
+const print=(value:unknown)=>{if(value&&typeof value==='object'&&'application' in value&&value.application==='pending'&&'error' in value)process.exitCode=1;process.stdout.write(JSON.stringify(value,null,2)+'\n');};
 function fail(message:string):never{throw Error(message);}
 const absolute=(value:string)=>path.resolve(value==='~'?homedir():value.startsWith('~/')?path.join(homedir(),value.slice(2)):value);
 const pause=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -38,6 +42,8 @@ function help(){
   const requested=command==='help'?positional[0]:command;
   const topic=requested==='stop'?'down':requested;
   const sections:Record<string,string>={
+    middleware:'middleware list | add JSON | configure JSON | enable ID | disable ID | remove ID\n  middleware order ID,ID | reload | test --file sample.json\n  Modules run as trusted local code; sample tests do not call upstream tools.',
+    server:'server add "COMMAND or URL or JSON" --name ID [--preview] [--prepare]\n  server import FILE [--preview] [--prepare]\n  server list | templates | test ID | enable ID | disable ID | retry ID | refresh ID | remove ID\n  server auth ID login|status|logout\n  --replace explicitly replaces conflicts, preserving existing grants unless allowTools is supplied\n  Test connects or executes the configured program; preview never does.',
     up:'up [path] [--read | --write | --code] [--allow-lan | --local] [-y] [--port N] [--foreground]\n  Initialize and start. First use defaults to CWD; later starts reuse saved settings.',
     init:'init [path] [--read | --write | --code] [--allow-lan | --local] [-y] [--port N]\n  Save settings without starting. --write and --code enable full account coding permissions.',
     auth:'auth\n  auth key "Client name" [--expires 30d]\n  auth mode none|ingress|api-key|oauth\n  auth revoke ID\n  auth oauth init-keycloak --resource URL --callback URL\n  auth oauth setup --issuer URL --resource URL --client-id ID --subject USER_ID\n  auth oauth doctor',
@@ -55,13 +61,17 @@ function help(){
   };
   if(topic&&topic!=='help'&&!sections[topic])fail('Unknown command: '+topic+'. Run starmux --help.');
   const overview=[
-    'Connect AI clients to your computer’s files, shell and development tools.',
+    'An all-in-one MCP server and programmable gateway. Connect and manage your tools in one place.',
     '',
     'Workspace Lifecycle:',
     '  starmux up [path] [--code] [--allow-lan | --local]   Start in the background (default: Read-only)',
     '  starmux down                 Stop the running instance (alias: stop)',
     '  starmux status               Show health, endpoint and connection guide',
     '  starmux logs [-f]            View or stream gateway logs',
+    '',
+    'Gateway Services & Middleware:',
+    '  starmux server              Add, test and manage local or remote MCP servers',
+    '  starmux middleware          Configure, test and reload middleware',
     '',
     'Access & Verification:',
     '  starmux auth                 Manage auth mode, API keys and OAuth',
@@ -117,11 +127,17 @@ async function configure(){
     port:string('port')?Number(string('port')):loaded?.config.port??(selector?await suggestPort(homedir(),allowLan?'0.0.0.0':'127.0.0.1'):18893),
     allowLan,
     ...(writing?{accessRole:'trusted',mode:'read-write',writeScope:'unrestricted'}:{}),
-    ...(flags.read?{accessRole:'restricted',mode:'read-only',writeScope:'unrestricted',gitMode:'off',worktreeMode:'off',upstreams:[]}:{}),
+    ...(flags.read?{accessRole:'restricted',mode:'read-only',writeScope:'unrestricted'}:{}),
   }));
   await consent(instance,config);
   if(!instance)instance=await createInstance(selector??'default',{config});
-  else if(JSON.stringify(config)!==JSON.stringify(loaded!.config))await patchInstanceConfig(instance,config,loaded!.revision);
+  else if(JSON.stringify(config)!==JSON.stringify(loaded!.config)){
+    // Patch only actual changes; parsing defaults must not add advanced fields
+    // back into an ordinary config when changing its port/network/mode.
+    const patch=Object.fromEntries(Object.entries(config).filter(([key,value])=>
+      JSON.stringify(value)!==JSON.stringify(loaded!.config[key as keyof InstanceConfig])));
+    await patchInstanceConfig(instance,patch,loaded!.revision);
+  }
   await rememberConsent(instance,config);return instance;
 }
 async function isDefaultInstance(instance:Instance){
@@ -306,14 +322,31 @@ async function dashboard(instance:Instance){
 }
 async function logs(instance:Instance){
   const count=Number(string('lines')??60);if(!Number.isInteger(count)||count<1||count>200)fail('--lines must be 1..200.');
-  const file=path.join(instancePaths(instance).logs,'core.log');let offset=0;
-  const text=await exists(file)?await readTrusted(file,true,32*1024*1024):'';offset=Buffer.byteLength(text);
+  const file=path.join(instancePaths(instance).logs,'core.log');
+  const tail=await exists(file)?await readProcessLogTail(file):null;
+  let offset=tail?.offset??0,identity=tail?.identity??'';const text=tail?.text??'';
   const lines=text.split('\n');if(text.endsWith('\n'))lines.pop();
   const output=lines.slice(-count).join('\n')+(text.endsWith('\n')?'\n':'');
   if(json)print({instanceId:instance.id,output});else process.stdout.write(output||'No logs yet.\n');
   if(!flags.follow)return;
   let done=false;const stop=()=>{done=true;};process.once('SIGINT',stop);process.once('SIGTERM',stop);
-  try{while(!done){await pause(300);if(!await exists(file))continue;const size=(await stat(file)).size;if(size<offset)offset=0;if(size===offset)continue;const f=await open(file,'r');try{const buffer=Buffer.alloc(Math.min(size-offset,65536));const {bytesRead}=await f.read(buffer,0,buffer.length,offset);offset+=bytesRead;const output=buffer.subarray(0,bytesRead).toString();if(json)print({instanceId:instance.id,output});else process.stdout.write(output);}finally{await f.close();}}}finally{process.off('SIGINT',stop);process.off('SIGTERM',stop);}
+  try{while(!done){
+    await pause(300);
+    try{
+      const current=await trustedFileStat(file,true,Infinity);
+      const nextIdentity=`${current.dev}:${current.ino}`;
+      if(nextIdentity!==identity||current.size<offset)offset=0;
+      identity=nextIdentity;if(current.size===offset)continue;
+      const f=await open(file,'r');
+      try{
+        const actual=await f.stat();if(`${actual.dev}:${actual.ino}`!==identity)continue;
+        const buffer=Buffer.alloc(Math.min(current.size-offset,65536));
+        const {bytesRead}=await f.read(buffer,0,buffer.length,offset);offset+=bytesRead;
+        const output=buffer.subarray(0,bytesRead).toString();
+        if(json)print({instanceId:instance.id,output});else process.stdout.write(output);
+      }finally{await f.close();}
+    }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+  }}finally{process.off('SIGINT',stop);process.off('SIGTERM',stop);}
 }
 async function configCommand(){
   const op=positional[0]??'show';const selector=string('instance');
@@ -331,7 +364,7 @@ async function configCommand(){
     let text=string('file')?await readTrusted(absolute(string('file')!),false):'';
     if(!string('file'))for await(const part of process.stdin){text+=String(part);if(text.length>262144)fail('Config input too large.');}
     const config=await validateConfig(parseConfig(text));await consent(instance,config);
-    const saved=await saveInstanceConfig(instance,text,string('revision')??'');await rememberConsent(instance,config);print({result:'SAVED',revision:saved.revision});return;
+    const saved=await saveInstanceConfig(instance,text,string('revision')??'');await rememberConsent(instance,config);print({result:'SAVED',revision:saved.revision,warnings:saved.warnings});return;
   }
   if(op==='patch'&&!string('patch')){
     let text='';for await(const part of process.stdin){text+=String(part);if(text.length>262144)fail('Config input too large.');}flags.patch=text;
@@ -375,13 +408,39 @@ function validateSubcommand(){
   if(count<minimum||count>maximum||positional.slice(1).some(value=>!value.trim()))fail('Invalid arguments for starmux '+name+'. See starmux '+command+' --help.');
   for(const key of Object.keys(flags))if(!['instance','json','help','version'].includes(key)&&!supported.includes(key))fail('Option --'+key+' is not supported by '+name+'.');
 }
+async function serverCommand(){
+ const manager=new ServerManagement(),instance=await selected();const op=positional[0]??'list';
+ if(op==='list'){print(await manager.list(instance));return;}
+ if(op==='templates'){print((await manager.list(instance)).templates);return;}
+ if(op==='auth'){
+  const id=positional[1]??fail('Server ID required'),authAction=positional[2]??'status';const owner=await ensureManager(),base=`http://127.0.0.1:${owner.port}`;
+  const response=await fetch(base+`/api/v1/instances/${instance.id}/servers`,{method:'POST',headers:{authorization:'Bearer '+owner.token,origin:base,'content-type':'application/json'},body:JSON.stringify({op:'auth',id,authAction})});const result=await response.json();print(result);if(!response.ok)process.exitCode=1;return;
+ }
+
+ if(['add','import'].includes(op)){
+  const preview=await manager.preview(instance,string('input')??positional[1]??'',string('name'),op==='import'?absolute(string('file')??positional[1]??fail('Import requires a file')):undefined);
+  if(flags.preview){print(preview);return;}
+  if(preview.conflicts.length&&!flags.replace)fail('SERVER_ID_CONFLICT: '+preview.conflicts.join(', '));
+  const abort=new AbortController();const cancel=()=>abort.abort();process.once('SIGINT',cancel);
+  try{const test=await manager.test(instance,{previewId:preview.previewId,prepare:flags.prepare===true,signal:abort.signal});if(test.results.some(r=>r.status!=='READY')){print(test);process.exitCode=1;return;}
+   const saved=await manager.savePreview(instance,preview.previewId,preview.revision,flags.replace===true);print({result:'SAVED',revision:saved.revision,servers:test.results,...await applySavedGateway(instance,saved.revision)});
+  }finally{process.removeListener('SIGINT',cancel);}return;
+ }
+ const id=positional[1]??fail('Server ID required');
+ if(['retry','refresh'].includes(op)){print(await applySavedGateway(instance,(await manager.list(instance)).revision,id));return;}
+ if(op==='test'){const result=await manager.test(instance,{id,prepare:flags.prepare===true});print(result);if(result.results.some(r=>r.status!=='READY'))process.exitCode=1;return;}
+ if(['enable','disable','remove'].includes(op)){const saved=await manager.list(instance);const result=await manager.action(instance,id,op as 'enable'|'disable'|'remove',string('revision')??saved.revision);print({result:'SAVED',revision:result.revision,...await applySavedGateway(instance,result.revision)});return;}
+ fail('Unknown server action: '+op);
+}
 async function main(){
   if(flags.version){process.stdout.write(version+'\n');return;}
   if(command==='help'||flags.help){help();return;}
   const allowed:Record<string,string[]>={
     up:['allow-lan','local','no-allow-lan','port','read','write','code','yes','foreground','app-parent-pid'],init:['allow-lan','local','no-allow-lan','port','read','write','code','yes'],
-    status:['all'],ls:['archived'],rm:[],down:[],stop:[],logs:['lines','follow'],doctor:[],verify:['token-stdin'],dashboard:['token','no-open'],
+    status:['all'],ls:['archived'],rm:[],down:[],stop:[],logs:['lines','follow'],doctor:[],verify:['token-stdin'],dashboard:['token','no-open','page'],
     auth:['expires','issuer','resource','resource-aliases','client-id','subject','subjects','registration','token-auth','callback','allow-loopback-http'],
+    middleware:['input','file','revision'],
+    server:['input','file','name','prepare','preview','revision','replace'],
     config:['yes','archived','effective','link','name','revision','patch','file','output'],permissions:['target','mode'],privacy:['all','target']
   };
   for(const key of Object.keys(flags))if(!['instance','json','help','version'].includes(key)&&!allowed[command]?.includes(key))fail('Option --'+key+' is not supported by '+command+'.');
@@ -392,7 +451,7 @@ async function main(){
     if(positional.length>1||positional.length&&!['status','stop'].includes(positional[0]!))fail('Usage: starmux dashboard [status|stop]');
     if(positional[0]==='stop'){await stopManager();if(json)print({result:'STOPPED'});else process.stdout.write('Dashboard stopped. Instances are unchanged.\n');return;}
     if(positional[0]==='status'){const r=await managerStatus();const result={running:!!r,url:r?`http://127.0.0.1:${r.port}`:null};if(json)print(result);else process.stdout.write(JSON.stringify(result)+'\n');return;}
-    const target=string('instance')?await selected():null;const r=await ensureManager();const url=`http://127.0.0.1:${r.port}/${target?'?instance='+target.id:''}#token=${r.token}`;
+    const target=string('instance')?await selected():null;const r=await ensureManager();const url=`http://127.0.0.1:${r.port}/?${new URLSearchParams({...target?{instance:target.id}:{},...string('page')?{page:string('page')!}:{}})}#token=${r.token}`;
     if(flags['no-open']){if(json)print({url});else process.stdout.write(url+'\n');return;}
     const executable=process.platform==='darwin'?'open':process.platform==='win32'?'rundll32.exe':'xdg-open';
     await new Promise<void>((resolve,reject)=>{const child=spawn(executable,process.platform==='win32'?['url.dll,FileProtocolHandler',url]:[url],{stdio:'ignore'});child.once('error',reject);child.once('exit',code=>code===0?resolve():reject(Error('Browser unavailable. Use starmux dashboard --no-open.')));});
@@ -415,6 +474,16 @@ async function main(){
     const target=positional[0]??string('instance')??(await selected()).id;
     await handle('instance',['archive',target,...(json?['--json']:[])]);return;
   }
+  if(command==='middleware'){
+   const manager=new MiddlewareManagement(),instance=await selected(),op=positional[0]??'list';const saved=await manager.list(instance);
+   if(op==='list'){print(saved);return;}
+   if(op==='reload'){print(await applySavedGateway(instance,saved.revision,'__middleware__'));return;}
+   const text=string('file')?await readFile(absolute(string('file')!),'utf8'):string('input')??positional[1]??'';
+   if(op==='test'){print(await manager.test(instance,JSON.parse(text)));return;}
+   const input=['add','configure'].includes(op)?JSON.parse(text):op==='order'?text.split(','):text;
+   const result=await manager.update(instance,op,string('revision')??saved.revision,input);print({result:'SAVED',revision:result.revision,...await applySavedGateway(instance,result.revision)});return;
+  }
+  if(command==='server'){await serverCommand();return;}
   if(command==='config'){await configCommand();return;}
   if(!['status','down','stop','auth','dashboard','verify','doctor','logs','permissions','privacy'].includes(command))fail('Unknown command: '+command+'. Run starmux --help.');
   if(!(await readRegistry()).instances.length){if(command==='status'||command==='down'||command==='stop'){if(json)print({phase:'stopped',initialized:false});else process.stdout.write('Not initialized. Run starmux up in your project.\n');return;}}

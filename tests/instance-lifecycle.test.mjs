@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {fork} from 'node:child_process';
 import {createHmac,randomBytes} from 'node:crypto';
 import {once} from 'node:events';
-import {mkdtemp, mkdir, readFile, realpath, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, mkdir, open, readFile, realpath, rm, stat, writeFile} from 'node:fs/promises';
 import {createServer,createConnection} from 'node:net';
 import {tmpdir, networkInterfaces} from 'node:os';
 import path from 'node:path';
@@ -115,6 +115,32 @@ test('start, confirmed stop, repeated stop, and restart use distinct runs', asyn
   assert.equal(restarted.phase, 'running');
   assert.notEqual(restarted.runtime.runId, running.runtime.runId);
   await stopInstance(f.instance, f.home);
+});
+
+test('an oversized old log does not prevent startup and stop flushes both output streams',async t=>{
+  const f=await fixture(t,{logMessages:true});
+  const log=path.join(instancePaths(f.instance,f.home).logs,'core.log');
+  const handle=await open(log,'w',0o600);await handle.truncate(33*1024*1024);await handle.close();
+  await f.start();await stopInstance(f.instance,f.home);
+  const text=await readFile(log,'utf8');
+  assert.match(text,/fixture stdout/);assert.match(text,/fixture stderr/);assert.match(text,/fixture shutdown/);
+  assert.ok((await stat(log)).size<=8*1024*1024);
+  await f.start();await stopInstance(f.instance,f.home);
+  assert.equal((await instanceStatus(f.instance,f.home)).phase,'stopped');
+});
+
+test('a log write failure stops the worker and releases control instead of hanging cleanup',async t=>{
+  const f=await fixture(t,{logBurstBytes:8*1024*1024+1});
+  // A directory is an unsafe rotation target. Do not overwrite it.
+  const target=path.join(instancePaths(f.instance,f.home).logs,'core.log.1');
+  await mkdir(target);
+  const child=await f.start();
+  await waitFor(()=>child.exitCode!==null||child.signalCode!==null,15000);
+  const status=await instanceStatus(f.instance,f.home);
+  assert.equal(status.phase,'stopped');
+  assert.equal(status.lastRun.problem,'INSTANCE_LOG_FAILED');
+  assert.equal(await availablePort(f.port),true);
+  assert.ok((await stat(target)).isDirectory());
 });
 
 test('occupied configured port without control is unknown, and down refuses success', async t => {

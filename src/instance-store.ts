@@ -1,3 +1,6 @@
+import {upstreamOAuthFile} from './upstream-oauth.js';
+import {middlewareConfigSchema} from './middleware-config.js';
+import {upstreamConfigSchema} from './config-schemas.js';
 import {withPrivateLock as withLock} from './private-store-lock.js';
 export {withPrivateLock as withLock} from './private-store-lock.js';
 import {randomUUID,createHash} from 'node:crypto';
@@ -22,13 +25,14 @@ export const instanceSchema=z.object({id:z.string().uuid(),name:nameSchema,sourc
 export const registrySchema=z.object({schemaVersion:z.literal(1),defaultInstanceId:z.string().uuid().nullable(),instances:z.array(instanceSchema)}).strict();
 export type Instance=z.infer<typeof instanceSchema>;
 type Registry=z.infer<typeof registrySchema>;
-const upstream=z.object({id:z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/),transport:z.literal('stdio'),command:z.string().min(1),args:z.array(z.string()),
-  allowTools:z.array(z.string()),envRefs:z.record(z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,79}$/)).default({})}).strict();
+const upstream=upstreamConfigSchema;
 export const instanceConfigSchema=z.object({$schema:z.string().optional(),schemaVersion:z.literal(1),projectRoot:z.string(),
   port:z.number().int().min(1024).max(65535),allowLan:z.boolean().default(false),mode:z.enum(['read-only','read-write']).default('read-only'),
   accessRole:z.enum(['restricted','trusted']).default('restricted'),writeScope:z.enum(['home-only','unrestricted']).default('unrestricted'),
-  connection:z.enum(['local','https','tunnel']).default('local'),gitMode:z.enum(['off','review','write','push']).default('off'),
-  worktreeMode:z.enum(['off','linked']).default('off'),upstreams:z.array(upstream).default([])}).strict();
+  connection:z.enum(['local','https','tunnel']).default('local'),
+  gitMode:z.enum(['off','review','write','push']).default('off').describe('Advanced compatibility option for workspace-scoped profiles. Ignored in global Read-only/Coding mode; does not restrict terminal Git.'),
+  worktreeMode:z.enum(['off','linked']).default('off').describe('Advanced compatibility option for workspace-scoped profiles. Ignored in global Read-only/Coding mode; does not restrict directory access.'),
+  middlewares:z.array(middlewareConfigSchema).max(32).refine(v=>new Set(v.map(m=>m.id)).size===v.length).optional(),upstreams:z.array(upstream).default([])}).strict();
 export type InstanceConfig=z.infer<typeof instanceConfigSchema>;
 export const fingerprint=(value:string)=>createHash('sha256').update(value).digest('hex');
 export const instancesRoot=(home=homedir())=>path.join(home,'.config','starmux');
@@ -38,7 +42,7 @@ export function instancePaths(instance:Instance,home=homedir()){
     access:path.join(root,'state','access-v1.json'),grants:path.join(root,'state','workspace-grants-v1.json'),deny:path.join(root,'state','deny-rules-v1.json')};
 }
 export async function exists(file:string){try{await lstat(file);return true;}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')return false;throw e;}}
-export async function readTrusted(file:string,privateFile=true,max=262144){
+export async function trustedFileStat(file:string,privateFile=true,max=262144){
   if(!path.isAbsolute(file))throw Error('CONFIG_PATH_ABSOLUTE_REQUIRED');
   const stat=await lstat(file);
   if(!stat.isFile()||stat.nlink!==1||!ownedByUser(file,stat,privateFile)||(!privateFile&&process.platform!=='win32'&&(stat.mode&0o022)!==0)||stat.size>max)
@@ -52,6 +56,10 @@ export async function readTrusted(file:string,privateFile=true,max=262144){
     if(process.platform!=='win32'&&(st.mode&0o022)!==0&&(st.mode&0o1000)===0)throw Error('CONFIG_DIRECTORY_UNSAFE');
     const next=path.dirname(parent);if(next===parent)break;parent=next;
   }
+  return stat;
+}
+export async function readTrusted(file:string,privateFile=true,max=262144){
+  await trustedFileStat(file,privateFile,max);
   return readFile(file,'utf8');
 }
 export async function atomicPrivate(file:string,text:string){
@@ -88,6 +96,7 @@ export async function resolveInstance(selector?:string,home=homedir(),includeArc
   return result;
 }
 export function parseConfig(text:string):InstanceConfig{
+  if(Buffer.byteLength(text)>262144)throw Error('CONFIG_TOO_LARGE');
   const errors:ParseError[]=[];let value:unknown=parse(text,errors,{allowTrailingComma:true});
   if(errors.length){const e=errors[0]!;const prefix=text.slice(0,e.offset);throw Error(`CONFIG_JSON_INVALID line ${prefix.split('\n').length}, column ${e.offset-(prefix.lastIndexOf('\n')+1)+1}: ${printParseErrorCode(e.error)}`);}
   const result=instanceConfigSchema.safeParse(value);
@@ -106,15 +115,34 @@ export async function validateConfig(config:InstanceConfig){
   if(usesGlobalPermissions(config))await createAccountAccessPolicy(config.projectRoot,config.mode);
   else await createProjectPolicy({root:config.projectRoot,mode:config.mode,
     developerCommands:accessRole==='trusted'?'trusted-project':'presets',allowTrustedHomeRoot:accessRole==='trusted'});
-  validateConfiguredUpstreams({version:1,upstreams:config.upstreams.map(({envRefs,...u})=>({...u,env:Object.fromEntries(Object.keys(envRefs).map(k=>[k,'reference']))}))});
+  validateConfiguredUpstreams({version:1,upstreams:config.upstreams.map(u=>resolveUpstream(u,()=> 'reference'))});
   return config;
 }
 export const sourceRevision=(file:string,text:string)=>fingerprint(file+'\0'+text);
 export function configJSONSchema(){return zodToJsonSchema(instanceConfigSchema,{name:'GatewayInstance'});}
+export interface ConfigWarning {
+  code:'CONFIG_OPTION_IGNORED';field:'gitMode'|'worktreeMode';value:string;
+  mode:'Coding'|'Read-only';message:string;
+}
+// Keep diagnostics separate from validation: compatible configurations remain
+// valid, and routine startup/status probes never print configuration notices.
+export function configWarnings(config:InstanceConfig,text?:string):ConfigWarning[]{
+  if(!usesGlobalPermissions(config))return [];
+  const explicit=text===undefined?null:parse(text) as Record<string,unknown>;
+  const mode=config.mode==='read-only'?'Read-only':'Coding';
+  return (['gitMode','worktreeMode'] as const)
+    .filter(field=>explicit?Object.hasOwn(explicit,field):config[field]!=='off')
+    .map(field=>({code:'CONFIG_OPTION_IGNORED',field,value:config[field],mode,
+      message:`${field}=${JSON.stringify(config[field])} is ignored in global ${mode} mode. `+
+        (field==='gitMode'?
+          (mode==='Coding'?'Git remains available through the terminal; this option does not restrict Git operations.':'Read-only mode blocks shell execution and Git mutations regardless of this option.'):
+          'Directory access follows OS-account and upstream permissions; this option does not restrict access to linked worktrees.')}));
+}
+export const formatConfigWarnings=(warnings:readonly ConfigWarning[])=>warnings.map(w=>`Note: ${w.message}\n`).join('');
 export async function loadInstanceConfig(instance:Instance){
   const text=await readTrusted(instance.source.path,instance.source.kind==='managed');
   const config=await validateConfig(parseConfig(text));
-  return {text,config,revision:sourceRevision(instance.source.path,text),effectiveRevision:fingerprint(JSON.stringify({...config,$schema:undefined})),source:instance.source};
+  return {text,config,warnings:configWarnings(config,text),revision:sourceRevision(instance.source.path,text),effectiveRevision:fingerprint(JSON.stringify({...config,$schema:undefined})),source:instance.source};
 }
 export async function availablePort(port:number,host:'127.0.0.1'|'0.0.0.0'='127.0.0.1'){
   // macOS can permit a wildcard bind alongside a specific-interface listener.
@@ -139,7 +167,14 @@ export async function suggestPort(home=homedir(),host:'127.0.0.1'|'0.0.0.0'='127
   for(let port=18893;port<19893;port++)if(!used.has(port)&&await availablePort(port,host))return port;
   throw Error('NO_AVAILABLE_INSTANCE_PORT');
 }
-export function configTemplate(config:InstanceConfig){return '// Gateway startup settings. Save, then apply to restart this instance.\n// Credentials and grants live in the private instance state directory.\n'+JSON.stringify(config,null,2)+'\n';}
+export function configTemplate(config:InstanceConfig){
+  const template:Partial<InstanceConfig>={...config};
+  if(usesGlobalPermissions(config)){
+    if(config.gitMode==='off')delete template.gitMode;
+    if(config.worktreeMode==='off')delete template.worktreeMode;
+  }
+  return '// Gateway settings. Service/middleware changes apply locally; global settings restart the instance.\n// Credentials and grants live in the private instance state directory.\n'+JSON.stringify(template,null,2)+'\n';
+}
 export async function createInstance(name:string,options:{config?:InstanceConfig;file?:string;link?:boolean;requiredAccess?:Instance['requiredAccess']}={},home=homedir()){
   name=nameSchema.parse(name);
   const input=options.file?path.resolve(options.file):undefined;
@@ -205,10 +240,34 @@ export async function ensureAccessReady(instance:Instance,home=homedir()){
 export async function prepareUpstreams(instance:Instance,config:InstanceConfig,home=homedir()){
   if(!config.upstreams.length)return undefined;
   const p=instancePaths(instance,home);const secretFile=path.join(p.state,'secrets.json');
-  const needsSecrets=config.upstreams.some(u=>Object.keys(u.envRefs).length);
-  const secrets=needsSecrets?z.record(z.string()).parse(JSON.parse(await readTrusted(secretFile)) as unknown):{};
-  const definitions=config.upstreams.map(({envRefs,...u})=>({...u,env:Object.fromEntries(Object.entries(envRefs).map(([key,ref])=>{
-    if(secrets[ref]===undefined)throw Error('INSTANCE_SECRET_MISSING: '+ref);return [key,secrets[ref]];
-  }))}));
+  const needsSecrets=config.upstreams.some(u=>u.enabled!==false&&(Object.keys(u.transport==='stdio'?u.envRefs:u.headerRefs).length||(u.transport!=='stdio'&&u.auth?.clientSecretRef)));
+  const secrets=needsSecrets&&await exists(secretFile)?z.record(z.string()).parse(JSON.parse(await readTrusted(secretFile)) as unknown):{};
+  const definitions=config.upstreams.map(u=>{
+    let missing=false;
+    const definition=resolveUpstream(u,ref=>{if(u.enabled===false)return '';if(secrets[ref]===undefined){missing=true;return '';}return secrets[ref];},u.transport==='stdio'?'':upstreamOAuthFile(p.state,u.id,u.url));
+    return {...definition,...(missing?{configurationError:'UPSTREAM_SECRET_MISSING'}:{})};
+  });
   const file=path.join(p.state,'resolved-upstreams.json');await atomicPrivate(file,JSON.stringify({version:1,upstreams:definitions}));return file;
+}
+
+function resolveUpstream(upstream:InstanceConfig['upstreams'][number],lookup:(ref:string)=>string,stateFile='validation-only'){
+  if(upstream.transport==='stdio'){
+    const {envRefs,...definition}=upstream;
+    return {...definition,env:Object.fromEntries(Object.entries(envRefs).map(([name,ref])=>[name,lookup(ref)]))};
+  }
+  const {headerRefs,auth,...definition}=upstream;
+  return {...definition,...(auth?{auth:{type:'oauth',stateFile,...(auth.clientId?{clientId:auth.clientId}:{}),...(auth.issuer?{issuer:auth.issuer}:{}),...(auth.clientSecretRef?{clientSecret:lookup(auth.clientSecretRef)}:{})}}:{}),headers:{...definition.headers,...Object.fromEntries(Object.entries(headerRefs).map(([name,ref])=>[name,lookup(ref)]))}};
+}
+
+export async function prepareMiddlewares(instance:Instance,config:InstanceConfig,home=homedir()){
+ if(!config.middlewares?.some(m=>m.enabled!==false))return undefined;
+ const file=path.join(instancePaths(instance,home).state,'resolved-middlewares.json');
+ await atomicPrivate(file,JSON.stringify(config.middlewares.map(m=>({...m,...(m.module?{module:path.resolve(path.dirname(instance.source.path),m.module)}:{})}))));return file;
+}
+
+/** Surgical edits preserve comments on existing sibling definitions. */
+export async function editInstanceConfigPaths(instance:Instance,edits:{path:(string|number)[];value:unknown}[],revision:string,home=homedir()){
+ let text=(await loadInstanceConfig(instance)).text;
+ for(const edit of edits)text=applyEdits(text,modify(text,edit.path,edit.value,{formattingOptions:{insertSpaces:true,tabSize:2}}));
+ return saveInstanceConfig(instance,text,revision,home);
 }

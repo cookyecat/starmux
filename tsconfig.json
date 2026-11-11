@@ -15,7 +15,8 @@
       "node"
     ],
     "skipLibCheck": true,
-    "inlineSources": false
+    "inlineSources": false,
+    "declaration": true
   },
   "include": [
     "src/**/*.ts"

@@ -1,3 +1,4 @@
+import {MiddlewareError} from './middleware-process.js';
 import type { AuditSink,CallToolResult,RequestContext,ToolInvocation } from './contracts.js';
 import type { BridgeOptions,BridgeUpstream } from './desktop-commander-facade.js';
 import { authorizeInvocation,createInvocationExecutor,observeSafely } from './invocation.js';
@@ -36,9 +37,10 @@ function workspaceErrorText(error:unknown,hasGrants:boolean):string{
 // The dispatch order is part of the compatibility contract: Gateway tools,
 // extension routes, owner-enabled native mode, workspace policy, then deny.
 export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink, options: BridgeOptions) {
-  const execute = createInvocationExecutor(upstream);
+
   return async (params: ToolInvocation, context: RequestContext): Promise<CallToolResult> => {
     const id = context.requestId;
+    const execute=createInvocationExecutor(upstream,invocation=>{const route=options.upstreamRouter?.routeFor(invocation.name);if(route&&route!=='desktop')return ()=>{};options.upstreamTrace?.(id,'upstreamRequest',{serverId:route??'desktop',request:invocation});return (result,failure)=>options.upstreamTrace?.(id,'upstreamResponse',result??{error:failure});});
     const name = params.name;
     const args = params.arguments || {};
     if(options.globalReadOnly&&!isReadOnlyTool(name)){
@@ -121,16 +123,18 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
       }
       audit({event:"MCP_ROUTE_FORWARDED",requestId:id,tool:name});
       try{
-        const result=await execute(authorizeInvocation(routed));
+        const result=await execute(authorizeInvocation({...params,...routed}));
         audit({event:"MCP_ROUTE_COMPLETED",requestId:id,tool:name,
           isError:result.isError===true});
         return result;
       }catch(error){
         // Report ambiguous remote effects distinctly; never silently replay.
         const code=errorCode(error)==="UPSTREAM_CALL_UNCERTAIN"?
-          "UPSTREAM_CALL_UNCERTAIN":"UPSTREAM_UNAVAILABLE";
+          "UPSTREAM_CALL_UNCERTAIN":errorCode(error)==="UPSTREAM_CLOSED"?"UPSTREAM_CLOSED":"UPSTREAM_UNAVAILABLE";
         audit({event:"MCP_ROUTE_UPSTREAM_FAILED",requestId:id,tool:name,reason:code});
-        return {isError:true,content:[{type:"text",text:code}]};
+        return {isError:true,content:[{type:"text",text:code==="UPSTREAM_CLOSED"?
+          "UPSTREAM_CLOSED: The upstream is stopping or closed. This call was not dispatched. Wait for the instance to restart, reconnect and refresh tools before retrying.":
+          code==="UPSTREAM_CALL_UNCERTAIN"?"UPSTREAM_CALL_UNCERTAIN: The call may have executed before the connection closed. Check its effects before retrying; do not automatically replay it.":code}]};
       }
     }
     // Deliberately trusted, owner-enabled native mode: the upstream server
@@ -141,7 +145,7 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
        upstream.upstreamCatalog.some(tool=>tool.name===name)){
       audit({event:"DC_NATIVE_FORWARDED",requestId:id,tool:name});
       try{
-        const result=await execute(authorizeInvocation({name,arguments:args}));
+        const result=await execute(authorizeInvocation({...params,name,arguments:args}));
         audit({event:"DC_NATIVE_COMPLETED",requestId:id,tool:name,
           isError:result.isError===true});
         return result;
@@ -177,4 +181,21 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
     audit({event:"DC_BRIDGE_DENIED",requestId:id,tool:name,reason:"POLICY_REQUIRED"});
     return {isError:true,content:[{type:"text",text:"POLICY_REQUIRED: Configure an instance before using tools."}]};
   };
+}
+
+// Policy preflight is also used for synthetic results and rerouted middleware calls.
+// Actual execution remains exclusively in createToolDispatcher.
+export function createToolAuthorizer(upstream:BridgeUpstream,options:BridgeOptions){
+ return async(params:ToolInvocation)=>{
+  const reject=()=>{throw new MiddlewareError('MIDDLEWARE_REJECTED','core','request');};
+  if(options.globalReadOnly&&!isReadOnlyTool(params.name))reject();
+  try{
+   await options.denyRules?.check(params.name,params.arguments??{});
+   if(options.upstreamRouter?.routeFor(params.name)&&options.upstreamRouter.routeFor(params.name)!=='desktop'){await options.upstreamRouter.authorizeExtension(params.name,params.arguments??{});return;}
+   if(!upstream.upstreamCatalog.some(t=>t.name===params.name))reject();
+   if(options.nativePassthrough)return;
+   if(options.workspacePolicy){await options.workspacePolicy.prepare(params.name,params.arguments??{});return;}
+   reject();
+  }catch{reject();}
+ };
 }

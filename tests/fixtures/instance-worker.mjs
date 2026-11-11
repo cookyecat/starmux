@@ -23,6 +23,7 @@ function close(delay = 0) {
   if (closing) return;
   closing = true;
   setTimeout(() => {
+    if(settings.logMessages)process.stdout.write('fixture shutdown\n');
     server.close(() => { if (process.connected) process.disconnect(); });
     server.closeAllConnections();
   }, delay);
@@ -32,4 +33,6 @@ process.on('message', message => {
 });
 process.on('SIGTERM', () => { if (!settings.ignoreStop) close(); });
 process.on('disconnect', () => close());
+if(settings.logMessages){process.stdout.write('fixture stdout\n');process.stderr.write('fixture stderr\n');}
+if(settings.logBurstBytes)process.stdout.write(Buffer.alloc(settings.logBurstBytes,120));
 process.send({type: 'gateway-ready'});

@@ -6,8 +6,11 @@ export type AuditEvent = {event: string; [key: string]: unknown};
 export type AuditSink = (event: AuditEvent) => void;
 export interface McpUpstream {
   readonly upstreamCatalog: readonly Tool[];
+  cacheIdentity?():Promise<string>;
   forwardWorkspaceInvocation(invocation: ToolInvocation): Promise<CallToolResult>;
 }
+export interface NativePrompts {listNativePrompts():Promise<import('@modelcontextprotocol/sdk/types.js').Prompt[]>;getNativePrompt(name:string,args?:Record<string,string>):Promise<import('@modelcontextprotocol/sdk/types.js').GetPromptResult>;}
+export interface PromptProvider {listPrompts():Promise<import('@modelcontextprotocol/sdk/types.js').Prompt[]>;getPrompt(name:string,args?:Record<string,string>):Promise<import('@modelcontextprotocol/sdk/types.js').GetPromptResult>;}
 export interface NativeResources {
   listNativeResources(): Promise<Resource[]>;
   readNativeResource(uri: string): Promise<ReadResourceResult>;
@@ -20,15 +23,17 @@ export interface ResourceProvider {
 }
 export interface RouteDefinition {
   id: string;
-  upstream: McpUpstream & Partial<NativeResources>;
+  upstream: McpUpstream & Partial<NativeResources & NativePrompts>;
   exposeNativeNames?: boolean;
   authorize?: ((name: string, args: ToolArguments) => ToolArguments | Promise<ToolArguments>) | null;
 }
 export interface RouteInfo {id: string; toolCount: number; nativeNames?: boolean}
 export interface UpstreamStatus {id: string; status: 'DISCONNECTED'|'READY'|'UNAVAILABLE'|'CLOSED'; toolCount: number; lastError: string|null}
-export interface UpstreamRouter extends McpUpstream, Partial<ResourceProvider> {
+export interface UpstreamRouter extends McpUpstream, Partial<ResourceProvider & PromptProvider> {
   readonly routes: readonly RouteInfo[];
   routeFor(publicName: string): string|null;
+  cacheScopeFor?(target:{serverId:string;toolName:string}):Promise<string>;
+  targetFor?(publicName:string):{serverId:string;toolName:string}|undefined;
   authorizeExtension(publicName: string, args: ToolArguments): Promise<ToolInvocation>;
 }
 export interface WorkspacePolicy {

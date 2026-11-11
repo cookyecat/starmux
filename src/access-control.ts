@@ -1,11 +1,12 @@
 import {oauthConfigSchema,oauthConnectionSchema,validateOAuthConfig,createOAuthVerifier,OAuthError,type OAuthConfig} from './oauth-resource.js';
 import {randomBytes,createHash,timingSafeEqual} from 'node:crypto';
-import {lstat,readFile,writeFile,rename,rm,mkdir} from 'node:fs/promises';
+import {lstat,readFile,writeFile,rename,rm} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {z} from 'zod';
 import {createPrivateDirectory,ownedByUser} from './platform.js';
 import type {RequestContext} from './contracts.js';
+import {withPrivateLock} from './private-store-lock.js';
 
 const credential=z.object({id:z.string().regex(/^[a-f0-9]{24}$/),name:z.string().trim().min(1).max(80).regex(/^[^\x00-\x1f\x7f]+$/),
   digest:z.string().regex(/^[a-f0-9]{64}$/),createdAt:z.string().datetime(),expiresAt:z.string().datetime().nullable(),
@@ -33,13 +34,7 @@ export async function createAccessControl(file=defaultAccessFile(),options:{init
   }
   // A filesystem lock serializes mutations across CLI and Core processes.
   async function locked<T>(action:()=>Promise<T>):Promise<T>{
-    const lock=file+'.lock';let acquired=false;
-    for(let i=0;i<100;i++){
-      try{await mkdir(lock,{mode:0o700});acquired=true;break;}
-      catch(e){if(!(e instanceof Error&&'code' in e&&e.code==='EEXIST'))throw e;await new Promise(r=>setTimeout(r,20));}
-    }
-    if(!acquired)throw Error('ACCESS_STORE_BUSY');
-    try{return await action();}finally{await rm(lock,{recursive:true,force:true});}
+    return withPrivateLock(file+'.lock',action,'ACCESS_STORE_BUSY');
   }
   async function load(){
     if(!ownedByUser(folder,await lstat(folder),true))throw Error('ACCESS_DIRECTORY_UNSAFE');

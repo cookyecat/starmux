@@ -67,7 +67,8 @@
     "test": "tsc -p tsconfig.json && node --test tests/*.test.mjs",
     "prepare": "node scripts/prepare.mjs",
     "prepack": "npm run build",
-    "sync:upstream": "npm install --save-dev --save-exact @wonderwhy-er/desktop-commander@latest --ignore-scripts && npm run build"
+    "sync:upstream": "npm install --save-dev --save-exact @wonderwhy-er/desktop-commander@latest --ignore-scripts && npm run build",
+    "verify:package": "node scripts/verify-package.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
@@ -93,12 +94,22 @@
   },
   "files": [
     "dist/src/**/*.js",
+    "dist/src/**/*.d.ts",
     "dist/vendor",
     "bin/starmux.mjs",
     "scripts/prepare.mjs",
     "LICENSE",
     "CHANGELOG.md",
     "README.md",
-    "server.json"
-  ]
+    "server.json",
+    "docs/GATEWAY.md"
+  ],
+  "exports": {
+    "./middleware": {
+      "types": "./dist/src/middleware.d.ts",
+      "import": "./dist/src/middleware.js"
+    },
+    "./package.json": "./package.json",
+    "./dist/*": "./dist/*"
+  }
 }

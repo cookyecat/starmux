@@ -76,7 +76,7 @@ private struct InstanceCreateSheet: View {
             TextField(it("实例名称", "Instance name"), text: $name)
             if file.isEmpty {
                 HStack { TextField(it("工作目录", "Work directory"), text: $project); Button(it("选择…", "Choose…")) { project = choose(directory: true) ?? project } }
-                Picker(it("能力", "Capability"), selection: $role) { Text(it("只读工作区", "Read-only workspace")).tag("restricted"); Text(it("可信开发", "Trusted developer")).tag("trusted") }.pickerStyle(.segmented)
+                Picker(it("能力", "Capability"), selection: $role) { Text("Read-only").tag("restricted"); Text("Coding").tag("trusted") }.pickerStyle(.segmented)
                 Text(it("自动建议可用端口。保存后可在配置中修改。", "An available port is suggested automatically and can be edited after saving.")).font(.caption).foregroundStyle(.secondary)
             } else {
                 Text(file).font(.caption).textSelection(.enabled)
@@ -117,6 +117,7 @@ private struct InstanceDetail: View {
     @State private var originalWriteScope = "unrestricted"
     @State private var originalMode = "read-only"
     @State private var advanced = false
+    @State private var configWarnings: [String] = []
     @State private var diff = ""
     @State private var logs = ""
     @State private var access = ""
@@ -128,6 +129,12 @@ private struct InstanceDetail: View {
     private var target: [String] { ["--instance", instance.id] }
     private func load() async {
         if let data = await model.perform(["config", "show"] + target), let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            configWarnings = (object["warnings"] as? [[String: Any]] ?? []).compactMap { warning in
+                guard let message = warning["message"] as? String else { return nil }
+                guard let field = warning["field"] as? String, let mode = warning["mode"] as? String else { return message }
+                let detail = field == "gitMode" ? (mode == "Coding" ? "AI 仍可通过终端执行 Git；此选项不会限制 Git 操作。" : "只读模式会阻止 Shell 执行和 Git 修改，与此选项无关。") : "目录访问遵循 OS 账户与上游权限；此选项不会限制关联 worktree 的访问。"
+                return it("\(field) 在全局 \(mode) 模式下不生效。" + detail, message)
+            }
             raw = object["text"] as? String ?? ""; revision = object["revision"] as? String ?? ""
             guard let config = object["config"] as? [String: Any] else { advanced = true; return }
             project = config["projectRoot"] as? String ?? ""; port = String(config["port"] as? Int ?? 18893)
@@ -206,7 +213,7 @@ private struct InstanceDetail: View {
         VStack(alignment: .leading, spacing: 12) {
             LabeledContent(it("工作目录", "Work directory")) { TextField("", text: $project) }
             LabeledContent(it("本机端口", "Local port")) { TextField("", text: $port) }
-            Picker(it("能力", "Capability"), selection: $role) { Text(it("只读工作区", "Read-only workspace")).tag("restricted"); Text(it("可信开发", "Trusted developer")).tag("trusted") }
+            Picker(it("能力", "Capability"), selection: $role) { Text("Read-only").tag("restricted"); Text("Coding").tag("trusted") }
             Picker(it("连接偏好", "Connection preference"), selection: $connection) { Text(it("仅本机", "Local only")).tag("local"); Text("HTTPS").tag("https"); Text("Tunnel").tag("tunnel") }
             if role == "trusted" && originalRole != role { Toggle(it("确认启用原生工具和 Shell", "Approve native tools and Shell"), isOn: $approved) }
             HStack {
@@ -219,6 +226,10 @@ private struct InstanceDetail: View {
                 Button(it("重新载入", "Reload")) { Task { await load() } }
             }
             Text(it("保存不会重启。外部文件修改也需要明确应用。", "Saving does not restart. External edits also require explicit apply.")).font(.caption).foregroundStyle(.secondary)
+            if !configWarnings.isEmpty { Text(it("已保存配置的提示", "Saved configuration notices")).font(.caption) }
+            ForEach(Array(configWarnings.enumerated()), id: \.offset) { _, warning in
+                Text(warning).font(.callout).foregroundStyle(.orange).textSelection(.enabled)
+            }
             DisclosureGroup(it("高级：JSONC 源文件", "Advanced: JSONC source"), isExpanded: $advanced) {
                 TextEditor(text: $raw).font(.system(.caption, design: .monospaced)).frame(height: 240).border(Color.gray.opacity(0.3))
                 HStack {
@@ -237,6 +248,10 @@ private struct InstanceDetail: View {
             HStack {
                 Button(it("查看访问状态", "Inspect access")) { Task { if let data = await model.perform(["auth"] + target) { access = String(decoding: data, as: UTF8.self) } } }
                 Button(it("打开管理控制台", "Open management console")) { Task { _ = await model.perform(["dashboard", "-i", instance.id]) } }
+            }
+            HStack {
+                Button(it("管理 MCP 服务", "Manage MCP servers")) { Task { _ = await model.perform(["dashboard", "-i", instance.id, "--page", "servers"]) } }
+                Button(it("管理中间件", "Manage middleware")) { Task { _ = await model.perform(["dashboard", "-i", instance.id, "--page", "middlewares"]) } }
             }
             HStack { TextField(it("客户端密钥名称", "Client key name"), text: $keyName); Button(it("创建密钥", "Create key")) { Task { if let data = await model.perform(["auth", "key", keyName] + target) { access = String(decoding: data, as: UTF8.self) } } }.disabled(keyName.isEmpty) }
             Text(it("新密钥仅显示一次；撤销对后续请求立即生效。", "New keys are shown once. Revocation affects subsequent requests immediately.")).font(.caption)

@@ -14,7 +14,7 @@ import {availablePort,createInstance,instanceConfigSchema,loadInstanceConfig,sug
 import {lanIpv4Addresses} from '../dist/src/cli/starmux-status.js';
 
 const publicRoutes=['/mcp','/healthz','/.well-known/oauth-protected-resource','/.well-known/oauth-protected-resource/mcp'];
-const ownerRoutes=['/catalog.json','/access','/dashboard','/dashboard.json','/permissions','/filters','/activity.json','/privacy/status','/unknown','/mcp/','/.well-known/oauth-protected-resource-evil'];
+const ownerRoutes=['/catalog.json','/access','/dashboard','/dashboard.json','/permissions','/filters','/activity.json','/tool-calls.json','/privacy/status','/unknown','/mcp/','/.well-known/oauth-protected-resource-evil'];
 const validHosts=['127.0.0.1:18893','localhost:18893','localhost','192.168.1.50:18893','100.101.102.103:18893','[fd7a:115c:a1e0::1]:18893','[::ffff:192.168.1.1]','mcp.example.com','demo-tunnel.trycloudflare.com','mac.tail1234.ts.net:443','jetson.local'];
 const invalidHosts=['','evil.com/path','user@evil.com','evil.com evil.org','evil.com,evil.org','evil.com\\path','x:70000','x:0','x:','x:-1','x:1.1','x:1:2','[bad:ip]','[:::]','[::1]tail','::1','[]','-evil.com','evil-.com','x..com','.x','x.','999.999.1.1','127.1','x#fragment','x?query','x\t','x\n','x\x00','a'.repeat(256)];
 const hostRequest=host=>({headers:{host},rawHeaders:['Host',host]});
@@ -65,7 +65,7 @@ function send(port,route,{hostname='127.0.0.1',host=`${hostname}:${port}`,method
   });
 }
 const initialization={method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-03-26',capabilities:{},clientInfo:{name:'lan-test',version:'1'}}})};
-function assertInitialized(response){assert.equal(response.status,200,response.text);assert.ok(JSON.parse(response.text).result.serverInfo);}
+function assertInitialized(response){assert.equal(response.status,200,response.text);const data=response.headers['content-type']?.includes('text/event-stream')?response.text.split('\n').find(line=>line.startsWith('data: '))?.slice(6):response.text;assert.ok(JSON.parse(data).result.serverInfo);}
 
 test('default listener supports unchanged tunnel Host, rejects rebinding, and remains physically loopback-only',{timeout:30000},async t=>{
   const {port,audits}=await gateway(t,false);

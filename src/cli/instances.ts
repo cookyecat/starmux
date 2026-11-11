@@ -7,7 +7,7 @@ import {createWorkspaceGrants} from '../workspace-grants.js';
 import {createDenyRules} from '../explicit-deny-rules.js';
 import {createPrivateDirectory} from '../platform.js';
 import {instanceStatus,instanceRequest,stopInstance} from '../instance-runtime.js';
-import {atomicPrivate,changeRegistry,configJSONSchema,sourceRevision,configTemplate,validateConfig,withLock,createInstance,exists,fingerprint,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,type InstanceConfig} from '../instance-store.js';
+import {atomicPrivate,changeRegistry,configJSONSchema,configWarnings,formatConfigWarnings,usesGlobalPermissions,sourceRevision,configTemplate,validateConfig,withLock,createInstance,exists,fingerprint,instancePaths,loadInstanceConfig,parseConfig,patchInstanceConfig,readRegistry,readTrusted,resolveInstance,saveInstanceConfig,suggestPort,type InstanceConfig} from '../instance-store.js';
 
 const booleans=new Set(['--json','--all','--link','--archived','--approve-trusted-developer','--approve-unrestricted','--effective','--allow-loopback-http']);
 function options(args:string[]){
@@ -110,21 +110,21 @@ export async function handle(command:string,args:string[]){
     if(op==='show'){
       if(flags.has('--effective')){
         const status=await instanceStatus(instance);const active=status.active;
-        if(json)output(active);
+        if(json)output(active?{...active,warnings:configWarnings(active.config)}:null);
         else if(!active)process.stdout.write(`Instance ${instance.name} has no confirmed active configuration (state: ${status.phase}).\n`);
         else process.stdout.write(
           `Instance       ${instance.name} (effective running config)\n`+
           `Workspace      ${active.config.projectRoot}\n`+
           `Port           ${active.config.port}\n`+
           `Mode           ${active.config.accessRole==='trusted'?'Coding (read-write, shell & git)':active.config.mode}\n`+
-          `Git workflow   ${active.config.gitMode}\n`+
-          `Extra MCPs     ${active.config.upstreams.length}\n`
+          (usesGlobalPermissions(active.config)?'':`Git workflow   ${active.config.gitMode}\n`)+
+          `Extra MCPs     ${active.config.upstreams.length}\n`+formatConfigWarnings(configWarnings(active.config))
         );
       }else{
         const text=await readTrusted(instance.source.path,instance.source.kind==='managed');
         let config:InstanceConfig|null=null;let problem:string|null=null;
         try{config=await validateConfig(parseConfig(text));}catch(e){problem=message(e);}
-        if(json)output({instanceId:instance.id,text,config,problem,revision:sourceRevision(instance.source.path,text),source:instance.source});
+        if(json)output({instanceId:instance.id,text,config,problem,warnings:config?configWarnings(config,text):[],revision:sourceRevision(instance.source.path,text),source:instance.source});
         else if(problem||!config)process.stdout.write(`Instance       ${instance.name}\nConfig file    ${instance.source.path}\nProblem        ${problem??'Invalid configuration'}\n`);
         else process.stdout.write(
           `Instance       ${instance.name}\n`+
@@ -132,8 +132,8 @@ export async function handle(command:string,args:string[]){
           `Workspace      ${config.projectRoot}\n`+
           `Port           ${config.port}\n`+
           `Mode           ${config.accessRole==='trusted'?'Coding (read-write, shell & git)':config.mode}\n`+
-          `Git workflow   ${config.gitMode}\n`+
-          `Extra MCPs     ${config.upstreams.length}\n\n`+
+          (usesGlobalPermissions(config)?'':`Git workflow   ${config.gitMode}\n`)+
+          `Extra MCPs     ${config.upstreams.length}\n`+formatConfigWarnings(configWarnings(config,text))+'\n'+
           `Commands\n`+
           `  Edit config  starmux config edit${instance.name==='default'?'':` -i ${instance.name}`}\n`+
           `  Apply        starmux config apply${instance.name==='default'?'':` -i ${instance.name}`}\n`
@@ -173,27 +173,28 @@ export async function handle(command:string,args:string[]){
     }
     if(op==='save'){
       const text=flags.get('--file')?await readTrusted(path.resolve(flags.get('--file')!),false):await readInput();
-      const saved=await saveInstanceConfig(instance,text,flags.get('--revision')??'');output({result:'SAVED',revision:saved.revision});return;
+      const saved=await saveInstanceConfig(instance,text,flags.get('--revision')??'');output({result:'SAVED',revision:saved.revision,warnings:saved.warnings});return;
     }
     if(op==='patch'){
       const patch=JSON.parse(flags.get('--patch')??await readInput()) as Record<string,unknown>;
       if(patch.accessRole==='trusted'&&(await loadInstanceConfig(instance)).config.accessRole!=='trusted')requireApprovals(parseConfig(JSON.stringify({...((await loadInstanceConfig(instance)).config),...patch})),flags);
-      output({result:'SAVED',revision:(await patchInstanceConfig(instance,patch,flags.get('--revision')??'')).revision});return;
+      const saved=await patchInstanceConfig(instance,patch,flags.get('--revision')??'');output({result:'SAVED',revision:saved.revision,warnings:saved.warnings});return;
     }
     const loaded=await loadInstanceConfig(instance);
     if(op==='validate'){
-      if(json)output({result:'VALID',revision:loaded.revision,source:instance.source});
-      else process.stdout.write(`✓ Configuration is valid (${instance.source.path})\n`);
+      if(json)output({result:'VALID',revision:loaded.revision,source:instance.source,warnings:loaded.warnings});
+      else process.stdout.write(`✓ Configuration is valid (${instance.source.path})\n`+formatConfigWarnings(loaded.warnings));
       return;
     }
     if(op==='diff'){
       const active=(await instanceStatus(instance)).active?.config??null;
-      const changes=Object.entries(loaded.config).filter(([key,value])=>JSON.stringify(value)!==JSON.stringify(active?.[key as keyof InstanceConfig])).map(([field,value])=>({field,before:active?.[field as keyof InstanceConfig]??null,after:value}));
-      if(json)output({instanceId:instance.id,revision:loaded.revision,changes});
+      const changes=Object.entries(loaded.config).filter(([key,value])=>!(usesGlobalPermissions(loaded.config)&&['gitMode','worktreeMode'].includes(key)&&value==='off'&&(!active||active[key as keyof InstanceConfig]==='off'))&&JSON.stringify(value)!==JSON.stringify(active?.[key as keyof InstanceConfig])).map(([field,value])=>({field,before:active?.[field as keyof InstanceConfig]??null,after:value}));
+      if(json)output({instanceId:instance.id,revision:loaded.revision,changes,warnings:loaded.warnings});
       else if(!changes.length)process.stdout.write('No pending configuration changes.\n');
       else{
         for(const c of changes)process.stdout.write(`${c.field}: ${JSON.stringify(c.before)} -> ${JSON.stringify(c.after)}\n`);
       }
+      if(!json)process.stdout.write(formatConfigWarnings(loaded.warnings));
       return;
     }
     if(op==='apply'){
@@ -202,19 +203,19 @@ export async function handle(command:string,args:string[]){
       const state=await instanceRequest(instance,'apply',flags.get('--revision')??loaded.revision);
       if(state&&state.phase!=='running')throw Error('INSTANCE_APPLY_UNVERIFIED');
       if(!state&&before.phase==='running')throw Error('INSTANCE_CHANGED_DURING_APPLY');
-      if(json)output({result:state?'APPLIED':'VALID_ON_NEXT_START',instanceId:instance.id,runtime:state});
-      else process.stdout.write(state?`Applied configuration to '${instance.name}'.\n`:`Configuration validated; will take effect on next 'starmux up'.\n`);
+      if(json)output({result:state?'APPLIED':'VALID_ON_NEXT_START',instanceId:instance.id,runtime:state,warnings:loaded.warnings});
+      else process.stdout.write((state?`Applied configuration to '${instance.name}'.\n`:`Configuration validated; will take effect on next 'starmux up'.\n`)+formatConfigWarnings(loaded.warnings));
       return;
     }
     if(op==='export'){
-      const file=flags.get('--output');const text=configTemplate(loaded.config);
+      const file=flags.get('--output');const text=loaded.text;
       if(file){await writeFile(path.resolve(file),text,{flag:'wx',mode:0o600});output({result:'EXPORTED',file:path.resolve(file)});}else process.stdout.write(text);return;
     }
     if(op==='edit'){
       const editor=process.env.VISUAL||process.env.EDITOR;if(!editor)throw Error('EDITOR_REQUIRED: set EDITOR to an executable, or use config path');
       const temp=await mkdtemp(path.join(await realpath(tmpdir()),'gateway-edit-'));const file=path.join(temp,'config.jsonc');
       try{await writeFile(file,loaded.text,{mode:0o600});await new Promise<void>((resolve,reject)=>{const child=spawn(editor,[file],{stdio:'inherit'});child.once('error',reject);child.once('exit',code=>code===0?resolve():reject(Error('EDITOR_FAILED')));});
-        const text=await readFile(file,'utf8');await saveInstanceConfig(instance,text,loaded.revision);output({result:'SAVED',message:'Use config diff, then config apply.'});
+        const text=await readFile(file,'utf8');const saved=await saveInstanceConfig(instance,text,loaded.revision);output({result:'SAVED',warnings:saved.warnings,message:'Use config diff, then config apply.'});
       }finally{await rm(temp,{recursive:true,force:true});}return;
     }
     throw Error('CONFIG_ACTION_INVALID');

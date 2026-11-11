@@ -1,7 +1,9 @@
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {createServer,createConnection,type Server} from 'node:net';
 import {fork,type ChildProcess} from 'node:child_process';
-import {mkdir,rm,open,rmdir} from 'node:fs/promises';
+import {mkdir,rm,rmdir} from 'node:fs/promises';
+import {finished as streamFinished} from 'node:stream/promises';
+import {createProcessLog} from './process-log.js';
 import {setTimeout as pause} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -12,7 +14,7 @@ export type {ActiveConfig,RuntimeState} from './instance-control-protocol.js';
 import {controlRoot,controlSocket,controlSocketRoot,sameFile,createPrivateDirectory,childEnvKeys,windows} from './platform.js';
 import {acquireControl,inspectControlOwner} from './global-core-control.js';
 import {runtimeIdentity} from './runtime-identity.js';
-import {atomicPrivate,changeRegistry,availablePort,ensureAccessReady,exists,instanceEnv,instancePaths,loadInstanceConfig,prepareUpstreams,readTrusted,resolveInstance,type Instance,type InstanceConfig} from './instance-store.js';
+import {atomicPrivate,changeRegistry,availablePort,ensureAccessReady,exists,instanceEnv,instancePaths,loadInstanceConfig,prepareUpstreams,prepareMiddlewares,readTrusted,resolveInstance,type Instance,type InstanceConfig} from './instance-store.js';
 
 type Owner=z.infer<typeof instanceOwnerSchema>;
 export function runtimePaths(id:string){
@@ -28,9 +30,9 @@ async function ownerFor(instance:Instance){
   const owner=instanceOwnerSchema.parse(raw);
   if(owner.instanceId!==instance.id)throw Error('INSTANCE_CONTROL_IDENTITY_INVALID');return owner;
 }
-async function exchange(instance:Instance,owner:Owner,method:'status'|'stop'|'apply',revision?:string,timeoutMs=method==='apply'?65000:2000){
+async function exchange(instance:Instance,owner:Owner,method:'status'|'stop'|'apply',revision?:string,timeoutMs=method==='apply'?65000:2000,forceId?:string){
   const nonce=randomBytes(24).toString('hex');
-  const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,method,revision:revision??null,runId:owner.runId,nonce});
+  const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,method,revision:revision??null,...(forceId?{forceId}:{}),runId:owner.runId,nonce});
   return new Promise<z.infer<typeof controlReplySchema>>((resolve,reject)=>{
     const socket=createConnection(runtimePaths(instance.id).socket);let raw='';
     const timer=setTimeout(()=>socket.destroy(Error('INSTANCE_CONTROL_TIMEOUT')),timeoutMs);
@@ -56,9 +58,9 @@ async function exchange(instance:Instance,owner:Owner,method:'status'|'stop'|'ap
     }catch(e){reject(e);}})();});
   });
 }
-export async function instanceRequest(instance:Instance,method:'status'|'apply',revision?:string):Promise<RuntimeState|null>{
+export async function instanceRequest(instance:Instance,method:'status'|'apply',revision?:string,forceId?:string):Promise<RuntimeState|null>{
   const owner=await ownerFor(instance);if(!owner||!alive(owner.pid))return null;
-  return (await exchange(instance,owner,method,revision)).state;
+  return (await exchange(instance,owner,method,revision,method==='apply'?65000:2000,forceId)).state;
 }
 async function snapshot<S extends z.ZodTypeAny>(file:string,schema:S):Promise<z.output<S>|null>{
   try{return schema.parse(JSON.parse(await readTrusted(file)));}catch{return null;}
@@ -169,6 +171,8 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
   let controlTimer:ReturnType<typeof setInterval>|undefined;
   const state:RuntimeState={protocolVersion:INSTANCE_CONTROL_VERSION,instanceId:instance.id,runId:owner.runId,pid:process.pid,launcher:owner.launcher,appParentPid:parent??null,executionMode:options.background?'background':'foreground',phase:'starting',port:null,active:null,problem:null,...identity};
   let worker:ChildProcess|null=null;let portLease:Awaited<ReturnType<typeof acquireControl>>|null=null;let server:Server|null=null;
+  let workerLogDone:Promise<void>|null=null;
+  let workerLogFailed=false;
   let ending=false;let expectedWorkerExit=false;let sequence:Promise<unknown>=Promise.resolve();
   let applying=false;
   let stopRequest:Promise<void>|null=null;
@@ -185,15 +189,17 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     await new Promise<void>((resolve,reject)=>{
       if(child.exitCode!==null||child.signalCode!==null){resolve();return;}
       let forced=false;
-      const finish=(error?:Error)=>{clearTimeout(grace);clearTimeout(deadline);child.off('exit',exited);child.off('error',failed);error?reject(error):resolve();};
+      const finish=(error?:Error)=>{clearTimeout(grace);clearTimeout(deadline);child.off('close',exited);child.off('error',failed);error?reject(error):resolve();};
       const exited=()=>{if(forced)state.problem='WORKER_STOP_FORCED';finish();};
       const failed=(error:Error)=>finish(error);
       const grace=setTimeout(()=>{forced=true;try{child.kill('SIGKILL');}catch(e){finish(e as Error);}},8000);
       const deadline=setTimeout(()=>finish(Error('INSTANCE_WORKER_STOP_TIMEOUT')),12000);
-      child.once('exit',exited);child.once('error',failed);
+      child.once('close',exited);child.once('error',failed);
       if(child.connected)child.send({type:'gateway-stop'},error=>{if(error&&child.exitCode===null&&child.signalCode===null)try{child.kill('SIGTERM');}catch(e){finish(e as Error);}});
       else child.kill('SIGTERM');
-    });worker=null;expectedWorkerExit=false;state.active=null;state.port=null;
+    });await workerLogDone;
+    if(workerLogFailed)state.problem='INSTANCE_LOG_FAILED';
+    workerLogDone=null;worker=null;expectedWorkerExit=false;state.active=null;state.port=null;
   }
   async function shutdown(reason?:string){
     if(ending)return;ending=true;state.problem=reason??null;state.phase='stopping';await stopWorker();
@@ -209,19 +215,32 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     }
     return stopRequest;
   }
+  let localApplySupported=false;
   async function startWorker(config:ActiveConfig,lease:Awaited<ReturnType<typeof acquireControl>>,announce=true){
     await ensureAccessReady(await resolveInstance(instance.id,home),home);
     if(!await availablePort(config.config.port,config.config.allowLan?'0.0.0.0':'127.0.0.1'))throw Error('PORT_IN_USE: '+config.config.port);
     const env:NodeJS.ProcessEnv={};for(const key of childEnvKeys)if(process.env[key])env[key]=process.env[key]!;
     Object.assign(env,instanceEnv(instance,config.config,home),{STARMUX_INTERNAL_SETUP_OWNER_PID:String(process.pid),STARMUX_INTERNAL_SETUP_RUN_ID:lease.owner.runId,STARMUX_INTERNAL_SETUP_TOKEN:lease.owner.token});
+    const middlewareFile=await prepareMiddlewares(instance,config.config,home);if(middlewareFile)env.STARMUX_MIDDLEWARES_FILE=middlewareFile;
     const upstreamFile=await prepareUpstreams(instance,config.config,home);if(upstreamFile)env.STARMUX_UPSTREAMS_FILE=upstreamFile;
     const log=path.join(instancePaths(instance,home).logs,'core.log');
-    if(await exists(log))await readTrusted(log,true,32*1024*1024);
-    const output=await open(log,'a',0o600);
-    const child=fork(fileURLToPath(options.workerModule??new URL('./instance-worker.js',import.meta.url)),[],{env,stdio:['ignore',output.fd,output.fd,'ipc']});worker=child;await output.close();
+    const output=await createProcessLog(log);
+    let child:ChildProcess;
+    try{child=fork(fileURLToPath(options.workerModule??new URL('./instance-worker.js',import.meta.url)),[],{env,stdio:['ignore','pipe','pipe','ipc']});}
+    catch(error){output.destroy();throw error;}
+    worker=child;
+    child.stdout!.pipe(output,{end:false});child.stderr!.pipe(output,{end:false});
+    child.once('close',()=>output.end());
+    workerLogFailed=false;
+    // A log failure must not become an unhandled stream error or silently leave
+    // a worker blocked behind an unread stdout pipe.
+    workerLogDone=streamFinished(output).catch(()=>{
+      workerLogFailed=true;
+      void requestStop('INSTANCE_LOG_FAILED').catch(()=>{});
+    });
     await new Promise<void>((resolve,reject)=>{
       const timer=setTimeout(()=>reject(Error('INSTANCE_START_TIMEOUT')),20000);
-      const ready=(message:unknown)=>{if(message&&typeof message==='object'&&'type' in message&&message.type==='gateway-ready'){clearTimeout(timer);child.off('exit',failed);child.off('error',failed);child.off('message',ready);resolve();}};
+      const ready=(message:unknown)=>{if(message&&typeof message==='object'&&'type' in message&&message.type==='gateway-ready'){localApplySupported='localApply' in message&&message.localApply===true;clearTimeout(timer);child.off('exit',failed);child.off('error',failed);child.off('message',ready);resolve();}};
       const failed=()=>{clearTimeout(timer);child.off('message',ready);reject(Error('INSTANCE_START_FAILED: inspect instance logs'));};
       child.once('error',failed);child.once('exit',failed);child.on('message',ready);
     });
@@ -231,12 +250,25 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     if(announce)emit('INSTANCE_RUNNING');
   }
   const active=(loaded:typeof initial):ActiveConfig=>({config:loaded.config,revision:loaded.revision,effectiveRevision:loaded.effectiveRevision,sourcePath:loaded.source.path});
-  async function apply(revision:string|null){
+  async function apply(revision:string|null,forceId?:string){
     if(ending||stopRequest)throw Error('INSTANCE_STOPPING');
     const current=await resolveInstance(instance.id,home);const next=await loadInstanceConfig(current);
     if(!revision||next.revision!==revision)throw Error('CONFIG_CONFLICT: configuration changed before apply');
     await ensureAccessReady(await resolveInstance(instance.id,home),home);await prepareUpstreams(instance,next.config,home);
     const previous=state.active;if(!previous||!portLease)throw Error('INSTANCE_NOT_RUNNING');
+    const stable=(config:InstanceConfig)=>{const {upstreams,middlewares,...rest}=config;return JSON.stringify(rest);};
+    if(worker&&localApplySupported&&stable(previous.config)===stable(next.config)){
+      const upstreamFile=await prepareUpstreams(instance,next.config,home),middlewareFile=await prepareMiddlewares(instance,next.config,home);
+      const child=worker,id=randomBytes(16).toString('hex');
+      await new Promise<void>((resolve,reject)=>{
+        const timer=setTimeout(()=>finish(Error('GATEWAY_APPLY_TIMEOUT: saved configuration remains pending')),60000);
+        const reply=(value:unknown)=>{if(!value||typeof value!=='object')return;const m=value as Record<string,unknown>;if(m.type==='gateway-applied'&&m.id===id)finish(m.error?Error(String(m.error)):undefined);};
+        const exited=()=>finish(Error('INSTANCE_WORKER_EXITED'));
+        const finish=(error?:Error)=>{clearTimeout(timer);child.off('message',reply);child.off('exit',exited);error?reject(error):resolve();};
+        child.on('message',reply);child.once('exit',exited);child.send({type:'gateway-apply',id,upstreamFile,middlewareFile,forceId,deadline:Date.now()+55000},error=>{if(error)finish(error);});
+      });
+      state.active=active(next);state.problem=null;await atomicPrivate(path.join(instancePaths(instance,home).snapshots,'active.json'),JSON.stringify(state.active,null,2));emit('INSTANCE_RUNNING');return;
+    }
     const oldLease=portLease;let candidateLease=oldLease;
     if(next.config.port!==previous.config.port){
       if(!await availablePort(next.config.port,next.config.allowLan?'0.0.0.0':'127.0.0.1'))throw Error('PORT_IN_USE: '+next.config.port);
@@ -290,7 +322,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
               // Another queued apply may already have replaced this run.
               if(req.runId!==owner.runId)throw Error('CONTROL_DENIED');
               applying=true;
-              try{await apply(req.revision);}finally{applying=false;}
+              try{await apply(req.revision,req.forceId);}finally{applying=false;}
             });
             if(req.method==='stop'){
               if(applying)throw Error('INSTANCE_APPLY_IN_PROGRESS: retry stop after configuration applies');

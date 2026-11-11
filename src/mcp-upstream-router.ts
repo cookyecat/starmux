@@ -1,3 +1,4 @@
+import {namespaceUri,resolveNamespacedUri,namespaceReferences} from './resource-namespace.js';
 import type { RouteDefinition,RouteInfo,Tool,ToolArguments,ToolInvocation,UpstreamRouter } from "./contracts.js";
 // MCP router: route upstream tool calls without implementing their functionality.
 // Registered upstream servers own their tools; the DC route retains native names.
@@ -6,6 +7,13 @@ export class MCPRouteError extends Error {
   constructor(public readonly code: string){super(code);}
 }
 function invalid(message: string): never{throw new MCPRouteError(message);}
+function checkedCatalog<T>(items:T[],identity:(item:T)=>string):T[]{
+  if(items.length>2000||Buffer.byteLength(JSON.stringify(items))>4194304)invalid('GATEWAY_CATALOG_LIMIT');
+  const seen=new Set<string>();for(const item of items){const id=identity(item);if(seen.has(id))invalid('GATEWAY_CATALOG_CONFLICT');seen.add(id);}return items;
+}
+export async function validateGatewayCatalogs(router:UpstreamRouter){
+  await Promise.all([router.listResources?.(),router.listResourceTemplates?.(),router.listPrompts?.()]);
+}
 function validRoute(route: unknown){
   return typeof route==="string"&&/^[a-z][a-z0-9_-]{0,39}$/.test(route);
 }
@@ -27,27 +35,29 @@ export function createMCPUpstreamRouter({routes,defaultRoute="desktop"}: {routes
       if(mapping.has(publicName)||publicName==="health_check"||
         publicName.startsWith("gateway_git_"))invalid("ROUTED_TOOL_COLLISION");
       mapping.set(publicName,{route:id,nativeName:tool.name,upstream,authorize});
-      catalog.push({...structuredClone(tool),name:publicName});
+      catalog.push({...namespaceReferences(id,tool),name:publicName});
     }
     routeInfos.push(Object.freeze({id,toolCount:names.size,nativeNames:exposeNativeNames}));
   }
   if(!seenRoutes.has(defaultRoute))invalid("DEFAULT_ROUTE_MISSING");
-  const resourceSource=routes.find(x=>x.id===defaultRoute)?.upstream;
+  checkedCatalog(catalog,tool=>tool.name);
+  const promptEntries=async()=>{
+    const entries=(await Promise.all(routes.map(async route=>(await route.upstream.listNativePrompts?.()??[]).map(prompt=>({route,prompt,name:route.id==='desktop'?prompt.name:route.id+'__'+prompt.name}))))).flat();
+    // Validate the public names, including ambiguous double-underscore prefixes.
+    checkedCatalog(entries.map(entry=>({...entry.prompt,name:entry.name})),prompt=>prompt.name);return entries;
+  };
   return Object.freeze({
-    // Default native route's MCP App resources correspond to the unchanged
-    // UI URIs advertised on its tools. Additional namespaced upstream
-    // resource URIs require explicit collision/ownership contracts later.
-    ...(typeof resourceSource?.listNativeResources==="function"&&
-        typeof resourceSource?.readNativeResource==="function"?{
-      async listResources(){return resourceSource.listNativeResources!();},
-      async readResource(uri: string){return resourceSource.readNativeResource!(uri);},
-      async listResourceTemplates(){
-        return typeof resourceSource.listNativeResourceTemplates==="function"?
-          resourceSource.listNativeResourceTemplates():[];
-      }
-    }:{}),
+    async listResources(){const lists=await Promise.all(routes.map(async r=>(await r.upstream.listNativeResources?.()??[]).map(resource=>({...resource,uri:namespaceUri(r.id,resource.uri)}))));return checkedCatalog(lists.flat(),resource=>resource.uri);},
+    async listResourceTemplates(){const lists=await Promise.all(routes.map(async r=>(await r.upstream.listNativeResourceTemplates?.()??[]).map(resource=>({...resource,uriTemplate:namespaceUri(r.id,resource.uriTemplate)}))));return checkedCatalog(lists.flat(),resource=>resource.uriTemplate);},
+    async readResource(uri:string){const target=resolveNamespacedUri(uri),route=routes.find(r=>r.id===target.serverId);if(!route?.upstream.readNativeResource)invalid('RESOURCE_ROUTE_NOT_FOUND');return namespaceReferences(route.id,await route.upstream.readNativeResource(target.uri));},
+    async listPrompts(){return (await promptEntries()).map(entry=>({...entry.prompt,name:entry.name}));},
+    async getPrompt(name:string,args?:Record<string,string>){
+      const entry=(await promptEntries()).find(entry=>entry.name===name);if(entry?.route.upstream.getNativePrompt)return namespaceReferences(entry.route.id,await entry.route.upstream.getNativePrompt(entry.prompt.name,args));invalid('PROMPT_NOT_FOUND');
+    },
     upstreamCatalog:Object.freeze(catalog),
     routes:Object.freeze(routeInfos),
+    async cacheScopeFor(target:{serverId:string;toolName:string}){return await routes.find(r=>r.id===target.serverId)?.upstream.cacheIdentity?.()??'os-account';},
+    targetFor(publicName:string){const target=mapping.get(publicName);return target?{serverId:target.route,toolName:target.nativeName}:undefined;},
     routeFor(publicName: string){return mapping.get(publicName)?.route||null;},
     async authorizeExtension(publicName: string,args: ToolArguments){
       const target=mapping.get(publicName);
@@ -62,9 +72,9 @@ export function createMCPUpstreamRouter({routes,defaultRoute="desktop"}: {routes
       if(!invocation||typeof invocation.name!=="string"||
         !mapping.has(invocation.name))invalid("NO_SUCH_ROUTED_TOOL");
       const target=mapping.get(invocation.name)!;
-      return target.upstream.forwardWorkspaceInvocation({
+      return namespaceReferences(target.route,await target.upstream.forwardWorkspaceInvocation({
         ...invocation,name:target.nativeName,arguments:invocation.arguments||{}
-      });
+      }));
     }
   });
 }

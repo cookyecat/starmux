@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
-import {execFile} from 'node:child_process';
-import {mkdtemp,mkdir,readFile,realpath,rm} from 'node:fs/promises';
+import {execFile,spawn} from 'node:child_process';
+import {once} from 'node:events';
+import {mkdtemp,mkdir,open,readFile,realpath,rename,rm,writeFile} from 'node:fs/promises';
 import {createServer} from 'node:net';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {promisify} from 'node:util';
 import test from 'node:test';
-import {createInstance,instanceConfigSchema,loadInstanceConfig,readRegistry} from '../dist/src/instance-store.js';
+import {createInstance,instanceConfigSchema,instancePaths,loadInstanceConfig,patchInstanceConfig,readRegistry} from '../dist/src/instance-store.js';
 import {runtimePaths} from '../dist/src/instance-runtime.js';
 
 const execute=promisify(execFile);
@@ -78,6 +79,63 @@ test('real CLI starts, applies permissions, confirms stop, and archives only a s
   assert.equal((await readRegistry(f.home)).instances[0].archived,true);
 });
 
+test('real CLI stays healthy with several slow or unresponsive optional upstreams',{timeout:90000},async t=>{
+  const f=await fixture(t),loaded=await loadInstanceConfig(f.instance);
+  const upstreams=['silent','slow-catalog','stubborn','healthy'].map((mode,index)=>({
+    id:'optional'+index,transport:'stdio',command:process.execPath,
+    args:[path.resolve('tests/fixtures/optional-upstream.mjs'),mode,path.join(f.home,mode+'.pid')],allowTools:['echo']
+  }));
+  await patchInstanceConfig(f.instance,{upstreams},loaded.revision,f.home);
+  const started=await f.run('up','--json');
+  assert.equal(started.code,0,started.stdout+started.stderr);
+  const state=JSON.parse(started.stdout);assert.equal(state.phase,'running');assert.equal(state.health,'ok');
+  assert.equal(state.accessMode,'ingress');
+  assert.equal((await f.run('down','--json')).code,0);
+});
+
+test('CLI reads oversized logs and follows same-sized rotated replacements',{timeout:30000},async t=>{
+  const f=await fixture(t),log=path.join(instancePaths(f.instance,f.home).logs,'core.log');
+  const handle=await open(log,'w',0o600);await handle.truncate(33*1024*1024);
+  const marker=Buffer.from('\nold-output\n');await handle.write(marker,0,marker.length,33*1024*1024-marker.length);await handle.close();
+  const initial=await f.run('logs','--json','--lines','1');assert.equal(initial.code,0,initial.stderr);
+  assert.equal(JSON.parse(initial.stdout).output,'old-output\n');
+  await writeFile(log,'old-output\n');
+  const child=spawn(process.execPath,[cli,'logs','--json','--follow','--lines','1'],{
+    env:{...process.env,HOME:f.home,USERPROFILE:f.home},stdio:['ignore','pipe','pipe']
+  });
+  let output='',errors='';child.stdout.on('data',data=>output+=data);child.stderr.on('data',data=>errors+=data);
+  t.after(async()=>{if(child.exitCode===null&&child.signalCode===null){const closed=once(child,'close');child.kill('SIGKILL');await closed;}});
+  async function waitForText(text){
+    for(let n=0;n<150;n++){if(output.includes(text))return;await new Promise(resolve=>setTimeout(resolve,40));}
+    assert.fail('Missing '+text+': '+output+errors);
+  }
+  await waitForText('old-output');await rename(log,log+'.1');await writeFile(log,'new-output\n',{mode:0o600});
+  await waitForText('new-output');
+  const closed=once(child,'close');child.kill('SIGTERM');await closed;
+});
+
+test('ordinary CLI mode changes keep configs simple; explicit ignored options get nonblocking notices',{timeout:90000},async t=>{
+  const f=await fixture(t);
+  assert.doesNotMatch((await loadInstanceConfig(f.instance)).text,/gitMode|worktreeMode/);
+  assert.doesNotMatch((await f.run('config','show')).stdout,/Git workflow|gitMode|worktreeMode/);
+  assert.doesNotMatch((await f.run('config','diff')).stdout,/gitMode|worktreeMode/);
+  assert.deepEqual(JSON.parse((await f.run('config','validate','--json')).stdout).warnings,[]);
+  for(const mode of ['--code','--read','--code']){
+    const result=await f.run('up',mode,'--yes','--json');assert.equal(result.code,0,result.stderr+result.stdout);
+    assert.doesNotMatch((await loadInstanceConfig(f.instance)).text,/gitMode|worktreeMode/);
+  }
+  let loaded=await loadInstanceConfig(f.instance);
+  const patch=await f.run('config','patch','--patch',JSON.stringify({gitMode:'review',worktreeMode:'linked'}),'--revision',loaded.revision,'--json');
+  assert.equal(patch.code,0,patch.stderr);assert.equal(JSON.parse(patch.stdout).warnings.length,2);
+  const valid=await f.run('config','validate');assert.equal(valid.code,0);assert.match(valid.stdout,/Git remains available through the terminal/);
+  const applied=await f.run('config','apply','--json');assert.equal(applied.code,0,applied.stderr);assert.equal(JSON.parse(applied.stdout).warnings.length,2);
+  assert.match((await f.run('config','show','--effective')).stdout,/gitMode=.*ignored/);
+  const up=await f.run('up','--json');assert.equal(up.code,0);assert.doesNotMatch(up.stderr,/CONFIG_OPTION_IGNORED|Note:/);
+  loaded=await loadInstanceConfig(f.instance);assert.equal(loaded.config.gitMode,'review');assert.equal(loaded.config.worktreeMode,'linked');
+  assert.equal((await f.run('config','export')).stdout,loaded.text);
+  assert.equal((await f.run('down','--json')).code,0);
+});
+
 test('CLI network flags persist, apply live, and preserve idempotent runs', {timeout:90000},async t=>{
   const f=await fixture(t);
   for(const args of [['--allow-lan','--local'],['--local','--allow-lan'],['--allow-lan','--no-allow-lan'],['--no-allow-lan','--allow-lan']]){
@@ -117,4 +175,27 @@ test('CLI network flags persist, apply live, and preserve idempotent runs', {tim
   assert.equal((await loadInstanceConfig(f.instance)).config.allowLan,true);
   assert.equal((await f.run('init','--no-allow-lan','--json')).code,0);
   assert.equal((await loadInstanceConfig(f.instance)).config.allowLan,false);
+});
+
+test('CLI permission round trips preserve services and advanced compatibility values',{timeout:90000},async t=>{
+  const f=await fixture(t),loaded=await loadInstanceConfig(f.instance);
+  const upstreams=[{id:'retained',transport:'stdio',command:process.execPath,args:[path.resolve('tests/fixtures/optional-upstream.mjs'),'healthy',path.join(f.home,'child.pid')],allowTools:['echo']}];
+  await patchInstanceConfig(f.instance,{upstreams,gitMode:'review',worktreeMode:'linked'},loaded.revision,f.home);
+  const {Client}=await import('@modelcontextprotocol/sdk/client/index.js');
+  const {StreamableHTTPClientTransport}=await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+  for(const mode of ['code','read','code']){
+    const started=await f.run('up','--'+mode,'--yes','--json');assert.equal(started.code,0,started.stdout+started.stderr);
+    const saved=await loadInstanceConfig(f.instance);
+    assert.deepEqual(saved.config.upstreams,instanceConfigSchema.parse({...saved.config,upstreams}).upstreams);
+    assert.equal(saved.config.gitMode,'review');assert.equal(saved.config.worktreeMode,'linked');
+    const client=new Client({name:'mode-regression',version:'1'},{capabilities:{}});
+    try{
+      await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${f.port}/mcp`)));
+      const tools=(await client.listTools()).tools;
+      assert.equal(tools.some(tool=>tool.name==='retained__echo'),mode==='code');
+      const call=await client.callTool({name:'retained__echo',arguments:{}});
+      if(mode==='read'){assert.equal(call.isError,true);assert.match(call.content[0].text,/READ_ONLY_MODE/);}
+      else assert.equal(call.content[0].text,'healthy');
+    }finally{await client.close();}
+  }
 });

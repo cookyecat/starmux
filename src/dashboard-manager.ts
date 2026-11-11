@@ -1,3 +1,5 @@
+import {MiddlewareManagement} from './middleware-management.js';
+import {ServerManagement,applySavedGateway} from './server-management.js';
 import {createServer,type IncomingMessage} from 'node:http';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import {homedir,networkInterfaces} from 'node:os';
@@ -43,7 +45,15 @@ export async function startDetachedInstance(instance:store.Instance){
 async function body(req:IncomingMessage){let text='';for await(const c of req){text+=String(c);if(Buffer.byteLength(text)>262144)throw Error('REQUEST_TOO_LARGE');}const value:unknown=JSON.parse(text||'{}');if(!value||typeof value!=='object'||Array.isArray(value))throw Error('INVALID_REQUEST');return value as {[key:string]:any};}
 export async function runManager(){
  const token=randomBytes(32).toString('hex'),runId=randomBytes(16).toString('hex');let port=0;
- const operations=new Map<string,{id:string;instanceId:string;state:string;error?:string}>();const busy=new Set<string>();
+ const services=new ServerManagement(),middlewares=new MiddlewareManagement();
+ const cancellations=new Map<string,AbortController>();
+ const operations=new Map<string,{id:string;instanceId:string;state:string;error?:string;result?:unknown}>();const busy=new Set<string>();
+ const startOperation=(instance:store.Instance,run:()=>Promise<unknown>)=>{
+  const id=randomBytes(12).toString('hex');const operation:{id:string;instanceId:string;state:string;result?:unknown;error?:string}={id,instanceId:instance.id,state:'running'};
+  operations.set(id,operation);busy.add(instance.id);
+  void run().then(result=>{operation.result=result;operation.state='complete';},error=>{operation.error=error instanceof Error?error.message:'OPERATION_FAILED';operation.state='error';}).finally(()=>{busy.delete(instance.id);if(operations.size>200){const old=[...operations.values()].find(o=>o.state!=='running');if(old)operations.delete(old.id);}});
+  return {...operation,operationId:id};
+ };
  const server=createServer(async(req,res)=>{
   const headers={'cache-control':'no-store','referrer-policy':'no-referrer','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"};
   const send=(status:number,data:unknown)=>{res.writeHead(status,{...headers,'content-type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));};
@@ -62,12 +72,33 @@ export async function runManager(){
     if(req.method==='POST'){if(Object.keys(b).some(k=>!['name','config','approved'].includes(k)))throw Error('INVALID_FIELDS');const config=await store.validateConfig(store.parseConfig(JSON.stringify(b.config)));await approve(config,b.approved);const i=await store.createInstance(String(b.name),{config});await consent(i,config);await createAccessControl(store.instancePaths(i).access);send(200,i);return;}
     const registry=await store.readRegistry();send(200,{defaultInstanceId:registry.defaultInstanceId,instances:await Promise.all(registry.instances.map(i=>instanceStatus(i))),operations:[...operations.values()]});return;
    }
-   const opId=route.match(/^\/api\/v1\/operations\/([a-f0-9]+)$/)?.[1];if(opId){send(operations.has(opId)?200:404,operations.get(opId)??{error:'OPERATION_NOT_FOUND'});return;}
-   const match=route.match(/^\/api\/v1\/instances\/([^/]+)\/(status|config|actions|access|activity|logs|permissions|filters|secrets)$/);if(!match){send(404,{error:'NOT_FOUND'});return;}
-   const allowed:Record<string,string[]>={config:['text','patch','validate','revision','approved'],actions:['action','name','revision'],access:['op','name','expiresAt','id','mode','config'],permissions:['op','target','mode'],filters:['op','value'],secrets:['op','name','value']};if(req.method==='POST'&&(!allowed[match[2]!]||Object.keys(b).some(k=>!allowed[match[2]!]!.includes(k))))throw Error('INVALID_FIELDS');
+   const opId=route.match(/^\/api\/v1\/operations\/([a-f0-9]+)$/)?.[1];if(opId){if(req.method==='POST'){if(b.op!=='cancel'||!cancellations.has(opId))throw Error('OPERATION_NOT_CANCELLABLE');cancellations.get(opId)!.abort();}send(operations.has(opId)?200:404,operations.get(opId)??{error:'OPERATION_NOT_FOUND'});return;}
+   const match=route.match(/^\/api\/v1\/instances\/([^/]+)\/(status|config|actions|access|activity|calls|logs|permissions|filters|secrets|servers|middlewares)$/);if(!match){send(404,{error:'NOT_FOUND'});return;}
+   const allowed:Record<string,string[]>={middlewares:['op','revision','input'],servers:['op','input','id','file','previewId','revision','prepare','authAction'],calls:['op','enabled'],config:['text','patch','validate','revision','approved'],actions:['action','name','revision'],access:['op','name','expiresAt','id','mode','config'],permissions:['op','target','mode'],filters:['op','value'],secrets:['op','name','value']};if(req.method==='POST'&&(!allowed[match[2]!]||Object.keys(b).some(k=>!allowed[match[2]!]!.includes(k))))throw Error('INVALID_FIELDS');
    const i=await store.resolveInstance(match[1],homedir(),true),action=match[2],p=store.instancePaths(i);
    if(req.method==='POST'&&['config','permissions','filters'].includes(action!)){const status=await instanceStatus(i);if(!['stopped','running'].includes(status.phase)&&!b.validate){send(409,{error:'INSTANCE_NOT_READY'});return;}}
    if(req.method==='POST'&&busy.has(i.id)){send(409,{error:'INSTANCE_BUSY'});return;}
+   if(action==='middlewares'){
+    if(req.method==='GET'){send(200,{...await middlewares.list(i),runtime:await gatewayState(i)});return;}
+    if(b.op==='test'){send(202,startOperation(i,()=>middlewares.test(i,b.input)));return;}
+    if(b.op==='reload'){send(202,startOperation(i,()=>applySavedGateway(i,String(b.revision),'__middleware__')));return;}
+    const saved=await middlewares.update(i,String(b.op),String(b.revision),b.input);send(202,startOperation(i,async()=>({...saved,...await applySavedGateway(i,saved.revision)})));return;
+   }
+   if(action==='servers'){
+    if(req.method==='GET'){send(200,{...await services.list(i),runtime:await gatewayState(i)});return;}
+    if(b.op==='auth'){send(200,await services.auth(i,String(b.id),String(b.authAction),b.previewId));return;}
+    if(b.op==='preview'){send(200,await services.preview(i,String(b.input??''),b.id,b.file));return;}
+    if(b.op==='save'||b.op==='replace'){const saved=await services.savePreview(i,String(b.previewId),String(b.revision),b.op==='replace');send(202,startOperation(i,async()=>({...saved,...await applySavedGateway(i,saved.revision)})));return;}
+    if(['enable','disable','remove'].includes(b.op)){const saved=await services.action(i,String(b.id),b.op,String(b.revision));send(202,startOperation(i,async()=>({...saved,...await applySavedGateway(i,saved.revision)})));return;}
+    if(['retry','refresh'].includes(b.op)){send(202,startOperation(i,()=>applySavedGateway(i,String(b.revision),String(b.id))));return;}
+    if(b.op==='test'){
+     const id=randomBytes(12).toString('hex');const operation:{id:string;instanceId:string;state:string;error?:string;result?:unknown}={id,instanceId:i.id,state:'running'};
+     operations.set(id,operation);busy.add(i.id);const controller=new AbortController();cancellations.set(id,controller);
+     void services.test(i,{...(b.previewId?{previewId:String(b.previewId)}:{id:String(b.id)}),prepare:b.prepare===true,signal:controller.signal}).then(result=>{operation.result=result;operation.state='complete';},()=>{operation.state='error';operation.error='SERVER_TEST_FAILED';}).finally(()=>{busy.delete(i.id);cancellations.delete(id);if(operations.size>200){const old=[...operations.values()].find(o=>o.state!=='running');if(old)operations.delete(old.id);}});
+     send(202,operation);return;
+    }
+    throw Error('INVALID_ACTION');
+   }
    if(action==='status'){send(200,await instanceStatus(i));return;}
    if(action==='actions'&&req.method==='POST'){
     if(!['start','stop','restart','apply','archive','restore','rename','default','copy'].includes(b.action))throw Error('INVALID_ACTION');
@@ -83,7 +114,7 @@ export async function runManager(){
     }catch(e){Object.assign(operation,{state:'error',error:e instanceof Error?e.message:'FAILED'});}finally{busy.delete(i.id);if(operations.size>200){const old=[...operations.values()].find(x=>x.state!=='running');if(old)operations.delete(old.id);}}})();send(202,operation);return;
    }
    if(action==='config'){
-    if(req.method==='POST'){const current=await store.loadInstanceConfig(i);let text=b.text!==undefined?String(b.text):current.text;if(b.patch){for(const [key,value] of Object.entries(b.patch))text=applyEdits(text,modify(text,[key],value,{formattingOptions:{insertSpaces:true,tabSize:2}}));}const config=await store.validateConfig(store.parseConfig(text));if(b.validate){send(200,{config,text});return;}await approve(config,b.approved,i);const saved=await store.saveInstanceConfig(i,text,String(b.revision));await consent(i,config);send(200,saved);return;}send(200,await store.loadInstanceConfig(i));return;
+    if(req.method==='POST'){const current=await store.loadInstanceConfig(i);let text=b.text!==undefined?String(b.text):current.text;if(b.patch){for(const [key,value] of Object.entries(b.patch))text=applyEdits(text,modify(text,[key],value,{formattingOptions:{insertSpaces:true,tabSize:2}}));}const config=await store.validateConfig(store.parseConfig(text));if(b.validate){send(200,{config,text,warnings:store.configWarnings(config,text)});return;}await approve(config,b.approved,i);const saved=await store.saveInstanceConfig(i,text,String(b.revision));await consent(i,config);send(200,saved);return;}send(200,await store.loadInstanceConfig(i));return;
    }
    if(action==='access'){
     const access=await createAccessControl(p.access);let created;
@@ -95,6 +126,18 @@ export async function runManager(){
     }const s=await instanceStatus(i);const c=s.active?.config;const urls=s.phase==='running'&&s.port?[`http://127.0.0.1:${s.port}/mcp`,...(c?.allowLan?Object.values(networkInterfaces()).flatMap(v=>v??[]).filter(v=>!v.internal&&v.family==='IPv4').map(v=>`http://${v.address}:${s.port}/mcp`):[])]:[];send(200,{...await access.snapshot(),created,urls});return;
    }
    if(action==='activity'){const s=await instanceStatus(i);if(s.phase!=='running'||!s.port){send(200,{available:false});return;}const result=await fetch(`http://127.0.0.1:${s.port}/dashboard.json`,{signal:AbortSignal.timeout(2000)});const snapshot=await result.json() as {instance?:{id:string}};if(snapshot.instance?.id!==i.id)throw Error('INSTANCE_IDENTITY_CHANGED');const activity=await fetch(`http://127.0.0.1:${s.port}/activity.json`,{signal:AbortSignal.timeout(2000)}).then(r=>r.ok?r.json():null);send(200,{available:!!activity,activity,snapshot,lan:Object.values(networkInterfaces()).flatMap(x=>x??[]).filter(x=>!x.internal&&x.family==='IPv4').map(x=>x.address)});return;}
+   if(action==='calls'){
+    const status=await instanceStatus(i);
+    if(status.phase!=='running'||!status.port){send(200,{available:false,entries:[]});return;}
+    const owner=await createAccessControl(p.access);
+    const response=await fetch(`http://127.0.0.1:${status.port}/tool-calls.json?instanceId=${encodeURIComponent(i.id)}`,{
+      headers:{authorization:'Bearer '+await owner.ownerToken()},signal:AbortSignal.timeout(3000),
+      ...(req.method==='POST'?{method:'POST',body:JSON.stringify(b)}:{})});
+    if(!response.ok)throw Error('CALL_LOG_UNAVAILABLE');
+    const snapshot=await response.json() as {instanceId?:string};
+    if(snapshot.instanceId!==i.id)throw Error('INSTANCE_IDENTITY_CHANGED');
+    send(200,{...snapshot,available:true});return;
+   }
    if(action==='logs'){
     const kind=url.searchParams.get('kind')??'core';if(!['core','supervisor'].includes(kind))throw Error('INVALID_LOG');const file=path.join(p.logs,kind+'.log');if(!await store.exists(file)){send(200,{text:'',cursor:null});return;}
     // Verify identity before opening, and read only a bounded tail rather than the whole log.
@@ -114,3 +157,8 @@ export async function runManager(){
 }
 async function approve(config:store.InstanceConfig,approved:unknown,i?:store.Instance){if(config.accessRole==='trusted'&&config.writeScope==='unrestricted'&&!approved&&!(i&&await store.exists(path.join(store.instancePaths(i).state,'coding-consent.json'))))throw Error('CODING_APPROVAL_REQUIRED');}
 async function consent(i:store.Instance,c:store.InstanceConfig){if(c.accessRole==='trusted'&&c.writeScope==='unrestricted')await store.atomicPrivate(path.join(store.instancePaths(i).state,'coding-consent.json'),JSON.stringify({version:1,scope:'os-account',approvedAt:new Date().toISOString()}));}
+
+async function gatewayState(instance:store.Instance){
+ const status=await instanceStatus(instance);if(status.phase!=='running'||!status.port)return null;
+ try{const owner=await createAccessControl(store.instancePaths(instance).access);const response=await fetch(`http://127.0.0.1:${status.port}/gateway-state.json?instanceId=${encodeURIComponent(instance.id)}`,{headers:{authorization:'Bearer '+await owner.ownerToken()},signal:AbortSignal.timeout(2000)});if(!response.ok)return null;const result=await response.json() as {instanceId:string};return result.instanceId===instance.id?result:null;}catch{return null;}
+}

@@ -67,9 +67,18 @@ starmux config schema            # Print the full JSON Schema (works even before
 | `accessRole` | `"restricted"` \| `"trusted"` | `"restricted"` | Tool execution role (`--code` sets `"trusted"`). |
 | `writeScope` | `"unrestricted"` \| `"home-only"` | `"unrestricted"` | On macOS, `"home-only"` restricts native writes to `$HOME` (requires `accessRole: "trusted"`, `gitMode: "off"`, and empty `upstreams`). |
 | `connection` | `"local"` \| `"https"` \| `"tunnel"` | `"local"` | Connection profile metadata. |
-| `gitMode` | `"off"` \| `"review"` \| `"write"` \| `"push"` | `"off"` | Optional gateway-managed Git workflow tools (`gateway_git_*`). |
-| `worktreeMode` | `"off"` \| `"linked"` | `"off"` | Whether workspace-scoped policies follow linked Git worktrees. |
 | `upstreams` | `Array<Upstream>` *(0..12)* | `[]` | Additional local `stdio` MCP servers mounted behind the router. |
+
+### Advanced compatibility options
+
+Ordinary Read-only and Coding configurations omit `gitMode` and `worktreeMode`. You do not need to set either option to use Git through the Coding-mode terminal or to access directories permitted by your OS account and upstream tools. Basic mode/network changes do not add these fields back.
+
+Existing JSONC configurations remain valid, including explicit `off` values and comments. For an explicitly configured option that does not apply to the selected global mode, `config show`, `validate`, `diff`, `save`/`patch`, and `apply` return a nonblocking notice; the local console also shows it when viewing, validating or saving a draft. Routine startup adds no notice or confirmation. JSON responses expose these notices in `warnings` without changing the configured values. `config show --effective` evaluates the confirmed running configuration independently from pending edits.
+
+| Field | Type & Values | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `gitMode` | `"off"` \| `"review"` \| `"write"` \| `"push"` | `"off"` | Compatibility option for workspace-scoped profiles: enables extra `gateway_git_*` tools for the user's project. Ignored in the normal global Read-only/Coding modes. Coding mode can still run Git through the built-in terminal. |
+| `worktreeMode` | `"off"` \| `"linked"` | `"off"` | Compatibility option for workspace-scoped profiles: follows linked Git worktrees of the user's project. Ignored in the normal global Read-only/Coding modes. |
 
 ---
 
@@ -79,7 +88,7 @@ Beyond the built-in Desktop Commander tools (which keep their native tool names 
 
 - **Namespaced Tool Names:** Tools from extra upstreams are exposed as `<id>__<toolName>` (for example, route `sqlite` with tool `read_query` becomes `sqlite__read_query`).
 - **Explicit Tool Allowlist (`allowTools`):** Only tools listed in `allowTools` can be invoked by AI clients.
-- **Fault Isolation:** Discovery has a 7-second timeout per child; an unavailable extra upstream does not prevent the primary Desktop Commander route from starting. Failed side-effecting tool calls are never retried automatically (`UPSTREAM_CALL_UNCERTAIN`).
+- **Fault Isolation:** The configured children are discovered concurrently. Each child shares one 7-second budget for initialization and tool discovery, followed by bounded process cleanup on failure. Discovery runs alongside the built-in engine, so slow optional children do not accumulate consecutive startup delays. Failed side-effecting tool calls are never retried automatically (`UPSTREAM_CALL_UNCERTAIN`).
 
 ### Example `config.jsonc` with an Extra `stdio` Upstream
 
@@ -95,8 +104,6 @@ Beyond the built-in Desktop Commander tools (which keep their native tool names 
   "accessRole": "trusted",
   "writeScope": "unrestricted",
   "connection": "local",
-  "gitMode": "off",
-  "worktreeMode": "off",
   "upstreams": [
     {
       "id": "sqlite",
@@ -166,6 +173,9 @@ starmux config recover -i dev   # Restore a missing config.jsonc from the last k
 
 ## 5. Runtime State Machine & Durable Control Records
 
+- **Automatic Core Log Retention:** `core.log` rotates while running at 8 MiB and retains up to three backups (`core.log.1` through `.3`). Existing oversized logs from older releases retain their newest 8 MiB when starting. `starmux logs` reads a bounded tail and `logs -f` follows file rotation. Normal shutdown flushes the worker's stdout and stderr before reporting completion.
+- **Store Recovery After a Crash:** New private store locks record their owning process before becoming visible. A later operation automatically recovers a lock only after confirming that its owner process no longer exists; an old timestamp alone is insufficient. Empty locks left by older releases, unknown records, and live owners remain protected because their abandonment cannot be established safely. Stop older releases before upgrading, as described in the upgrade guide.
+
 - **Live State Inspection (`running` / `stopped` / `unknown`):**
   - `running`: The instance supervisor and worker are healthy and verified over the local control socket.
   - `stopped`: No supervisor or port lease is active; `status` displays saved settings for the next start.
@@ -180,3 +190,21 @@ starmux config recover -i dev   # Restore a missing config.jsonc from the last k
 ---
 
 [Documentation Index](README.md) · [Installation & Networking](INSTALL.md) · [Security & Authentication](SECURITY.md) · [AI Client Guides](CLIENTS.md)
+
+### Mode switches and interrupted upstream calls
+
+Switching between Read-only and Coding preserves saved additional MCP service definitions and compatibility settings. Read-only still filters and rejects tools outside its read-only allowlist; switching back to Coding restores their availability without re-entering configuration.
+
+When an additional upstream is stopping or closed, a call that has not been dispatched returns an MCP tool error beginning with `UPSTREAM_CLOSED`. Wait for the instance to restart, reconnect, and refresh the tool catalog before retrying. An interrupted call that may already have executed returns `UPSTREAM_CALL_UNCERTAIN`; check its effects before retrying, especially for writes. Starmux does not automatically replay uncertain calls. If the instance's HTTP connection has already closed, the client instead observes a transport disconnection.
+
+In the Web console, use the copy-configuration button beside the intended local, LAN, or public address. The native macOS App displays ignored-setting notices for the saved configuration after loading or saving it.
+
+### Inspecting tool calls in the Web console
+
+Open `starmux dashboard`, select an instance, and open **Logs → Tool calls**. Each entry shows the tool, upstream service, start time, duration, and whether it is running, returned, blocked, failed, or has an uncertain outcome. Search by tool/service/error code, filter by status, or pause live updates. A returned response is not a guarantee that a higher-level AI task succeeded.
+
+Summary recording is on by default and does not retain tool arguments or response bodies. **Enable detailed recording** before reproducing an issue to capture previews for new calls; expand an entry to inspect its arguments and tool response. Turning it off stops further detail capture without deleting existing previews. **Clear records** removes the current history. Health probes are excluded. This view records actual MCP tool calls, not the client's full conversation or reasoning.
+
+Records stay in the instance process's memory: at most 200 calls, retained for 30 minutes. Restarting the instance clears history and resets detailed recording to off. Previews are limited to 8,192 characters per side, with truncation markers; binary image/audio data is omitted. Common credential fields are masked, but arbitrary command/output text may still contain sensitive content. Detailed records are available only through the authenticated local management interface and are not written into process logs.
+
+**System logs** retains the Core/supervisor output view for startup, shutdown and process diagnostics. Existing `starmux logs --follow` behavior is unchanged.

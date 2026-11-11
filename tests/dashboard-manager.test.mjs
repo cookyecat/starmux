@@ -19,10 +19,16 @@ test('independent manager authenticates, preserves revisions, and manages stoppe
  assert.equal((await fetch(base)).status,200);
  assert.match(await (await fetch(base+'/app.js')).text(),/starmux-manager-token/);
  const created=await request('instances',{name:'Test <instance>',config:{schemaVersion:1,projectRoot:project,port:19876}});assert.equal(created.status,200);const i=await created.json();instanceId=i.id;
- const config=await (await request(`instances/${i.id}/config`)).json();assert.ok(config.revision,JSON.stringify(config));
+ const config=await (await request(`instances/${i.id}/config`)).json();assert.ok(config.revision,JSON.stringify(config));assert.doesNotMatch(config.text,/gitMode|worktreeMode/);assert.deepEqual(config.warnings,[]);
  const validated=await (await request(`instances/${i.id}/config`,{text:config.text,patch:{port:19877},validate:true})).json();assert.equal(validated.config.port,19877);assert.match(validated.text,/\$schema/);
  assert.equal((await request(`instances/${i.id}/config`,{text:validated.text,revision:'stale'})).status,409);
  assert.equal((await request(`instances/${i.id}/config`,{text:validated.text,revision:config.revision})).status,200);
+ const ignored=await (await request(`instances/${i.id}/config`,{text:validated.text,patch:{gitMode:'review',worktreeMode:'linked'},validate:true})).json();
+ assert.equal(ignored.warnings.length,2);assert.match(ignored.warnings[0].message,/Read-only/);
+ const updated=await (await request(`instances/${i.id}/config`)).json();
+ const savedIgnored=await (await request(`instances/${i.id}/config`,{text:ignored.text,revision:updated.revision})).json();
+ assert.equal(savedIgnored.warnings.length,2);assert.equal(savedIgnored.config.gitMode,'review');
+ const reread=await (await request(`instances/${i.id}/config`)).json();assert.equal(reread.config.worktreeMode,'linked');assert.equal(reread.warnings.length,2);
  const key=await (await request(`instances/${i.id}/access`,{op:'create',name:'Browser test'})).json();assert.ok(key.created.key.startsWith('smx_'));
  assert.equal((await request('instances',undefined,{authorization:'Bearer '+key.created.key})).status,401);
  const snapshot=await (await request(`instances/${i.id}/access`)).json();assert.equal(snapshot.created,undefined);assert.ok(!JSON.stringify(snapshot).includes(key.created.key));
@@ -32,8 +38,16 @@ test('independent manager authenticates, preserves revisions, and manages stoppe
  const list=await (await request('instances')).json();assert.equal(list.instances[0].phase,'stopped');
  const action=async(action,extra={})=>{const r=await request(`instances/${i.id}/actions`,{action,...extra});assert.equal(r.status,202);const operation=await r.json();for(let n=0;n<120;n++){const status=await (await request('operations/'+operation.id)).json();if(status.state==='error')throw Error(status.error);if(status.state==='complete')return;await new Promise(r=>setTimeout(r,100));}throw Error('operation timeout');};
  await action('start');assert.equal((await (await request(`instances/${i.id}/status`)).json()).phase,'running');
+ const calls=`instances/${i.id}/calls`;
+ assert.equal((await (await request(calls)).json()).detailed,false);
+ assert.equal((await request(calls,{op:'details',enabled:true})).status,200);
+ assert.equal((await (await request(calls)).json()).detailed,true);
+ assert.equal((await request(calls,{op:'details',enabled:'yes'})).status,400);
+ assert.equal((await request(calls,undefined,{authorization:'Bearer '+key.created.key})).status,401);
+ assert.equal((await request(calls,{op:'clear'})).status,200);
  await action('stop');assert.equal((await (await request(`instances/${i.id}/status`)).json()).phase,'stopped');
  assert.equal((await fetch(base)).status,200,'manager survives stopping instance');
- await action('start');await action('stop');await action('archive');await action('restore');
+ assert.equal((await (await request(`instances/${i.id}/calls`)).json()).available,false);
+ await action('start');assert.equal((await (await request(`instances/${i.id}/calls`)).json()).detailed,false);await action('stop');await action('archive');await action('restore');
 
 });
