@@ -64,3 +64,22 @@ test('changing one service preserves unchanged plugin worker state',{timeout:300
  await f.save({...f.definition,args:[f.definition.args[0],'changed']},middleware);await f.runtime.apply(f.upstreamFile,f.middlewareFile);
  assert.equal((await client.callTool({name:'fixture__echo'})).structuredContent.args.sequence,2);
 });
+
+test('HTTP body byte limit is identical for Content-Length and chunked requests, with UTF-8 intact',{timeout:30000},async t=>{
+ const {request}=await import('node:http');
+ const f=await fixture(t),{client,transport,start}=await f.connect('body-limits');await start();
+ const limit=1024*1024;
+ const send=(body,chunked,split=body.length)=>new Promise((resolve,reject)=>{
+  const req=request(`http://127.0.0.1:${f.runtime.port}/mcp`,{method:'POST',headers:{'content-type':'application/json',accept:'application/json, text/event-stream','mcp-session-id':transport.sessionId,...(chunked?{'transfer-encoding':'chunked'}:{'content-length':body.length})}},res=>{let text='';res.on('data',d=>text+=d);res.on('end',()=>resolve({status:res.statusCode,text}));});
+  req.on('error',reject);req.write(body.subarray(0,split));setImmediate(()=>req.end(body.subarray(split)));
+ });
+ const raw=Buffer.from(JSON.stringify({jsonrpc:'2.0',id:999,method:'tools/call',params:{name:'fixture__echo',arguments:{text:'你好🙂'}}}));
+ for(const chunked of [false,true]){
+  for(const size of [65537,limit,limit+1]){
+   const response=await send(Buffer.concat([raw,Buffer.alloc(size-raw.length,32)]),chunked,raw.indexOf(Buffer.from('你'))+1);
+   assert.equal(response.status,size>limit?413:200,JSON.stringify({chunked,size,response}));
+   if(size<=limit)assert.ok(response.text.includes('你好🙂'),'multibyte UTF-8 split across chunks must survive');
+  }
+ }
+ assert.equal((await client.callTool({name:'fixture__echo'})).isError,undefined);
+});

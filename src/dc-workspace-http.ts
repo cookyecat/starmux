@@ -1,3 +1,4 @@
+const MCP_REQUEST_BODY_LIMIT=1024*1024;
 import {GatewaySnapshot} from './gateway-snapshot.js';
 import {readConfiguredUpstreams} from './configured-mcp-upstreams.js';
 import {MiddlewareEngine} from './middleware-engine.js';
@@ -371,8 +372,8 @@ http=createServer(async(req,res)=>{
   if(route!=="/mcp"){
     res.writeHead(404).end("Not found");return;
   }
-  if(Number(req.headers["content-length"]||0)>65536){
-    res.writeHead(413).end("Too large");return;
+  if(Number(req.headers["content-length"]||0)>MCP_REQUEST_BODY_LIMIT){
+    res.writeHead(413).end("Request too large");return;
   }
   let identity: import('./contracts.js').RequestContext['identity'];
   try{identity=await access.authenticate(req.headers.authorization);}
@@ -390,8 +391,9 @@ http=createServer(async(req,res)=>{
     ...(identity.kind==='verified-api-key'?{credentialId:identity.credentialId}:identity.kind==='verified-oauth'?{connectionId:identity.connectionId}:{})});
   let parsedBody:unknown;
   if(req.method==='POST'){
-    let body='';for await(const chunk of req){body+=String(chunk);if(Buffer.byteLength(body)>1048576){res.writeHead(413).end('Request too large');return;}}
-    try{parsedBody=JSON.parse(body);}catch{res.writeHead(400).end('Invalid JSON');return;}
+    const chunks:Buffer[]=[];let bytes=0;
+    for await(const chunk of req){const data=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);bytes+=data.length;if(bytes>MCP_REQUEST_BODY_LIMIT){res.writeHead(413).end('Request too large');return;}chunks.push(data);}
+    try{parsedBody=JSON.parse(Buffer.concat(chunks,bytes).toString('utf8'));}catch{res.writeHead(400).end('Invalid JSON');return;}
   }
   const identityKey=JSON.stringify(identity),sessionId=req.headers['mcp-session-id'];
   for(const [id,session] of sessions)if(!session.active&&Date.now()-session.lastSeen>1800000){sessions.delete(id);void session.transport.close();void session.gateway.close();}
