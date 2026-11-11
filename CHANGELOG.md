@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.1 - 2026-11-11
+
+- Isolate request cancellation from shared middleware workers and upstream connections; retain bounded accounting for already dispatched plugin hooks.
+- Distinguish applied, next-start, pending and unconfirmed gateway changes consistently in the Web console.
+- Enforce a uniform 1 MiB MCP HTTP request-body limit for fixed-length and chunked requests, preserving UTF-8 across chunks.
+
+- Explain instance selection errors, suggest registered instances for project paths, and distinguish instance names, IDs and project directories in the console.
+- Add actionable CLI and bilingual console guidance for configuration, connection, authentication and middleware failures while retaining original error codes.
+- Report failed connection tests and saved-but-unapplied service changes explicitly.
+
 ## 0.18.0 - 2026-11-11
 
 - Add unified stdio, Streamable HTTP and explicit legacy SSE service management, with configuration/command/URL imports, bounded discovery, API-key references and independent outbound OAuth accounts. Manage services through the Web console or `starmux server` commands.
