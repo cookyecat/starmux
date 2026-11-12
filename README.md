@@ -15,8 +15,9 @@
 ## Why Starmux?
 
 <div align="center">
-  <img src="docs/assets/starmux-vs-diy.svg" width="100%" alt="Traditional DIY Stack (File/Terminal MCP + stdio-to-HTTP Bridge + Auth/Aggregator Gateway + Process Supervisor) vs. Starmux All-in-One Self-Hosted Remote MCP Server and stdio-to-Streamable HTTP Gateway: Single 'starmux up' Daemon (http://127.0.0.1:18893/mcp)" />
+  <img src="docs/assets/starmux-all-in-one.gif" width="78%" alt="Starmux All-in-One Self-Hosted MCP Server." />
 </div>
+
 
 Cloud AI assistants (like **ChatGPT Web**, **Claude**, or **Doubao**) are isolated in the browser, and many desktop coding agents (like **Codex**, **WorkBuddy**, **Cursor**, **Claude Code**, **Antigravity**, **DSH-Harness**, **Kimi Code**, **Minimax Code**, or **ZCode**) lack native apps for headless Linux servers or ARM64 edge boards.
 
@@ -25,7 +26,7 @@ Meanwhile, deploying and managing MCP tools across machines normally requires **
 **Starmux** (`Star` topology + `Multiplexer`) is an out-of-the-box, **100% self-hosted All-in-One MCP Server & Gateway**—with zero third-party cloud relays—that replaces that entire fragmented chain with a **single `'starmux up'` daemon**:
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/cookyecat/starmux/main/docs/assets/starmux-architecture.svg" width="100%" alt="Starmux architecture: Self-hosted remote MCP server and gateway giving ChatGPT Web, Claude, Codex, WorkBuddy, Cursor, and Antigravity local computer use on macOS, Windows, Linux x64/ARM64, and NVIDIA Jetson" />
+  <img src="docs/assets/starmux-promo.gif" width="78%" alt="Starmux All-in-One Self-Hosted MCP Server and Programmable Multi-MCP Gateway: Single 'starmux up --code --allow-lan' daemon replacing a 4-tool DIY stack, connecting ChatGPT Web, Claude, Codex, WorkBuddy, Cursor, and Antigravity over Localhost, Direct LAN/Tailscale, SSH, or Tunnel/HTTPS to 25+ built-in zero-telemetry host tools and multiple stdio/HTTP MCP servers on macOS, Linux x64/ARM64, NVIDIA Jetson, and Windows" />
 </div>
 
 - **Turnkey File, Diff Edit, Terminal & Git Tools (Zero Extra Setup):** Built-in [Desktop Commander](https://github.com/wonderwhy-er/DesktopCommanderMCP) engine (25+ host tools) lets AI read/write files, run ripgrep searches, apply surgical diff edits, control interactive shells, manage background processes, and run Git out of the box—no external MCP servers or reverse proxies required.
