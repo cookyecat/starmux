@@ -18,7 +18,8 @@ export const runtimeStateSchema=z.object({
   port:z.number().int().min(1024).max(65535).nullable(),active:activeConfigSchema.nullable(),problem:z.string().nullable(),
   coreProgram:z.string(),buildVersion:z.string()
 });
-export const controlRequestSchema=z.object({protocolVersion:z.literal(INSTANCE_CONTROL_VERSION),method:z.enum(['status','stop','apply']),
+export const controlRequestSchema=z.object({protocolVersion:z.literal(INSTANCE_CONTROL_VERSION),method:z.enum(['status','stop','apply','revoke-read-only-tool']),
+  target:z.object({serverId:z.string().min(1).max(40),tool:z.string().min(1).max(128)}).optional(),
   revision:z.string().nullable(),forceId:z.string().max(80).optional(),runId,nonce:z.string().regex(/^[a-f0-9]{48}$/)});
 export const controlReplySchema=z.object({protocolVersion:z.literal(INSTANCE_CONTROL_VERSION),state:runtimeStateSchema,
   result:z.enum(['STATE','STOP_ACCEPTED']),error:z.string().optional()});

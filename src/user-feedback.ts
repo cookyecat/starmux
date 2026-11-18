@@ -42,10 +42,14 @@ export function withErrorGuidance(value:unknown):unknown{
 }
 
 /** Shared service/middleware feedback; saving is distinct from runtime application. */
-export function applicationFeedback(result:{application?:string;error?:string},language='en'){
+export function applicationFeedback(result:{application?:string;error?:string;otherConfigPending?:boolean},language='en'){
  const zh=language==='zh';
+ if(result.application==='pending'&&result.otherConfigPending&&!result.error)
+  return {message:zh?'授权已保存。应用实例配置后生效。':'Grant saved. Apply the instance configuration to activate it.',error:false};
  const error=Boolean(result.error)||!['applied','on-next-start'].includes(result.application??'');
- const message=result.application==='applied'&&!result.error?(zh?'已保存并应用':'Saved and applied'):
+ const message=result.application==='applied'&&result.otherConfigPending&&!result.error?
+  (zh?'已撤销该工具的只读权限。其他配置仍待应用。':'Read-only access to this tool was revoked. Other configuration changes are still pending.'):
+  result.application==='applied'&&!result.error?(zh?'已保存并应用':'Saved and applied'):
   result.application==='on-next-start'&&!result.error?(zh?'已保存；实例启动时生效。':'Saved; changes will activate when this instance starts.'):
   result.application==='pending'?(zh?'已保存，但尚未应用。':'Saved, but not applied.'):
   (zh?'生效状态未确认，请检查实例状态。':'Application status is unconfirmed; check instance status.');

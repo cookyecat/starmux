@@ -89,8 +89,11 @@ export class ConfiguredUpstream implements UpstreamAdapter {
     for(const value of Object.values(secrets??{}))if(value)text=text.split(value).join('[REDACTED]');
     return text;
   }
-  get status(){return Object.freeze({id:this.id,status:this.#state,toolCount:this.#catalog.length,
-    lastError:this.#lastError,enabled:this.definition.enabled!==false,allowedToolCount:this.upstreamCatalog.length,diagnostics:this.diagnosticPreview()});}
+  get status(){return this.statusWithGrants(new Set(this.definition.allowToolsInReadOnly));}
+  statusWithGrants(readOnly:ReadonlySet<string>){
+    const granted=this.upstreamCatalog;
+    return Object.freeze({id:this.id,status:this.#state,toolCount:this.#catalog.length,
+    lastError:this.#lastError,enabled:this.definition.enabled!==false,allowedToolCount:granted.length,readOnlyAllowedToolCount:granted.filter(tool=>readOnly.has(tool.name)).length,diagnostics:this.diagnosticPreview()});}
   async connect(){
     if(this.#closed)invalid("UPSTREAM_CLOSED");
     if(this.definition.enabled===false)invalid("UPSTREAM_DISABLED");

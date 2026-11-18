@@ -6,9 +6,9 @@ import type { RequestContext,AuditSink,DenyRules,GitWorkflow,McpUpstream,PromptP
 import type { InvocationObserver,InvocationMiddleware } from "./invocation.js";
 import { createInvocationPipeline,safeAuditSink } from "./invocation.js";
 import { createToolDispatcher,createToolAuthorizer } from "./tool-dispatch.js";
-import { isReadOnlyTool } from './account-access-policy.js';
+import { allowedInHostReadOnly } from './account-access-policy.js';
 export type BridgeUpstream = McpUpstream & Partial<ResourceProvider & PromptProvider>;
-export interface BridgeOptions {getSnapshot?:()=>{upstream:BridgeUpstream;middleware:MiddlewareEngine|undefined;router:UpstreamRouter;release:()=>void};upstreamTrace?:(id:string,stage:'upstreamRequest'|'upstreamResponse',value:unknown)=>void;retainSnapshot?:()=>()=>void;programmableMiddleware?:MiddlewareEngine;observer?:InvocationObserver;oauthScope?:string;request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;globalReadOnly?:boolean;permissionMode?:'global'|'workspace';denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
+export interface BridgeOptions {verification?:ReturnType<typeof import('./connection-verification.js').createConnectionVerification>;desktopReady?:()=>boolean;getSnapshot?:()=>{upstream:BridgeUpstream;middleware:MiddlewareEngine|undefined;router:UpstreamRouter;release:()=>void};upstreamTrace?:(id:string,stage:'upstreamRequest'|'upstreamResponse',value:unknown)=>void;retainSnapshot?:()=>()=>void;programmableMiddleware?:MiddlewareEngine;observer?:InvocationObserver;oauthScope?:string;request?:RequestContext;workspacePolicy?:WorkspacePolicy;upstreamRouter?:UpstreamRouter;nativePassthrough?:boolean;globalReadOnly?:boolean;permissionMode?:'global'|'workspace';denyRules?:DenyRules|null;gitWorkflow?:GitWorkflow;middleware?:readonly InvocationMiddleware[]}
 // Desktop Commander tool-schema facade. Upstream catalog remains unmodified.
 // Preserve all native upstream tools; owner-approved native mode forwards unchanged.
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -67,7 +67,9 @@ export function createDesktopCommanderBridge(upstream: BridgeUpstream, audit: Au
       description:"Starmux bridge connection, upstream availability and active mode check. Read-only blocks writes and arbitrary execution; Coding uses upstream tools with OS account permissions.",
       inputSchema:{type:"object",properties:{},additionalProperties:false},
       annotations:{readOnlyHint:true,destructiveHint:false}
-    }].filter(tool=>!state?.deniedTools.includes(tool.name)&&!state?.deniedTools.includes(options.programmableMiddleware?.canonical(tool.name)??tool.name)&&(!options.globalReadOnly||isReadOnlyTool(options.programmableMiddleware?.canonical(tool.name)??tool.name))).map(tool=>options.oauthScope?{...tool,
+    }].filter(tool=>!state?.deniedTools.includes(tool.name)&&!state?.deniedTools.includes(options.programmableMiddleware?.canonical(tool.name)??tool.name)&&(!options.globalReadOnly||allowedInHostReadOnly(options.programmableMiddleware?.canonical(tool.name)??tool.name,options.upstreamRouter))).map(tool=>options.verification&&(options.programmableMiddleware?.canonical(tool.name)??tool.name)==='get_file_info'?{...tool,inputSchema:{...tool.inputSchema,properties:{
+      ...tool.inputSchema.properties,starmuxCheck:{type:'string',description:'Optional connection check code supplied by the instance owner.'}
+    }}}:tool).map(tool=>options.oauthScope?{...tool,
       securitySchemes:[{type:'oauth2',scopes:[options.oauthScope]}],
       _meta:{...('_meta' in tool?tool._meta:{}),securitySchemes:[{type:'oauth2',scopes:[options.oauthScope]}]}}:tool)};
   }));
@@ -93,6 +95,21 @@ export function createDesktopCommanderBridge(upstream: BridgeUpstream, audit: Au
       if(method==='elicitation/create')return server.elicitInput(params as import('@modelcontextprotocol/sdk/types.js').ElicitRequest['params'],{signal});
       return server.listRoots(undefined,{signal});
     }
-  },()=>current((upstream,options)=>invokeCurrent(upstream,options,request.params))));
+  },()=>current(async(upstream,options)=>{
+    const params=request.params,check=options.verification;
+    if(!check||(options.programmableMiddleware?.canonical(params.name)??params.name)!=='get_file_info'||params.arguments?.starmuxCheck===undefined)return invokeCurrent(upstream,options,params);
+    const {starmuxCheck,...args}=params.arguments;
+    if(starmuxCheck!==check.code)return {isError:true,content:[{type:'text',text:'Connection check expired. Copy the current instruction from Starmux status.'}]};
+    const call=mcpCallContext.getStore()!;
+    call.verificationRead=false;
+    if(args.path==='.'&&options.workspacePolicy)args.path=options.workspacePolicy.root;
+    const result=await invokeCurrent(upstream,options,{...params,arguments:args});
+    if(!result.isError&&call.verificationRead){
+      check.complete(params._meta?.['starmux/local-self-check']===true?'local':'target');
+    }else if(!result.isError){
+      return {isError:true,content:[{type:'text',text:'Connection check requires a successful Desktop Commander metadata read.'}]};
+    }
+    return result;
+  })));
   return server;
 }

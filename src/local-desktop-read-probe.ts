@@ -1,3 +1,4 @@
+import {mcpCallContext} from './mcp-call-context.js';
 import {execFile} from "node:child_process";
 import {promisify} from "node:util";
 import {windows,childEnvKeys} from "./platform.js";
@@ -39,10 +40,32 @@ export class LocalDesktopReadProbe {
   #upstreamCatalog: Tool[] = [];
   #writeScope: string;
 
-  constructor({writeScope="unrestricted"}={}){
+  #closed=false;
+  #retryTimer:NodeJS.Timeout|undefined;
+  #retryDelay=1000;
+  #recovering:Promise<void>|undefined;
+  #shutdown=new AbortController();
+  readonly #projectRoot:string;
+
+  constructor({writeScope="unrestricted",projectRoot=process.cwd()}={}){
     if(!["unrestricted","home-only"].includes(writeScope))
       throw Error("INVALID_DC_WRITE_SCOPE");
     this.#writeScope=writeScope;
+    this.#projectRoot=projectRoot;
+  }
+
+  get ready(){return this.#client!==null;}
+
+  private scheduleRecovery(){
+    if(this.#closed||this.#retryTimer)return;
+    this.#retryTimer=setTimeout(()=>{
+      this.#retryTimer=undefined;
+      this.#recovering=this.connect().catch(()=>{
+        this.#retryDelay=Math.min(this.#retryDelay*2,30000);
+        this.scheduleRecovery();
+      });
+    },this.#retryDelay);
+    this.#retryTimer.unref();
   }
 
   async connect() {
@@ -63,13 +86,26 @@ export class LocalDesktopReadProbe {
     });
     const client = new Client({ name: "starmux-local-read-probe", version: "0.1.0" },
                               { capabilities: {} });
+    let disconnected=false;
+    client.onclose=()=>{
+      disconnected=true;
+      if(this.#client!==client)return;
+      this.#client=null;
+      this.#transport=null;
+      this.scheduleRecovery();
+    };
+    const options={signal:this.#shutdown.signal,timeout:5000};
     try {
-      await client.connect(transport);
-      const tools = await client.listTools();
+      this.#shutdown.signal.throwIfAborted();
+      await client.connect(transport,options);
+      const tools = await client.listTools(undefined,options);
       const names = tools.tools.map(x => x.name);
       if (!names.includes("read_file")) throw new Error("Upstream read_file missing");
       if (new Set(names).size !== names.length || names.some(name => typeof name !== "string"))
         throw new Error("Invalid upstream catalog");
+      const probe=toolResult(await client.callTool({name:"get_file_info",arguments:{path:this.#projectRoot}},undefined,options));
+      if(probe.isError||disconnected||this.#closed)throw Error("DESKTOP_COMMANDER_READ_PROBE_FAILED");
+      this.#retryDelay=1000;
       this.#upstreamCatalog = structuredClone(tools.tools);
       this.#toolNames = names.filter(name => EXPOSED_LOCAL_TOOLS.includes(name));
       this.#client = client;
@@ -103,10 +139,17 @@ export class LocalDesktopReadProbe {
     if (!this.#client) throw new Error("Not connected");
     if (!invocation || !this.#upstreamCatalog.some(t=>t.name===invocation.name))
       throw new Error("Unknown upstream tool");
-    return toolResult(await this.#client.callTool(invocation));
+    const result=toolResult(await this.#client.callTool(invocation));
+    const call=mcpCallContext.getStore();
+    if(call?.verificationRead===false&&invocation.name==='get_file_info'&&!result.isError)call.verificationRead=true;
+    return result;
   }
 
   async close() {
+    this.#closed=true;
+    clearTimeout(this.#retryTimer);
+    this.#shutdown.abort();
+    await this.#recovering;
     const client = this.#client;
     const pid=this.#transport?.pid;this.#transport=null;
     this.#client = null;

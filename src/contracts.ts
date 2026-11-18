@@ -25,12 +25,14 @@ export interface RouteDefinition {
   id: string;
   upstream: McpUpstream & Partial<NativeResources & NativePrompts>;
   exposeNativeNames?: boolean;
+  allowToolsInReadOnly?:ReadonlySet<string>|readonly string[];
   authorize?: ((name: string, args: ToolArguments) => ToolArguments | Promise<ToolArguments>) | null;
 }
 export interface RouteInfo {id: string; toolCount: number; nativeNames?: boolean}
 export interface UpstreamStatus {id: string; status: 'DISCONNECTED'|'READY'|'UNAVAILABLE'|'CLOSED'; toolCount: number; lastError: string|null}
 export interface UpstreamRouter extends McpUpstream, Partial<ResourceProvider & PromptProvider> {
   readonly routes: readonly RouteInfo[];
+  hasReadOnlyExtensionGrant?(publicName:string):boolean;
   routeFor(publicName: string): string|null;
   cacheScopeFor?(target:{serverId:string;toolName:string}):Promise<string>;
   targetFor?(publicName:string):{serverId:string;toolName:string}|undefined;

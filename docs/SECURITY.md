@@ -20,8 +20,8 @@ Every Starmux instance operates in one of two global permission modes:
 
 | Permission Mode | CLI Command | Allowed Operations | Blocked Operations |
 | :--- | :--- | :--- | :--- |
-| **Read-Only Mode** *(default)* | `starmux up` *(or `starmux up --read`)* | Reading files (`read_file`, `read_multiple_files`), listing directories, and searching code wherever your OS account and upstream server permit. | All file writes/edits, directory creation, Shell command execution, and Git mutations. |
-| **Coding Mode** | `starmux up --code` *(or `starmux up --write`)* | Full native tool access—reading/writing files, running Shell commands, and executing Git workflows—using your OS account's permissions. | Blocked only by OS permissions (POSIX/Windows ACLs, macOS TCC/FDA) or explicit deny rules. |
+| **Read-Only Mode** *(default)* | `starmux up` *(or `starmux up --read`)* | Reading files (`read_file`, `read_multiple_files`), listing directories, and searching code wherever your OS account and upstream server permit. Mounted tools require a per-server grant in both `allowTools` and `allowToolsInReadOnly`. | Built-in file writes/edits, directory creation, Shell command execution, and Git mutations. |
+| **Coding Mode** | `starmux up --code` *(or `starmux up --write`)* | Full native tool access—reading/writing files, running Shell commands, and executing Git workflows—using your OS account's permissions. | Subject to OS permissions (POSIX/Windows ACLs, macOS TCC/FDA). Workspace directory grants and explicit deny rules are inactive in global modes. |
 
 ### Key Security Boundaries
 - **`Project` Is a Path Context, Not a Chroot Jail:** In Read-Only mode, `Project` sets the base directory for resolving relative file paths. Read-Only mode allows reading files outside `Project` (such as `/etc/hosts` or shared system libraries) whenever your OS account and upstream server permit reading them.
@@ -60,7 +60,9 @@ starmux dashboard --token     # Print the raw owner management token
 
 ## 3. Bearer API Keys (`api-key`)
 
-Creating a key automatically enables `api-key` mode on the instance and prints both Form UI settings and a ready-to-paste `mcpServers` JSON block:
+In the Web console, **Create key only** keeps the current authentication mode. Choose **Create and switch to API key** to require a Bearer key for subsequent requests, including from clients previously using OAuth. In API key mode, **Create key** adds another client key.
+
+The CLI command `starmux auth key` automatically enables `api-key` mode on the instance and prints both Form UI settings and a ready-to-paste `mcpServers` JSON block:
 
 ```sh
 # Create a non-expiring API key

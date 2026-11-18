@@ -6,7 +6,13 @@ verifyInternalSetupWorker({port:Number(process.env.STARMUX_PROJECT_PORT),ownerPi
 const gateway=await runGateway();
 process.on('message',(message:unknown)=>{
  if(!message||typeof message!=='object')return;const m=message as Record<string,unknown>;
- if(m.type!=='gateway-apply'||typeof m.id!=='string')return;
+ if(typeof m.id!=='string')return;
+ if(m.type==='gateway-revoke-read-only-tool'&&typeof m.serverId==='string'&&typeof m.tool==='string'){
+   gateway.revokeReadOnlyTool(m.serverId,m.tool);
+   process.send?.({type:'gateway-applied',id:m.id});
+   return;
+ }
+ if(m.type!=='gateway-apply')return;
  void gateway.apply(typeof m.upstreamFile==='string'?m.upstreamFile:undefined,typeof m.middlewareFile==='string'?m.middlewareFile:undefined,typeof m.forceId==='string'?m.forceId:undefined,typeof m.deadline==='number'?m.deadline:undefined).then(()=>process.send?.({type:'gateway-applied',id:m.id}),error=>process.send?.({type:'gateway-applied',id:m.id,error:error?.pluginId?error.message:error?.code??'GATEWAY_APPLY_FAILED'}));
 });
-process.send({type:'gateway-ready',localApply:true});
+process.send({type:'gateway-ready',localApply:true,readOnlyRevocation:true});

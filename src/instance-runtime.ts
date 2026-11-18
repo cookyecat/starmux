@@ -14,7 +14,7 @@ export type {ActiveConfig,RuntimeState} from './instance-control-protocol.js';
 import {controlRoot,controlSocket,controlSocketRoot,sameFile,createPrivateDirectory,childEnvKeys,windows} from './platform.js';
 import {acquireControl,inspectControlOwner} from './global-core-control.js';
 import {runtimeIdentity} from './runtime-identity.js';
-import {atomicPrivate,changeRegistry,availablePort,ensureAccessReady,exists,instanceEnv,instancePaths,loadInstanceConfig,prepareUpstreams,prepareMiddlewares,readTrusted,resolveInstance,type Instance,type InstanceConfig} from './instance-store.js';
+import {atomicPrivate,changeRegistry,availablePort,instanceConfigSchema,effectiveConfigRevision,ensureAccessReady,exists,instanceEnv,instancePaths,loadInstanceConfig,prepareUpstreams,prepareMiddlewares,readTrusted,resolveInstance,type Instance,type InstanceConfig} from './instance-store.js';
 
 type Owner=z.infer<typeof instanceOwnerSchema>;
 export function runtimePaths(id:string){
@@ -30,9 +30,11 @@ async function ownerFor(instance:Instance){
   const owner=instanceOwnerSchema.parse(raw);
   if(owner.instanceId!==instance.id)throw Error('INSTANCE_CONTROL_IDENTITY_INVALID');return owner;
 }
-async function exchange(instance:Instance,owner:Owner,method:'status'|'stop'|'apply',revision?:string,timeoutMs=method==='apply'?65000:2000,forceId?:string){
+type ControlRequest=z.infer<typeof controlRequestSchema>;
+type Revocation=NonNullable<ControlRequest['target']>;
+async function exchange(instance:Instance,owner:Owner,method:ControlRequest['method'],revision?:string,timeoutMs=method==='apply'?65000:2000,forceId?:string,target?:Revocation){
   const nonce=randomBytes(24).toString('hex');
-  const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,method,revision:revision??null,...(forceId?{forceId}:{}),runId:owner.runId,nonce});
+  const body=JSON.stringify({protocolVersion:INSTANCE_CONTROL_VERSION,method,revision:revision??null,...(forceId?{forceId}:{}),target,runId:owner.runId,nonce});
   return new Promise<z.infer<typeof controlReplySchema>>((resolve,reject)=>{
     const socket=createConnection(runtimePaths(instance.id).socket);let raw='';
     const timer=setTimeout(()=>socket.destroy(Error('INSTANCE_CONTROL_TIMEOUT')),timeoutMs);
@@ -62,6 +64,10 @@ export async function instanceRequest(instance:Instance,method:'status'|'apply',
   const owner=await ownerFor(instance);if(!owner||!alive(owner.pid))return null;
   return (await exchange(instance,owner,method,revision,method==='apply'?65000:2000,forceId)).state;
 }
+export async function revokeInstanceReadOnlyTool(instance:Instance,revision:string,target:Revocation){
+  const owner=await ownerFor(instance);if(!owner||!alive(owner.pid))return null;
+  return (await exchange(instance,owner,'revoke-read-only-tool',revision,65000,undefined,target)).state;
+}
 async function snapshot<S extends z.ZodTypeAny>(file:string,schema:S):Promise<z.output<S>|null>{
   try{return schema.parse(JSON.parse(await readTrusted(file)));}catch{return null;}
 }
@@ -75,6 +81,7 @@ export async function instanceStatus(instance:Instance,home=homedir()){
   const snapshots=instancePaths(instance,home).snapshots;
   const lastRun=await snapshot(path.join(snapshots,'last-runtime.json'),runtimeStateSchema);
   const lastActive=await snapshot(path.join(snapshots,'active.json'),activeConfigSchema);
+  let verification:import('./connection-verification.js').ConnectionVerification|null=null;
   let health='not-running';let accessMode:string|null=null;let lastToolCallAt:string|null=null;
   if(!runtime&&!runtimeProblem){
     // Historical ports are hints for detecting a lost control channel, never
@@ -92,10 +99,15 @@ export async function instanceStatus(instance:Instance,home=homedir()){
   if(runtime?.phase==='running'&&runtime.port){
     try{
       const response=await fetch(`http://127.0.0.1:${runtime.port}/healthz`,{signal:AbortSignal.timeout(1500)});
-      const data=await response.json() as {status?:string;instanceId?:string;accessMode?:string};
+      const data=await response.json() as {status?:string;instanceId?:string;accessMode?:string;desktopCommander?:string};
       health=response.ok&&data.status==='ok'&&data.instanceId===instance.id?'ok':'unrecognized';accessMode=data.accessMode??null;
-      if(health==='ok')try{
-        const activity=await fetch(`http://127.0.0.1:${runtime.port}/activity.json`,{signal:AbortSignal.timeout(1000)}).then(r=>r.json()) as {lastToolCallAt?:string};
+      if(response.status===503&&data.instanceId===instance.id&&data.desktopCommander==='unavailable'){
+        health='degraded';
+        runtimeProblem='Desktop Commander unavailable; reconnecting and verifying host tools.';
+      }
+      if(health==='ok'||health==='degraded')try{
+        const activity=await fetch(`http://127.0.0.1:${runtime.port}/activity.json`,{signal:AbortSignal.timeout(1000)}).then(r=>r.json()) as {lastToolCallAt?:string;verification?:import('./connection-verification.js').ConnectionVerification};
+        if(activity.verification&&/^[0-9a-f]{16}$/.test(activity.verification.code))verification=activity.verification;
         lastToolCallAt=typeof activity.lastToolCallAt==='string'?activity.lastToolCallAt:null;
       }catch{/* Activity is optional; it must not turn a healthy service into an outage. */}
     }catch{health='unreachable';}
@@ -107,12 +119,12 @@ export async function instanceStatus(instance:Instance,home=homedir()){
   return {schemaVersion:1,event:'GATEWAY_STATUS',instanceId:instance.id,name:instance.name,archived:instance.archived,source:instance.source,
     phase,configState,configProblem,runtimeProblem,runtime,saved,lastActive,lastRun,
     port:runtime?.port??saved?.config.port??null,configuredPort:saved?.config.port??null,active,revision:saved?.revision??null,
-    health,accessMode,lastToolCallAt,profile:instance.legacy??'setup',installed:false,registered:false,
+    localEndpoint:runtime?.phase==='running'&&runtime.port?`http://127.0.0.1:${runtime.port}/mcp`:null,verification,health,accessMode,lastToolCallAt,profile:instance.legacy??'setup',installed:false,registered:false,
     label:instance.name,workspaceMode:active?.config.mode??(phase==='stopped'?saved?.config.mode:null)??null,
     writeScope:active?.config.writeScope??(phase==='stopped'?saved?.config.writeScope:null)??null,coreControl:runtime?.phase==='running'?'RUNNING':'unavailable',
     coreLauncher:runtime?.launcher??'unknown',coreOwnerPid:runtime?.pid??null,
     executionMode:runtime?(runtime.executionMode==='background'?'background':'foreground-owned'):phase==='stopped'?'stopped':'unknown',loginAutostart:'disabled',
-    connectionState:health==='ok'?(lastToolCallAt?'local-ready-activity-recorded':'local-ready-remote-unverified'):health,requiredAccess:instance.requiredAccess};
+    connectionState:health==='ok'?(verification?.targetVerifiedAt?'target-client-read-verified':lastToolCallAt?'local-ready-activity-recorded':'local-ready-remote-unverified'):health,requiredAccess:instance.requiredAccess};
 }
 export async function stopInstance(instance:Instance,home=homedir(),options:{timeoutMs?:number}={}){
   const timeoutMs=options.timeoutMs??65000;
@@ -215,7 +227,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     }
     return stopRequest;
   }
-  let localApplySupported=false;
+  let localApplySupported=false;let revocationSupported=false;
   async function startWorker(config:ActiveConfig,lease:Awaited<ReturnType<typeof acquireControl>>,announce=true){
     await ensureAccessReady(await resolveInstance(instance.id,home),home);
     if(!await availablePort(config.config.port,config.config.allowLan?'0.0.0.0':'127.0.0.1'))throw Error('PORT_IN_USE: '+config.config.port);
@@ -240,7 +252,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     });
     await new Promise<void>((resolve,reject)=>{
       const timer=setTimeout(()=>reject(Error('INSTANCE_START_TIMEOUT')),20000);
-      const ready=(message:unknown)=>{if(message&&typeof message==='object'&&'type' in message&&message.type==='gateway-ready'){localApplySupported='localApply' in message&&message.localApply===true;clearTimeout(timer);child.off('exit',failed);child.off('error',failed);child.off('message',ready);resolve();}};
+      const ready=(message:unknown)=>{if(message&&typeof message==='object'&&'type' in message&&message.type==='gateway-ready'){localApplySupported='localApply' in message&&message.localApply===true;revocationSupported='readOnlyRevocation' in message&&message.readOnlyRevocation===true;clearTimeout(timer);child.off('exit',failed);child.off('error',failed);child.off('message',ready);resolve();}};
       const failed=()=>{clearTimeout(timer);child.off('message',ready);reject(Error('INSTANCE_START_FAILED: inspect instance logs'));};
       child.once('error',failed);child.once('exit',failed);child.on('message',ready);
     });
@@ -250,6 +262,42 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     if(announce)emit('INSTANCE_RUNNING');
   }
   const active=(loaded:typeof initial):ActiveConfig=>({config:loaded.config,revision:loaded.revision,effectiveRevision:loaded.effectiveRevision,sourcePath:loaded.source.path});
+  async function updateWorker(child:ChildProcess,message:Record<string,unknown>){
+    const id=randomBytes(16).toString('hex');
+    await new Promise<void>((resolve,reject)=>{
+      const timer=setTimeout(()=>finish(Error('GATEWAY_APPLY_TIMEOUT: saved configuration remains pending')),60000);
+      const reply=(value:unknown)=>{if(!value||typeof value!=='object')return;const m=value as Record<string,unknown>;if(m.type==='gateway-applied'&&m.id===id)finish(m.error?Error(String(m.error)):undefined);};
+      const exited=()=>finish(Error('INSTANCE_WORKER_EXITED'));
+      const finish=(error?:Error)=>{clearTimeout(timer);child.off('message',reply);child.off('exit',exited);error?reject(error):resolve();};
+      child.on('message',reply);child.once('exit',exited);child.send({...message,id,deadline:Date.now()+55000},error=>{if(error)finish(error);});
+    });
+  }
+  async function revokeReadOnlyTool(revision:string|null,target:Revocation){
+    if(ending||stopRequest)throw Error('INSTANCE_STOPPING');
+    const previous=state.active;
+    if(!worker||!previous)throw Error('INSTANCE_NOT_RUNNING');
+    if(!revocationSupported)throw Error('INSTANCE_CONTROL_PROTOCOL_UNSUPPORTED');
+    const saved=await loadInstanceConfig(await resolveInstance(instance.id,home));
+    const savedServer=saved.config.upstreams.find(server=>server.id===target.serverId);
+    if(saved.revision!==revision||savedServer?.allowToolsInReadOnly?.includes(target.tool))
+      throw Error('CONFIG_CONFLICT: configuration changed before revocation');
+
+    const config=structuredClone(previous.config);
+    const server=config.upstreams.find(item=>item.id===target.serverId);
+    if(server){
+      const remaining=server.allowToolsInReadOnly?.filter(name=>name!==target.tool)??[];
+      if(remaining.length||savedServer?.allowToolsInReadOnly!==undefined)server.allowToolsInReadOnly=remaining;
+      else delete server.allowToolsInReadOnly;
+    }
+    await updateWorker(worker,{type:'gateway-revoke-read-only-tool',...target});
+    const projected=instanceConfigSchema.parse(config);
+    const effectiveRevision=effectiveConfigRevision(projected);
+    state.active=effectiveRevision===saved.effectiveRevision?active(saved):{
+      config:projected,effectiveRevision,revision:'active:'+effectiveRevision,sourcePath:previous.sourcePath
+    };
+    await atomicPrivate(path.join(instancePaths(instance,home).snapshots,'active.json'),JSON.stringify(state.active,null,2));
+    emit('INSTANCE_RUNNING');
+  }
   async function apply(revision:string|null,forceId?:string){
     if(ending||stopRequest)throw Error('INSTANCE_STOPPING');
     const current=await resolveInstance(instance.id,home);const next=await loadInstanceConfig(current);
@@ -259,14 +307,7 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
     const stable=(config:InstanceConfig)=>{const {upstreams,middlewares,...rest}=config;return JSON.stringify(rest);};
     if(worker&&localApplySupported&&stable(previous.config)===stable(next.config)){
       const upstreamFile=await prepareUpstreams(instance,next.config,home),middlewareFile=await prepareMiddlewares(instance,next.config,home);
-      const child=worker,id=randomBytes(16).toString('hex');
-      await new Promise<void>((resolve,reject)=>{
-        const timer=setTimeout(()=>finish(Error('GATEWAY_APPLY_TIMEOUT: saved configuration remains pending')),60000);
-        const reply=(value:unknown)=>{if(!value||typeof value!=='object')return;const m=value as Record<string,unknown>;if(m.type==='gateway-applied'&&m.id===id)finish(m.error?Error(String(m.error)):undefined);};
-        const exited=()=>finish(Error('INSTANCE_WORKER_EXITED'));
-        const finish=(error?:Error)=>{clearTimeout(timer);child.off('message',reply);child.off('exit',exited);error?reject(error):resolve();};
-        child.on('message',reply);child.once('exit',exited);child.send({type:'gateway-apply',id,upstreamFile,middlewareFile,forceId,deadline:Date.now()+55000},error=>{if(error)finish(error);});
-      });
+      await updateWorker(worker,{type:'gateway-apply',upstreamFile,middlewareFile,forceId});
       state.active=active(next);state.problem=null;await atomicPrivate(path.join(instancePaths(instance,home).snapshots,'active.json'),JSON.stringify(state.active,null,2));emit('INSTANCE_RUNNING');return;
     }
     const oldLease=portLease;let candidateLease=oldLease;
@@ -318,11 +359,15 @@ export async function runInstance(instance:Instance,options:{home?:string;appPar
             if(parsed&&typeof parsed==='object'&&'nonce' in parsed&&typeof parsed.nonce==='string')nonce=parsed.nonce;
             checkInstanceProtocol(parsed);const req=controlRequestSchema.parse(parsed);
             if(req.runId!==owner.runId)throw Error('CONTROL_DENIED');
-            if(req.method==='apply')await serialize(async()=>{
+            if(req.method==='apply'||req.method==='revoke-read-only-tool')await serialize(async()=>{
               // Another queued apply may already have replaced this run.
               if(req.runId!==owner.runId)throw Error('CONTROL_DENIED');
               applying=true;
-              try{await apply(req.revision,req.forceId);}finally{applying=false;}
+              try{
+                if(req.method==='apply')await apply(req.revision,req.forceId);
+                else if(req.target)await revokeReadOnlyTool(req.revision,req.target);
+                else throw Error('INVALID_READ_ONLY_GRANT');
+              }finally{applying=false;}
             });
             if(req.method==='stop'){
               if(applying)throw Error('INSTANCE_APPLY_IN_PROGRESS: retry stop after configuration applies');

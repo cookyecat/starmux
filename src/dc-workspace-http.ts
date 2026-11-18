@@ -1,4 +1,5 @@
 const MCP_REQUEST_BODY_LIMIT=1024*1024;
+import {createConnectionVerification} from './connection-verification.js';
 import {GatewaySnapshot} from './gateway-snapshot.js';
 import {readConfiguredUpstreams} from './configured-mcp-upstreams.js';
 import {MiddlewareEngine} from './middleware-engine.js';
@@ -38,13 +39,14 @@ import { createAccountAccessPolicy } from './account-access-policy.js';
 import { isAllowedGatewayHost,isClientFacingGatewayRoute,isLoopbackSocketAddress } from './http-host-policy.js';
 
 export interface RuntimeOptions {env?: NodeJS.ProcessEnv; audit?: AuditSink}
-export interface GatewayRuntime {apply(upstreamFile?:string,middlewareFile?:string,forceId?:string,deadline?:number):Promise<void>;start(): Promise<void>; close(): Promise<void>; readonly port: number|null}
+export interface GatewayRuntime {revokeReadOnlyTool(serverId:string,tool:string):void;apply(upstreamFile?:string,middlewareFile?:string,forceId?:string,deadline?:number):Promise<void>;start(): Promise<void>; close(): Promise<void>; readonly port: number|null}
 /** Construction and imports are inert; only start acquires resources. */
 export function createGatewayRuntime(options: RuntimeOptions={}): GatewayRuntime {
   let running: Awaited<ReturnType<typeof initializeGateway>>|null=null;
   let starting: Promise<void>|null=null;
   let closing: Promise<void>|null=null;
   return {
+    revokeReadOnlyTool(serverId,tool){if(!running)throw Error("INSTANCE_NOT_RUNNING");running.revokeReadOnlyTool(serverId,tool);},
     async apply(upstreamFile,middlewareFile,forceId,deadline){if(!running)throw Error("INSTANCE_NOT_RUNNING");await running.apply(upstreamFile,middlewareFile,forceId,deadline);},
     get port(){return running?.port??null;},
     async start(){
@@ -101,7 +103,8 @@ const audit: AuditSink=e=>{
   at:new Date().toISOString(),profile:"project-workspace",...e
 })+"\n");
 };
-const upstream=new LocalDesktopReadProbe({writeScope});
+const verification=createConnectionVerification();
+const upstream=new LocalDesktopReadProbe({writeScope,projectRoot:root});
 let programmableMiddleware:MiddlewareEngine|undefined;
 let callLog:ReturnType<typeof createToolCallLog>|undefined;
 let snapshot:GatewaySnapshot|undefined;let closingGateway=false;let applying=false;
@@ -139,26 +142,26 @@ if(env.STARMUX_MIDDLEWARES_FILE){
  const parsed=middlewareConfigSchema.array().max(32).parse(configs);
  programmableMiddleware=await MiddlewareEngine.create(parsed,router.upstreamCatalog.map(tool=>({tool,target:router.targetFor!(tool.name)!})),process.cwd(),event=>{callLog?.middlewareTrace(event);audit({event:'MIDDLEWARE_STAGE',...event});});
 }
-let currentUpstreamFile=env.STARMUX_UPSTREAMS_FILE,currentMiddlewareFile=env.STARMUX_MIDDLEWARES_FILE;
+let currentMiddlewareFile=env.STARMUX_MIDDLEWARES_FILE;
 const catalogChanges=new Set<string>();let refreshTimer:NodeJS.Timeout|undefined;
-const refreshCatalog=()=>{if(closingGateway)return;const id=catalogChanges.values().next().value;if(!id)return;if(applying){refreshTimer=setTimeout(refreshCatalog,100);refreshTimer.unref();return;}catalogChanges.delete(id);void apply(currentUpstreamFile,currentMiddlewareFile,id).catch(()=>audit({event:'UPSTREAM_CATALOG_REFRESH_FAILED',route:id})).finally(()=>{if(catalogChanges.size)refreshCatalog();});};
+const refreshCatalog=()=>{if(closingGateway)return;const id=catalogChanges.values().next().value;if(!id)return;if(applying){refreshTimer=setTimeout(refreshCatalog,100);refreshTimer.unref();return;}catalogChanges.delete(id);void apply(undefined,currentMiddlewareFile,id,undefined,true).catch(()=>audit({event:'UPSTREAM_CATALOG_REFRESH_FAILED',route:id})).finally(()=>{if(catalogChanges.size)refreshCatalog();});};
 configured!.registry.onCatalogChanged=id=>{catalogChanges.add(id);if(refreshTimer)clearTimeout(refreshTimer);refreshTimer=setTimeout(refreshCatalog,100);refreshTimer.unref();};
 snapshot=new GatewaySnapshot(router,programmableMiddleware,[...configured!.upstreams,...(programmableMiddleware?[programmableMiddleware]:[])]);
-async function apply(upstreamFile?:string,middlewareFile?:string,forceId?:string,deadline=Date.now()+55000){
+async function apply(upstreamFile?:string,middlewareFile?:string,forceId?:string,deadline=Date.now()+55000,catalogRefresh=false){
  const signal=AbortSignal.timeout(Math.max(1,deadline-Date.now()));
  if(closingGateway)throw Error('INSTANCE_STOPPING');if(applying)throw Error('INSTANCE_BUSY');applying=true;
  let candidate:Awaited<ReturnType<import('./server-registry.js').ServerRegistry['prepare']>>|undefined;let pipeline:MiddlewareEngine|undefined;
  try{
-  const definitions=upstreamFile?await readConfiguredUpstreams(upstreamFile):[];
-  candidate=await configured!.registry.prepare({version:1,upstreams:definitions},forceId,signal);
-  const nextRouter=createMCPUpstreamRouter({routes:[{id:'desktop',upstream,exposeNativeNames:true},...configured!.registry.routes(candidate.services)]});
+  const definitions=catalogRefresh?configured!.upstreams.map(service=>service.definition):upstreamFile?await readConfiguredUpstreams(upstreamFile):[];
+  candidate=await configured!.registry.prepare({version:1,upstreams:definitions},forceId,signal,catalogRefresh);
+  const nextRouter=createMCPUpstreamRouter({routes:[{id:'desktop',upstream,exposeNativeNames:true},...candidate.routes]});
   await validateGatewayCatalogs(nextRouter);
   const configs=middlewareFile?middlewareConfigSchema.array().max(32).parse(JSON.parse(await readTrusted(middlewareFile))):[];
   if(configs.some(c=>c.enabled!==false))pipeline=await MiddlewareEngine.create(configs,nextRouter.upstreamCatalog.map(tool=>({tool,target:nextRouter.targetFor!(tool.name)!})),process.cwd(),event=>{callLog?.middlewareTrace(event);audit({event:'MIDDLEWARE_STAGE',...event});},signal,forceId==='__middleware__'?undefined:snapshot?.middleware);
   if(closingGateway||signal.aborted)throw Error('GATEWAY_APPLY_TIMEOUT');
   const old=snapshot!;const disabled=configured!.upstreams.filter(s=>!candidate!.services.some(n=>n.id===s.id&&n.definition.enabled!==false));
   const next=new GatewaySnapshot(nextRouter,pipeline,[...candidate.services,...(pipeline?[pipeline]:[])]);
-  candidate.commit();currentUpstreamFile=upstreamFile;currentMiddlewareFile=middlewareFile;router=nextRouter;programmableMiddleware=pipeline;snapshot=next;old.retire();
+  candidate.commit();currentMiddlewareFile=middlewareFile;router=nextRouter;programmableMiddleware=pipeline;snapshot=next;old.retire();
   for(const session of sessions.values()){void session.gateway.sendToolListChanged().catch(()=>{});void session.gateway.sendResourceListChanged().catch(()=>{});void session.gateway.sendPromptListChanged().catch(()=>{});}
   // Disabled/removed services reject new calls immediately via the new catalog;
   // old calls have a bounded drain before their transport is cancelled.
@@ -346,7 +349,8 @@ http=createServer(async(req,res)=>{
   if(route==="/activity.json"&&req.method==="GET"&&activity){
     res.writeHead(200,{...dashboardHeaders,
       "content-type":"application/json; charset=utf-8"});
-    res.end(JSON.stringify(activity.snapshot()));
+    const toolName=programmableMiddleware?programmableMiddleware.catalog.find(tool=>programmableMiddleware?.canonical(tool.name)==='get_file_info')?.name??null:'get_file_info';
+    res.end(JSON.stringify({...activity.snapshot(),verification:verification.snapshot(toolName)}));
     return;
   }
   // A lightweight, read-only capability probe in the actual Core
@@ -363,9 +367,10 @@ http=createServer(async(req,res)=>{
     return;
   }
   if(route==="/healthz"&&req.method==="GET"){
-    res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});
+    const ready=upstream.ready;
+    res.writeHead(ready?200:503,{"content-type":"application/json","cache-control":"no-store"});
     const accessMode=await access.snapshot().then(s=>s.mode).catch(()=>"unavailable");
-    res.end(JSON.stringify({status:"ok",service:"dc-project-workspace",mode,
+    res.end(JSON.stringify({status:ready?'ok':'degraded',desktopCommander:ready?'ready':'unavailable',service:"dc-project-workspace",mode,
       writeScope,accessMode,allowLan,...(env.STARMUX_INSTANCE_ID?{instanceId:env.STARMUX_INSTANCE_ID,instanceName:env.STARMUX_INSTANCE_NAME}:{})}));
     return;
   }
@@ -417,7 +422,7 @@ http=createServer(async(req,res)=>{
   const gateway=createDesktopCommanderBridge(pinned.router,audit,{
     getSnapshot:()=>{const selected=snapshot!;return {upstream:selected.router,router:selected.router,middleware:selected.middleware,release:selected.retain()};},
     ...(pinned.middleware?{programmableMiddleware:pinned.middleware}:{}),upstreamTrace:callLog!.stage,observer:callLog!.observer,request,...(oauth?{oauthScope:oauth.scope}:{}),workspacePolicy,upstreamRouter:pinned.router,
-    nativePassthrough:nativeAccessMode==='native',denyRules,globalReadOnly,permissionMode:globalPermissions?'global':'workspace',...(gitWorkflow?{gitWorkflow}:{})
+    ...(activity?{verification}:{}),desktopReady:()=>upstream.ready,nativePassthrough:nativeAccessMode==='native',denyRules,globalReadOnly,permissionMode:globalPermissions?'global':'workspace',...(gitWorkflow?{gitWorkflow}:{})
   });
   bridges.add(gateway);
   transport.onclose=()=>{if(registered){sessions.delete(registered);for(const service of configured!.upstreams)void service.releaseSession(registered);}bridges.delete(gateway);release();};
@@ -436,7 +441,11 @@ await new Promise<void>((resolve,reject)=>{
 const address=http.address();
 if(!address||typeof address==='string')throw Error('INVALID_LISTENER_ADDRESS');
 audit({event:'PROJECT_WORKSPACE_LISTENING',port:address.port,host:listenHost,allowLan,mode});
-return {port:address.port,close,apply};
+function revokeReadOnlyTool(serverId:string,tool:string){
+  configured!.registry.revokeReadOnlyTool(serverId,tool);
+  for(const session of sessions.values())void session.gateway.sendToolListChanged().catch(()=>{});
+}
+return {port:address.port,close,apply,revokeReadOnlyTool};
 }catch(error){await close().catch(()=>{});throw error;}
 }
 /** Only the process entrypoint owns signal handlers. */

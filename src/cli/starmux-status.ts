@@ -4,6 +4,12 @@ import {exists,instancePaths,usesGlobalPermissions,type Instance,type InstanceCo
 import {shellQuote} from '../platform.js';
 import {networkInterfaces} from 'node:os';
 
+export function targetClientStatus(check:import('../connection-verification.js').ConnectionVerification){
+  return check.targetVerifiedAt?'Target client read confirmed at '+check.targetVerifiedAt:
+    !check.toolName?'Connection check requires a published get_file_info tool.':
+    'In your target AI client, call '+check.toolName+' with '+JSON.stringify({path:'.',starmuxCheck:check.code});
+}
+
 export function lanIpv4Addresses():string[]{
   return [...new Set(Object.values(networkInterfaces()).flatMap(entries=>
     (entries??[]).filter(entry=>!entry.internal&&entry.family==='IPv4').map(entry=>entry.address)))];
@@ -66,7 +72,7 @@ export async function formatStarmuxStatus(instance:Instance,status:Status,config
   const switchHint=config&&(status.phase==='running'||status.phase==='stopped')
     ?config.accessRole==='trusted'?`  (run '${command('up --read')}' to return to read-only)`:`  (run '${codingCmd}' to enable edits & shell)`
     :'';
-  const mode=describeMode(config,globalMode)+switchHint;
+  const mode=describeMode(config,globalMode)+(globalMode?' · workspace grants and deny rules inactive':'')+switchHint;
   const title=`${indicator} Starmux is ${status.phase}  (instance: ${instance.name})`;
   const lines=['',title,row('Instance',instance.id)];
   if(ready&&status.port){
@@ -91,11 +97,13 @@ export async function formatStarmuxStatus(instance:Instance,status:Status,config
     lines.push(row('Saved mode',describeMode(savedConfig,!!savedConfig&&usesGlobalPermissions(savedConfig))+(status.configState==='pending'?' (pending)':'')));
     if(!status.active)lines.push(row('Saved project',savedConfig?.projectRoot??'Unavailable'));
   }
+  if(status.verification)lines.push(row('Local self-check',status.verification.localVerifiedAt??'Pending · run '+command('verify')),row('Target client',targetClientStatus(status.verification)));
   if(status.runtime)lines.push(row('Runtime',status.runtime.buildVersion));
   if(ready&&status.port&&auth.mode==='oauth'&&auth.oauth){
     lines.push(row('Client URL',auth.oauth.resource),row('Issuer',auth.oauth.issuer));
   }
-  if(status.configProblem||status.runtimeProblem)lines.push(row('Problem',status.configProblem??status.runtimeProblem!));
+  if(status.runtimeProblem)lines.push(row('Problem',status.runtimeProblem));
+  if(status.configProblem)lines.push(row('Config problem',status.configProblem));
   if(auth.problem)lines.push(row('Auth issue',auth.problem));
 
   const keyCommand=command('auth key "My AI Client"');
@@ -106,7 +114,7 @@ export async function formatStarmuxStatus(instance:Instance,status:Status,config
       lines.push(
         row('URL (Local)',`http://127.0.0.1:${status.port}/mcp  (AI client on this computer)`),
         row('URL (Remote)',`https://<your-domain-or-tunnel>/mcp  (via protected HTTPS proxy or tunnel -> 127.0.0.1:${status.port})`),
-        row('Authentication',`None  (optional Bearer API key: ${keyCommand})`)
+        row('Authentication',`None  (to require a Bearer API key: ${keyCommand})`)
       );
     }else if(auth.mode==='api-key'){
       lines.push(

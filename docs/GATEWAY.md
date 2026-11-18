@@ -2,6 +2,16 @@
 
 Starmux keeps its existing startup and client connection address. Authentication defaults to `none`; `--allow-lan` changes the listening interface without enabling authentication. Additional servers and middleware are optional. The native macOS App links to the selected instance's **MCP servers** and **Middleware** pages.
 
+## Grant an upstream query while keeping the host read-only
+
+Start the instance with `starmux up --read`. For an upstream that exposes `query`, add the service definition through the CLI or paste the same JSON into **MCP servers** in the Web console. Replace the example URL and tool name with those of your service.
+
+```sh
+starmux server add '{"id":"reports","transport":"streamable-http","url":"https://reports.example.com/mcp","allowTools":["query"],"allowToolsInReadOnly":["query"]}'
+```
+
+The client can call `reports__query`. The host terminal and file-editing tools stay blocked. The grant permits the upstream operation with the upstream service’s own privileges. On **MCP servers**, check or uncheck a native tool under **Tools allowed in host read-only mode**. Unchecking a tool immediately revokes access for connected clients, even when the instance has other saved changes. For example, a saved switch to Coding stays pending and the host remains read-only. Checking a tool applies the grant immediately when the running instance has no other pending changes. The console reports when a grant is pending or will take effect on the next start. Omitting the field or setting it to `[]` grants no upstream tools in global Read-only mode.
+
 ## Connect a server
 
 Open `starmux dashboard`, choose **MCP servers**, and paste a command, URL, single server object, or `mcpServers` configuration. **Preview** only parses the input. **Test connection** starts the configured program or connects to the remote endpoint. **Enable tested services** saves the definitions and applies them to a running instance.
@@ -27,7 +37,7 @@ Commands are tokenized into executable and arguments. Shell pipes, redirection, 
 
 The first successful discovery authorizes the tools found in that import. Explicit `allowTools`, including an empty list, is honored. Refreshing a registered service preserves its authorization list. Use **Edit**, change the definition's `allowTools`, preview and test, then **Replace existing service** to deliberately change it. Name conflicts never silently overwrite an existing server. CLI replacement requires `--replace`.
 
-Additional tools retain `<server ID>__<native name>`. Built-in Desktop Commander names remain unchanged. Read-only mode still excludes additional tools; a server's `readOnlyHint` never grants permission or enables a cache. The service page distinguishes discovered, authorized and mode-available counts.
+Additional tools retain `<server ID>__<native name>`. Built-in Desktop Commander names remain unchanged. In global Read-only mode each upstream starts with zero callable tools. To grant a tool, include its native name in both `allowTools` and `allowToolsInReadOnly` on that upstream. Discovery and `readOnlyHint` cannot add names to the second list. The service page distinguishes discovered, authorized and mode-available counts.
 
 Service updates connect and validate a candidate first. A failed candidate leaves the running version available and the saved configuration pending. Existing calls keep their original routing and middleware generation. Disabling or removing a service removes it from new calls immediately after application; existing calls receive up to five seconds to drain. An interrupted call may have executed upstream: check its effects before retrying.
 

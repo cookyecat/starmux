@@ -1,9 +1,10 @@
+import {mcpCallContext} from './mcp-call-context.js';
 import {MiddlewareError} from './middleware-process.js';
 import type { AuditSink,CallToolResult,RequestContext,ToolInvocation } from './contracts.js';
 import type { BridgeOptions,BridgeUpstream } from './desktop-commander-facade.js';
 import { authorizeInvocation,createInvocationExecutor,observeSafely } from './invocation.js';
 import { errorCode } from './validation.js';
-import { isReadOnlyTool } from './account-access-policy.js';
+import { allowedInHostReadOnly } from './account-access-policy.js';
 
 function workspaceErrorText(error:unknown,hasGrants:boolean):string{
   const code=errorCode(error);
@@ -43,15 +44,20 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
     const execute=createInvocationExecutor(upstream,invocation=>{const route=options.upstreamRouter?.routeFor(invocation.name);if(route&&route!=='desktop')return ()=>{};options.upstreamTrace?.(id,'upstreamRequest',{serverId:route??'desktop',request:invocation});return (result,failure)=>options.upstreamTrace?.(id,'upstreamResponse',result??{error:failure});});
     const name = params.name;
     const args = params.arguments || {};
-    if(options.globalReadOnly&&!isReadOnlyTool(name)){
+    if(mcpCallContext.getStore()?.verificationRead!==undefined&&name!=='get_file_info'){
+      return {isError:true,content:[{type:'text',text:'Connection check requires the built-in get_file_info tool.'}]};
+    }
+    if(options.globalReadOnly&&!allowedInHostReadOnly(name,options.upstreamRouter)){
       audit({event:'DC_BRIDGE_DENIED',requestId:id,tool:name,reason:'READ_ONLY_MODE'});
-      return {isError:true,content:[{type:'text',text:"READ_ONLY_MODE: This operation requires Coding mode. Run 'starmux up --code' to enable edits & shell."}]};
+      return {isError:true,content:[{type:'text',text:options.upstreamRouter?.routeFor(name)&&options.upstreamRouter.routeFor(name)!=='desktop'?
+        'READ_ONLY_MODE: The owner must grant this upstream tool in allowToolsInReadOnly.':"READ_ONLY_MODE: This operation requires Coding mode. Run 'starmux up --code' to enable edits & shell."}]};
     }
     const observe = (fn: () => void) => observeSafely(fn, audit, context);
     if(name==="health_check"){
       audit({event:"DC_BRIDGE_HEALTH_CHECK",requestId:id});
-      return {content:[{type:"text",text:JSON.stringify({
-        status:"ok",service:"starmux-dc-bridge",
+      const ready=options.desktopReady?.()??true;
+      return {...(ready?{}:{isError:true}),content:[{type:"text",text:JSON.stringify({
+        status:ready?"ok":"degraded",desktopCommander:ready?"ready":"unavailable",service:"starmux-dc-bridge",
         upstream:"desktop-commander",tools:upstream.upstreamCatalog.length,
         routes:options.upstreamRouter?.routes||[{id:"desktop",toolCount:upstream.upstreamCatalog.length}],
         mode:options.globalReadOnly?'read-only':options.nativePassthrough?'coding':
@@ -188,7 +194,7 @@ export function createToolDispatcher(upstream: BridgeUpstream, audit: AuditSink,
 export function createToolAuthorizer(upstream:BridgeUpstream,options:BridgeOptions){
  return async(params:ToolInvocation)=>{
   const reject=()=>{throw new MiddlewareError('MIDDLEWARE_REJECTED','core','request');};
-  if(options.globalReadOnly&&!isReadOnlyTool(params.name))reject();
+  if(options.globalReadOnly&&!allowedInHostReadOnly(params.name,options.upstreamRouter))reject();
   try{
    await options.denyRules?.check(params.name,params.arguments??{});
    if(options.upstreamRouter?.routeFor(params.name)&&options.upstreamRouter.routeFor(params.name)!=='desktop'){await options.upstreamRouter.authorizeExtension(params.name,params.arguments??{});return;}

@@ -24,6 +24,9 @@ test('structured failure results retain codes, IDs and state without mutating or
  const {applicationFeedback}=await import('../dist/src/user-feedback.js');
  for(const language of ['en','zh']){
   assert.equal(applicationFeedback({application:'applied'},language).error,false);
+  const pendingGrant=applicationFeedback({application:'pending',otherConfigPending:true},language);
+  assert.equal(pendingGrant.error,false);
+  assert.match(pendingGrant.message,/Apply the instance configuration|应用实例配置后/);
   const deferred=applicationFeedback({application:'on-next-start'},language);
   assert.equal(deferred.error,false);assert.match(deferred.message,/when this instance starts|实例启动时/);
   for(const application of ['pending','unknown',undefined]){

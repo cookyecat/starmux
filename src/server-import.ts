@@ -50,10 +50,10 @@ export async function previewServerImport(input:string,{base,id='server',file}:{
   if(!raw||typeof raw!=='object'||Array.isArray(raw))fail('SERVER_IMPORT_INVALID');const item={...raw} as Record<string,unknown>;
   if(item.id!==undefined&&item.id!==importName)fail('SERVER_ID_CONFLICT');if(item.disabled!==undefined&&typeof item.disabled!=='boolean')fail('SERVER_IMPORT_INVALID');
   if(!('allowTools' in item))result.discoverGrants.push(name);
-  const unknown=Object.keys(item).filter(k=>!['id','command','args','env','envRefs','cwd','url','type','transport','headers','headerRefs','enabled','disabled','allowTools','startupTimeoutMs','auth'].includes(k));
+  const unknown=Object.keys(item).filter(k=>!['id','command','args','env','envRefs','cwd','url','type','transport','headers','headerRefs','enabled','disabled','allowTools','allowToolsInReadOnly','startupTimeoutMs','auth'].includes(k));
   if(unknown.length)fail('SERVER_IMPORT_UNKNOWN_FIELDS: '+unknown.join(', '));
   let transport=item.transport??item.type??(item.url?'streamable-http':'stdio');if(transport==='http')transport='streamable-http';
-  const common={id:name,enabled:item.enabled??(item.disabled===undefined?true:!item.disabled),allowTools:item.allowTools??[],...(item.startupTimeoutMs!==undefined?{startupTimeoutMs:item.startupTimeoutMs}:{})};
+  const common={id:name,enabled:item.enabled??(item.disabled===undefined?true:!item.disabled),allowTools:item.allowTools??[],...(item.allowToolsInReadOnly!==undefined?{allowToolsInReadOnly:item.allowToolsInReadOnly}:{}),...(item.startupTimeoutMs!==undefined?{startupTimeoutMs:item.startupTimeoutMs}:{})};
   const refs:Record<string,string>={};const values=(transport==='stdio'?item.env:item.headers)??{};
   if(!values||typeof values!=='object'||Array.isArray(values))fail('SERVER_IMPORT_SECRETS_INVALID');
   const publicHeaders:Record<string,string>={};

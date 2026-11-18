@@ -1,6 +1,7 @@
 import {AsyncLocalStorage} from 'node:async_hooks';
 import type {ClientCapabilities,Progress} from '@modelcontextprotocol/sdk/types.js';
 export interface McpCallContext {
+ verificationRead?:boolean;
  trace?:(stage:'upstreamRequest'|'upstreamResponse',value:unknown)=>void;
  sessionId:string;
  capabilities:ClientCapabilities;

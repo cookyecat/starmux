@@ -151,10 +151,11 @@ export function configWarnings(config:InstanceConfig,text?:string):ConfigWarning
           'Directory access follows OS-account and upstream permissions; this option does not restrict access to linked worktrees.')}));
 }
 export const formatConfigWarnings=(warnings:readonly ConfigWarning[])=>warnings.map(w=>`Note: ${w.message}\n`).join('');
+export const effectiveConfigRevision=(config:InstanceConfig)=>fingerprint(JSON.stringify({...config,$schema:undefined}));
 export async function loadInstanceConfig(instance:Instance){
   const text=await readTrusted(instance.source.path,instance.source.kind==='managed');
   const config=await validateConfig(parseConfig(text));
-  return {text,config,warnings:configWarnings(config,text),revision:sourceRevision(instance.source.path,text),effectiveRevision:fingerprint(JSON.stringify({...config,$schema:undefined})),source:instance.source};
+  return {text,config,warnings:configWarnings(config,text),revision:sourceRevision(instance.source.path,text),effectiveRevision:effectiveConfigRevision(config),source:instance.source};
 }
 export async function availablePort(port:number,host:'127.0.0.1'|'0.0.0.0'='127.0.0.1'){
   // macOS can permit a wildcard bind alongside a specific-interface listener.

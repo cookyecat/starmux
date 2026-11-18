@@ -6,15 +6,17 @@ import {GatewayError,errorCode} from './validation.js';
 export class ServerRegistry {
   onCatalogChanged:((id:string)=>void)|undefined;
   readonly #services=new Map<string,ConfiguredUpstream>();
+  #readOnlyGrants=new Map<string,Set<string>>();
   #closed=false;
   #starting:Promise<void>|null=null;
   constructor(definitions:unknown,private readonly audit:AuditSink=()=>{}){
-    for(const definition of validateConfiguredUpstreams(definitions)){const service=new ConfiguredUpstream(definition);this.attach(service);this.#services.set(definition.id,service);}
+    for(const definition of validateConfiguredUpstreams(definitions)){const service=new ConfiguredUpstream(definition);this.attach(service);this.#services.set(definition.id,service);this.#readOnlyGrants.set(definition.id,new Set(definition.allowToolsInReadOnly));}
   }
   private attach(service:ConfiguredUpstream){service.onCatalogChanged=()=>{if(this.#services.get(service.id)===service)this.onCatalogChanged?.(service.id);};}
   get upstreams(){return [...this.#services.values()];}
-  status(){return this.upstreams.map(service=>service.status);}
-  async prepare(definitions:unknown,forceId?:string,signal?:AbortSignal){
+  status(){return this.upstreams.map(service=>service.statusWithGrants(this.#readOnlyGrants.get(service.id)!));}
+  revokeReadOnlyTool(id:string,tool:string){this.#readOnlyGrants.get(id)?.delete(tool);}
+  async prepare(definitions:unknown,forceId?:string,signal?:AbortSignal,catalogRefresh=false){
     if(this.#closed)throw new GatewayError('UPSTREAM_CLOSED');
     const next=validateConfiguredUpstreams(definitions);const created:ConfiguredUpstream[]=[];const abort=()=>{for(const service of created)void service.close();};signal?.addEventListener('abort',abort,{once:true});
     try{
@@ -26,7 +28,14 @@ export class ServerRegistry {
         if(definition.enabled!==false)await service.connect();return service;
       }));
       if(this.#closed||signal?.aborted)throw new GatewayError('UPSTREAM_CLOSED');
-      return {services,created,commit:()=>{if(this.#closed)throw new GatewayError('UPSTREAM_CLOSED');this.#services.clear();for(const service of services)this.#services.set(service.id,service);}};
+      // Catalog refreshes share the live grant sets so even a revoke during discovery survives commit.
+      const grants=catalogRefresh?this.#readOnlyGrants:new Map(next.map(def=>[def.id,new Set(def.allowToolsInReadOnly)]));
+      return {services,created,routes:this.routes(services,grants),commit:()=>{
+        if(this.#closed)throw new GatewayError('UPSTREAM_CLOSED');
+        this.#services.clear();
+        for(const service of services)this.#services.set(service.id,service);
+        this.#readOnlyGrants=grants;
+      }};
     }catch(error){await Promise.allSettled(created.map(service=>service.close()));throw error;}finally{signal?.removeEventListener('abort',abort);}
   }
   async connectAll(){
@@ -38,8 +47,8 @@ export class ServerRegistry {
     })).then(()=>{}).finally(()=>{this.#starting=null;});
     return this.#starting;
   }
-  routes(services=this.upstreams):RouteDefinition[]{
-    return services.filter(s=>s.definition.enabled!==false&&s.status.status==='READY').map(upstream=>({id:upstream.id,upstream,authorize:(name,args)=>{
+  routes(services=this.upstreams,grants=this.#readOnlyGrants):RouteDefinition[]{
+    return services.filter(s=>s.definition.enabled!==false&&s.status.status==='READY').map(upstream=>({id:upstream.id,upstream,allowToolsInReadOnly:grants.get(upstream.id)!,authorize:(name,args)=>{
       if(!upstream.definition.allowTools.includes(name))throw new GatewayError('UPSTREAM_TOOL_NOT_GRANTED');return args;
     }}));
   }

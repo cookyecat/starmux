@@ -13,9 +13,9 @@ test('command parser preserves quoted arguments without shell expansion',()=>{
 });
 test('preview redacts credentials, resolves source-relative paths, and rejects unknown fields',async()=>{
  const base=path.resolve('.internal');
- const r=await previewServerImport(JSON.stringify({mcpServers:{local:{command:'node',args:['./server.mjs'],env:{API_KEY:'private'}},remote:{url:'https://example.invalid/mcp',headers:{Authorization:'Bearer private','X-Region':'local'}}}}),{base});
+ const r=await previewServerImport(JSON.stringify({mcpServers:{local:{command:'node',args:['./server.mjs'],env:{API_KEY:'fixture-secret-value'}},remote:{url:'https://example.invalid/mcp',headers:{Authorization:'Bearer fixture-secret-value','X-Region':'local'}}}}),{base});
  assert.equal(r.servers[0].args[0],path.join(base,'server.mjs'));
- assert.equal(r.servers[0].cwd,base);assert.equal(JSON.stringify(r.servers).includes('private'),false);
+ assert.equal(r.servers[0].cwd,base);assert.equal(JSON.stringify(r.servers).includes('fixture-secret-value'),false);
  assert.equal(r.servers[1].headers['X-Region'],'local');assert.equal(Object.keys(r.secrets).length,2);
  await assert.rejects(previewServerImport('{"command":"node","unsupported":true}',{base}),/UNKNOWN_FIELDS/);
  await assert.rejects(previewServerImport('https://user:password@example.invalid/mcp',{base}),/INVALID/);

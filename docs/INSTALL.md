@@ -106,6 +106,8 @@ cd /path/to/your/project
 starmux up
 ```
 
+Use the address printed by `starmux up` or the connection settings in the Web console when copying client configurations. Substitute its actual port throughout the examples below. An existing instance keeps its configured port.
+
 On first execution, `starmux up` initializes the `default` instance, allocates port `18893` (or the next free port in `18893–19892`), spawns a detached background supervisor, and prints the runtime summary:
 
 ```text
@@ -120,7 +122,7 @@ Connect an AI client (MCP settings)
   Transport       Streamable HTTP
   URL (Local)     http://127.0.0.1:18893/mcp  (AI client on this computer)
   URL (Remote)    https://<your-domain-or-tunnel>/mcp  (via protected HTTPS proxy or tunnel -> 127.0.0.1:18893)
-  Authentication  None  (optional Bearer API key: starmux auth key "My AI Client")
+  Authentication  None  (to require a Bearer API key: starmux auth key "My AI Client")
 
 Commands
   Verify          starmux verify
@@ -153,6 +155,10 @@ Commands
 - **Background vs. Foreground Execution:**
   - By default, `starmux up` detaches and continues running after you close the terminal (it does not register an OS boot/login service).
   - Pass `starmux up --foreground` to keep the supervisor attached to the current terminal until `Ctrl+C`—recommended when wrapping Starmux inside `systemd`, `launchd`, Docker, or `tmux`.
+
+### Verify the target AI client
+
+Run `starmux verify` (add `-i NAME` for a named instance) to check the local MCP handshake, tool discovery and directory read. Copy the separate `get_file_info` instruction from its output, `starmux status`, or **Overview → First connection** into the AI client you want to connect. The instruction includes the verification code for this running instance. After the client completes the read, the CLI and console show its first success time. Restarting the worker starts a fresh check.
 
 ### 3.3 Everyday CLI Reference
 
@@ -356,7 +362,7 @@ ssh -N -o ExitOnForwardFailure=yes \
    STARMUX_TOKEN=smx_YOUR_API_KEY starmux verify
    starmux verify --token-stdin < /private/token-file
    ```
-   `starmux verify` connects to `http://127.0.0.1:<PORT>/mcp`, completes the MCP initialization handshake, lists tools, and performs a test directory read (`list_directory`):
+   `starmux verify` connects to `http://127.0.0.1:<PORT>/mcp`, completes the MCP initialization handshake, lists tools, and reads the project directory metadata (`get_file_info`):
    ```text
    ✓ MCP handshake      http://127.0.0.1:18893/mcp
    ✓ Tool discovery     26 tools available (Read-only mode)
@@ -386,6 +392,7 @@ ssh -N -o ExitOnForwardFailure=yes \
 | **`HTTP 403` (`HOST_NOT_ALLOWED`)** | Host is missing, duplicated or malformed, or a public Host targets an owner route. | Use a valid single Host for `/mcp`; management pages require `127.0.0.1:<port>` or `localhost:<port>` from the same machine. |
 | **`HTTP 403` (`LOOPBACK_REQUIRED`)** | Non-loopback access to an owner route or a local-only listener. | Use `starmux up --allow-lan` for direct MCP access. Owner pages remain local in every mode. |
 | **`HTTP 401 Unauthorized` on `/mcp`** | Client omitted the `Authorization` header, sent a revoked/expired token, or the instance's active auth mode does not match. | Run `starmux auth` to inspect the active mode (`none`, `api-key`, `oauth`) and active credentials. |
+| **Desktop Commander unavailable** | The gateway is running while its built-in host tools reconnect. During recovery, `/healthz` returns HTTP 503. | Starmux retries automatically and checks the project directory with `get_file_info` before reporting ready. If the problem persists, check project access and instance logs. |
 | **Instance status shows `unknown`** | The CLI cannot verify live worker state (e.g., control socket in `~/.config/starmux/control` was removed or an older supervisor holds the port). | Run `starmux doctor` and `starmux status` to inspect `runtimeProblem`. Resolve or stop the conflicting process before running `starmux up`. |
 | **Port `18893` is already in use** | Another process or instance owns the port. | First run `starmux doctor` to check if an existing Starmux run owns it; to switch ports, run `starmux up --port 18894` (or `starmux config edit`) and update your proxy/client port. |
 | **Local `verify` passes, but remote HTTPS fails** | DNS, firewall, router port-forwarding (`TCP 443`), or IPv6 routing issue between the client and your host. | Test `curl -i https://mcp.example.com/mcp` from an external network; verify `A`/`AAAA` records and router/OS firewall rules. |

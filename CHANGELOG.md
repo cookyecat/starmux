@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.0 - 2026-11-19
+
+- Grant individual upstream tools in host Read-only mode from the Web console. Revoke them for connected clients while unrelated configuration changes remain pending.
+- Report Desktop Commander availability and verify recovery with a read-only call. Distinguish local readiness from a target client’s first verified call in the CLI and console.
+- Select an available port on first setup and report the actual connection address. Clarify global Read-only and Coding permissions.
+
 ## 0.18.2 - 2026-11-11
 
 - Bundle Desktop Commander 0.3.2 with the existing telemetry/cloud removal and add its retained command parser dependency, `unbash`, to production installations.

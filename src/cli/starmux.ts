@@ -19,7 +19,7 @@ import {atomicPrivate,availablePort,changeRegistry,configJSONSchema,createInstan
 import {handle} from './instances.js';
 import {packageRoot,desktopCommanderEntry} from '../runtime-paths.js';
 import {shellQuote} from '../platform.js';
-import {formatStarmuxStatus} from './starmux-status.js';
+import {targetClientStatus,formatStarmuxStatus} from './starmux-status.js';
 import {readProcessLogTail} from '../process-log.js';
 import {trustedFileStat} from '../instance-store.js';
 
@@ -125,7 +125,7 @@ async function configure(){
   const allowLan=flags['allow-lan']?true:flags.local||flags['no-allow-lan']?false:loaded?.config.allowLan??false;
   const config=await validateConfig(instanceConfigSchema.parse({...loaded?.config,
     projectRoot:await realpath(absolute(project)),schemaVersion:1,
-    port:string('port')?Number(string('port')):loaded?.config.port??(selector?await suggestPort(homedir(),allowLan?'0.0.0.0':'127.0.0.1'):18893),
+    port:string('port')?Number(string('port')):loaded?.config.port??await suggestPort(homedir(),allowLan?'0.0.0.0':'127.0.0.1'),
     allowLan,
     ...(writing?{accessRole:'trusted',mode:'read-write',writeScope:'unrestricted'}:{}),
     ...(flags.read?{accessRole:'restricted',mode:'read-only',writeScope:'unrestricted'}:{}),
@@ -189,12 +189,15 @@ async function verify(instance:Instance){
   try{
     await client.connect(transport as Transport);
     const listed=await client.listTools();toolCount=listed.tools.length;
-    const result=await client.callTool({name:'list_directory',arguments:{path:'.',depth:0}});
-    if(result.isError)fail('Directory read failed.');
+    if(status.verification&&!status.verification.toolName)fail('The instance does not publish get_file_info for the connection check.');
+    const result=await client.callTool({name:status.verification?.toolName??'get_file_info',_meta:{'starmux/local-self-check':true},arguments:{path:status.active?.config.projectRoot??'.',...(status.verification?{starmuxCheck:status.verification.code}:{})}});
+    if(result.isError)fail('Project directory metadata read failed.');
   }
   catch(e){throw Error('Verification failed: '+String(e)+'. For authenticated instances provide STARMUX_TOKEN or --token-stdin.');}
   finally{await client.close();}
-  if(json)print({result:'PASS',instanceId:instance.id,port:status.port,remoteClientVerified:false});
+  const verification=(await instanceStatus(instance)).verification;
+  if(status.verification&&verification?.code!==status.verification.code)fail('Instance changed during verification. Run starmux verify again.');
+  if(json)print({result:'PASS',instanceId:instance.id,port:status.port,endpoint,localSelfCheck:'passed',targetClientVerified:!!verification?.targetVerifiedAt,remoteClientVerified:!!verification?.targetVerifiedAt,verification});
   else{
     const cfg=status.active?.config;
     const mode=cfg?.accessRole==='trusted'?'Coding mode':'Read-only mode';
@@ -203,7 +206,8 @@ async function verify(instance:Instance){
       `✓ MCP handshake      ${endpoint}\n`+
       `✓ Tool discovery     ${toolCount} tools available (${mode})\n`+
       `✓ Workspace read     ${root}\n`+
-      `PASS · MCP handshake, tool discovery and workspace read.\n`
+      `PASS · MCP handshake, tool discovery and workspace read.\n`+
+      (verification?targetClientStatus(verification)+'\n':'')
     );
   }
 }

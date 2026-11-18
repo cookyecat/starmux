@@ -1,7 +1,7 @@
 import {realpath,stat} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
-import type {WorkspacePolicy} from './contracts.js';
+import type {WorkspacePolicy,UpstreamRouter} from './contracts.js';
 import {GatewayError,errorCode} from './validation.js';
 import {prepareBatchRead} from './batch-read-policy.js';
 
@@ -11,6 +11,12 @@ const readOnlyTools=new Set(['health_check','get_config','read_file','read_multi
   'list_directory','get_file_info','start_search','get_more_search_results','stop_search',
   'list_searches','read_process_output','list_sessions','list_processes','get_usage_stats','get_recent_tool_calls']);
 export const isReadOnlyTool=(name:string)=>readOnlyTools.has(name);
+
+export function allowedInHostReadOnly(name:string,router?:UpstreamRouter){
+  const route=router?.routeFor(name);
+  if(route&&route!=='desktop')return router?.hasReadOnlyExtensionGrant?.(name)===true;
+  return isReadOnlyTool(name);
+}
 
 export async function createAccountAccessPolicy(root:string,mode='read-only'):Promise<WorkspacePolicy>{
   if(!path.isAbsolute(root))throw new GatewayError('ROOT_REQUIRED');

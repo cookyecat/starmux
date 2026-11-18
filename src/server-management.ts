@@ -76,6 +76,24 @@ export class ServerManagement {
   const result=await store.editInstanceConfigPaths(instance,edits,revision,this.home);
   this.#previews.delete(previewId);return result;
  }
+ async setReadOnlyTool(instance:store.Instance,id:string,revision:string,input:unknown){
+  if(!input||typeof input!=='object'||!('tool' in input)||typeof input.tool!=='string'||
+     !('enabled' in input)||typeof input.enabled!=='boolean')throw Error('INVALID_READ_ONLY_GRANT');
+  const saved=await store.loadInstanceConfig(instance);
+  if(saved.revision!==revision)throw Error('CONFIG_REVISION_CONFLICT');
+  const servers=saved.config.upstreams;
+  const index=servers.findIndex(server=>server.id===id),server=servers[index];
+  if(!server){
+   if(input.enabled)throw Error('SERVER_NOT_FOUND');
+   return saved; // The running instance can still have grants for a service pending removal.
+  }
+  if(input.enabled&&!server.allowTools.includes(input.tool))throw Error('UPSTREAM_TOOL_NOT_GRANTED');
+  const grants=new Set(server.allowToolsInReadOnly);
+  if(grants.has(input.tool)===input.enabled)return saved;
+  if(input.enabled)grants.add(input.tool);
+  else grants.delete(input.tool);
+  return store.editInstanceConfigPaths(instance,[{path:['upstreams',index,'allowToolsInReadOnly'],value:[...grants]}],revision,this.home);
+ }
  async action(instance:store.Instance,id:string,action:'enable'|'disable'|'remove',revision:string){
   const saved=await this.list(instance);if(!saved.servers.some(s=>s.id===id))throw Error('SERVER_NOT_FOUND');
   const index=saved.servers.findIndex(s=>s.id===id);

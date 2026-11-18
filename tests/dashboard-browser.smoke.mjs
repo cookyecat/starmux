@@ -1,6 +1,9 @@
 // Run after npm run build. CI installs Playwright; local runs may provide its module path.
 import assert from 'node:assert/strict';
+import {checkReadOnlyGrants} from './dashboard-read-grants.smoke.mjs';
 import {parse} from 'jsonc-parser';
+import {createAccessControl} from '../dist/src/access-control.js';
+import {instancePaths,resolveInstance} from '../dist/src/instance-store.js';
 import {mkdtemp,realpath,readFile,mkdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -15,6 +18,8 @@ try{
  const record=JSON.parse(await readFile(path.join(home,'.config/starmux/dashboard/manager.json'),'utf8'));const base=`http://127.0.0.1:${record.port}`;
  const response=await fetch(base+'/api/v1/instances',{method:'POST',headers:{authorization:'Bearer '+record.token,origin:base,'content-type':'application/json'},body:JSON.stringify({name:'Design workspace',config:{schemaVersion:1,projectRoot:path.join(home,'project'),port:19879}})});assert.equal(response.status,200);
  browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const grantsPage=await browser.newPage();
+ try{await checkReadOnlyGrants(grantsPage);}finally{await grantsPage.close();}
  await page.goto(base+'/#token='+record.token);await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();assert.equal(new URL(page.url()).hash,'');
  await mkdir('.internal/playwright',{recursive:true});await page.screenshot({path:'.internal/playwright/dashboard-light.png',fullPage:true});
  await page.locator('#theme').selectOption('dark');await page.screenshot({path:'.internal/playwright/dashboard-dark.png',fullPage:true});
@@ -38,6 +43,20 @@ try{
  assert.equal(await page.locator('#config-warnings').isHidden(),true);
  await page.locator('#language').selectOption('en');
  await page.locator('[data-page="access"]').click();await page.getByText('Create credential',{exact:true}).click();await page.locator('[name="name"]').fill('Browser credential');await page.locator('[data-action="create-key"]').click();await page.locator('#new-key code').waitFor();assert.match(await page.locator('#new-key code').textContent(),/^smx_/);
+ const instance=await resolveInstance('Design workspace',home);
+ const auth=await createAccessControl(instancePaths(instance,home).access,{initialize:false});
+ assert.equal((await auth.authenticate(undefined)).kind,'unverified-local');
+ assert.equal(await page.locator('[name="mode"]').inputValue(),'ingress');
+ assert.match(await page.locator('#new-key').textContent(),/accepts requests without credentials/);
+ await page.getByText('Create credential',{exact:true}).click();
+ await page.locator('[name="name"]').fill('Enabled browser credential');
+ await page.locator('[data-action="create-enabled-key"]').click();
+ await page.getByText('Clients must present an active API key.',{exact:true}).waitFor();
+ assert.equal(await page.locator('[name="mode"]').inputValue(),'api-key');
+ await assert.rejects(auth.authenticate(undefined),/ACCESS_UNAUTHORIZED/);
+ const key=await page.locator('#new-key code').textContent();
+ assert.equal((await auth.authenticate('Bearer '+key)).kind,'verified-api-key');
+ assert.equal((await resolveInstance(instance.id,home)).requiredAccess,'api-key');
  // Test each address using a deterministic LAN/public access response and captured clipboard.
  await page.evaluate(()=>{Object.defineProperty(navigator,'clipboard',{value:{writeText:async text=>{window.copiedConfiguration=text;}}});});
  const urls=['http://127.0.0.1:19879/mcp','http://192.168.50.114:19879/mcp','https://mcp.example.test/mcp'];

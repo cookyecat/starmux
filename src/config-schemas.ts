@@ -3,8 +3,9 @@ export const grantsSchema = z.object({version:z.literal(1),homeRead:z.boolean(),
 export const denySchema = z.object({version:z.literal(1),deniedTools:z.array(z.string()),deniedDirectories:z.array(z.string())}).strict();
 const cleanString=z.string().max(4096).refine(v=>!v.includes('\0'));
 const headers=z.record(z.string().regex(/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/),z.string().max(4096).refine(v=>!/[\r\n\0]/.test(v)));
+const toolNames=z.array(z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/)).max(2000).refine(v=>new Set(v).size===v.length);
 const common={id:z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/).refine(v=>!['desktop','health_check'].includes(v)),
-  allowTools:z.array(z.string().regex(/^[A-Za-z0-9_.:-]{1,128}$/)).max(2000).refine(v=>new Set(v).size===v.length),
+  allowTools:toolNames,allowToolsInReadOnly:toolNames.optional(),
   enabled:z.boolean().optional(),startupTimeoutMs:z.number().int().min(100).max(300000).optional()};
 const resolved={...common,configurationError:z.literal('UPSTREAM_SECRET_MISSING').optional()};
 const stdio={transport:z.literal('stdio'),command:cleanString.refine(v=>v.length>0),args:z.array(cleanString).max(40),cwd:cleanString.optional()};

@@ -8,7 +8,7 @@ import {open,readFile} from 'node:fs/promises';
 import {fork,spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import * as store from './instance-store.js';
-import {instanceStatus,instanceRequest,stopInstance} from './instance-runtime.js';
+import {instanceStatus,instanceRequest,revokeInstanceReadOnlyTool,stopInstance} from './instance-runtime.js';
 import {createAccessControl} from './access-control.js';
 import {discoverOAuth} from './oauth-resource.js';
 import {createWorkspaceGrants} from './workspace-grants.js';
@@ -69,7 +69,9 @@ export async function runManager(){
    const b=req.method==='POST'?await body(req):{};
    if(route==='/api/v1/stop'&&req.method==='POST'){send(200,{ok:true});server.close();server.closeIdleConnections();return;}
    if(route==='/api/v1/instances'){
-    if(req.method==='POST'){if(Object.keys(b).some(k=>!['name','config','approved'].includes(k)))throw Error('INVALID_FIELDS');const config=await store.validateConfig(store.parseConfig(JSON.stringify(b.config)));await approve(config,b.approved);const i=await store.createInstance(String(b.name),{config});await consent(i,config);await createAccessControl(store.instancePaths(i).access);send(200,i);return;}
+    if(req.method==='POST'){if(Object.keys(b).some(k=>!['name','config','approved'].includes(k)))throw Error('INVALID_FIELDS');const input=b.config;
+     if(input&&typeof input==='object'&&!Array.isArray(input)&&input.port===undefined)input.port=await store.suggestPort(homedir(),input.allowLan===true?'0.0.0.0':'127.0.0.1');
+     const config=await store.validateConfig(store.parseConfig(JSON.stringify(input)));await approve(config,b.approved);const i=await store.createInstance(String(b.name),{config});await consent(i,config);await createAccessControl(store.instancePaths(i).access);send(200,i);return;}
     const registry=await store.readRegistry();send(200,{defaultInstanceId:registry.defaultInstanceId,instances:await Promise.all(registry.instances.map(i=>instanceStatus(i))),operations:[...operations.values()]});return;
    }
    const opId=route.match(/^\/api\/v1\/operations\/([a-f0-9]+)$/)?.[1];if(opId){if(req.method==='POST'){if(b.op!=='cancel'||!cancellations.has(opId))throw Error('OPERATION_NOT_CANCELLABLE');cancellations.get(opId)!.abort();}send(operations.has(opId)?200:404,operations.get(opId)??{error:'OPERATION_NOT_FOUND'});return;}
@@ -86,6 +88,26 @@ export async function runManager(){
    }
    if(action==='servers'){
     if(req.method==='GET'){send(200,{...await services.list(i),runtime:await gatewayState(i)});return;}
+    if(b.op==='read-only-tool'){
+     send(202,startOperation(i,async()=>{
+       const before=b.input?.enabled===true?await instanceStatus(i):null;
+       const saved=await services.setReadOnlyTool(i,String(b.id),String(b.revision),b.input);
+       if(b.input.enabled===false){
+         try{
+           const runtime=await revokeInstanceReadOnlyTool(i,saved.revision,{serverId:b.id,tool:b.input.tool});
+           if(!runtime){
+             const current=await instanceStatus(i);
+             if(current.phase==='stopped')return {...saved,application:'on-next-start'};
+             return {...saved,application:'pending',error:current.runtimeProblem??'INSTANCE_CONTROL_UNAVAILABLE'};
+           }
+           return {...saved,application:'applied',otherConfigPending:runtime.active?.effectiveRevision!==saved.effectiveRevision};
+         }catch(error){return {...saved,application:'pending',error:(error as Error).message};}
+       }
+       if(before?.configState==='pending')return {...saved,application:'pending',otherConfigPending:true};
+       if(before?.phase!=='running'&&before?.phase!=='stopped')return {...saved,application:'pending',error:before?.runtimeProblem??'INSTANCE_NOT_READY'};
+       return {...saved,...await applySavedGateway(i,saved.revision)};
+     }));return;
+    }
     if(b.op==='auth'){send(200,await services.auth(i,String(b.id),String(b.authAction),b.previewId));return;}
     if(b.op==='preview'){send(200,await services.preview(i,String(b.input??''),b.id,b.file));return;}
     if(b.op==='save'||b.op==='replace'){const saved=await services.savePreview(i,String(b.previewId),String(b.revision),b.op==='replace');send(202,startOperation(i,async()=>({...saved,...await applySavedGateway(i,saved.revision)})));return;}
@@ -119,7 +141,11 @@ export async function runManager(){
    if(action==='access'){
     const access=await createAccessControl(p.access);let created;
     if(req.method==='POST'){
-     if(b.op==='create')created=await access.create(String(b.name),b.expiresAt||null);
+     if(b.op==='create'||b.op==='create-and-enable'){
+      const activate=b.op==='create-and-enable';
+      created=await access.create(String(b.name),b.expiresAt||null,activate);
+      if(activate)await store.changeRegistry(async r=>{r.instances.find(x=>x.id===i.id)!.requiredAccess='api-key';});
+     }
      else if(b.op==='revoke')await access.revoke(String(b.id));else if(b.op==='oauth-revoke')await access.revokeOAuth(String(b.id));
      else if(b.op==='mode'){if(!['ingress','api-key','oauth'].includes(b.mode))throw Error('INVALID_MODE');await access.setMode(b.mode);await store.changeRegistry(async r=>{r.instances.find(x=>x.id===i.id)!.requiredAccess=b.mode;});}
      else if(b.op==='oauth')await access.configureOAuth(await discoverOAuth(b.config));else throw Error('INVALID_ACTION');
@@ -159,6 +185,16 @@ async function approve(config:store.InstanceConfig,approved:unknown,i?:store.Ins
 async function consent(i:store.Instance,c:store.InstanceConfig){if(c.accessRole==='trusted'&&c.writeScope==='unrestricted')await store.atomicPrivate(path.join(store.instancePaths(i).state,'coding-consent.json'),JSON.stringify({version:1,scope:'os-account',approvedAt:new Date().toISOString()}));}
 
 async function gatewayState(instance:store.Instance){
- const status=await instanceStatus(instance);if(status.phase!=='running'||!status.port)return null;
- try{const owner=await createAccessControl(store.instancePaths(instance).access);const response=await fetch(`http://127.0.0.1:${status.port}/gateway-state.json?instanceId=${encodeURIComponent(instance.id)}`,{headers:{authorization:'Bearer '+await owner.ownerToken()},signal:AbortSignal.timeout(2000)});if(!response.ok)return null;const result=await response.json() as {instanceId:string};return result.instanceId===instance.id?result:null;}catch{return null;}
+ const status=await instanceStatus(instance);
+ if(status.phase!=='running'||!status.port||!status.active)return null;
+ const activeReadOnlyGrants=Object.fromEntries(status.active.config.upstreams.map(server=>[server.id,server.allowToolsInReadOnly??[]]));
+ try{
+   const owner=await createAccessControl(store.instancePaths(instance).access);
+   const response=await fetch(`http://127.0.0.1:${status.port}/gateway-state.json?instanceId=${encodeURIComponent(instance.id)}`,{headers:{authorization:'Bearer '+await owner.ownerToken()},signal:AbortSignal.timeout(2000)});
+   if(response.ok){
+     const result=await response.json() as {instanceId:string};
+     if(result.instanceId===instance.id)return {...result,activeReadOnlyGrants};
+   }
+ }catch{/* The supervisor still supplies the active permissions if worker diagnostics are unavailable. */}
+ return {activeReadOnlyGrants};
 }

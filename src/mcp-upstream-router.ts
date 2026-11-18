@@ -20,12 +20,14 @@ function validRoute(route: unknown){
 export function createMCPUpstreamRouter({routes,defaultRoute="desktop"}: {routes: RouteDefinition[]; defaultRoute?: string}): UpstreamRouter{
   if(!Array.isArray(routes)||routes.length===0)invalid("ROUTES_REQUIRED");
   const mapping=new Map<string,{route:string;nativeName:string;upstream: RouteDefinition["upstream"];authorize: RouteDefinition["authorize"]}>(),seenRoutes=new Set<string>(),catalog:Tool[]=[],routeInfos:RouteInfo[]=[];
-  for(const {id,upstream,exposeNativeNames=false,authorize=null} of routes){
+  const readOnlyGrants=new Map<string,ReadonlySet<string>>();
+  for(const {id,upstream,exposeNativeNames=false,authorize=null,allowToolsInReadOnly=[]} of routes){
     if(!validRoute(id)||seenRoutes.has(id))invalid("INVALID_OR_DUPLICATE_ROUTE");
     seenRoutes.add(id);
     if(!upstream||!Array.isArray(upstream.upstreamCatalog)||
       typeof upstream.forwardWorkspaceInvocation!=="function")invalid("INVALID_UPSTREAM");
     const names=new Set();
+    if(id!==defaultRoute)readOnlyGrants.set(id,allowToolsInReadOnly instanceof Set?allowToolsInReadOnly:new Set(allowToolsInReadOnly));
     for(const tool of upstream.upstreamCatalog){
       if(typeof tool?.name!=="string"||!tool.name||names.has(tool.name)||
         !tool.inputSchema||typeof tool.inputSchema!=="object")
@@ -58,6 +60,7 @@ export function createMCPUpstreamRouter({routes,defaultRoute="desktop"}: {routes
     routes:Object.freeze(routeInfos),
     async cacheScopeFor(target:{serverId:string;toolName:string}){return await routes.find(r=>r.id===target.serverId)?.upstream.cacheIdentity?.()??'os-account';},
     targetFor(publicName:string){const target=mapping.get(publicName);return target?{serverId:target.route,toolName:target.nativeName}:undefined;},
+    hasReadOnlyExtensionGrant(name:string){const target=mapping.get(name);return !!target&&readOnlyGrants.get(target.route)?.has(target.nativeName)===true;},
     routeFor(publicName: string){return mapping.get(publicName)?.route||null;},
     async authorizeExtension(publicName: string,args: ToolArguments){
       const target=mapping.get(publicName);

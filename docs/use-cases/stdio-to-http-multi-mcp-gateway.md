@@ -30,7 +30,7 @@ cd /path/to/your/project
 starmux up --code
 ```
 
-*(By default, Starmux starts in Global Read-Only mode `--read`, which blocks write/execute tools and additional upstream MCP tools until you opt into `--code`.)*
+*(By default, Starmux starts in Global Read-Only mode `--read`, which blocks host writes and Shell execution. See the explicit upstream grants below.)*
 
 ---
 
@@ -132,7 +132,7 @@ Built-in Desktop Commander tools keep their native names (e.g., `read_file`, `ed
 Starmux automatically detects sensitive environment variables (`env`) and HTTP headers during import, moves their values into the instance's private secret store (`~/.config/starmux/instances/<uuid>/state/`, protected with `0600` owner-only permissions), and replaces them in `config.jsonc` with safe `envRefs` and `headerRefs` pointers. Exported configurations never leak plaintext secrets.
 
 ### Q: Does Global Read-Only mode (`starmux up --read`) also restrict mounted third-party MCP servers?
-Yes. Because an external MCP server's `readOnlyHint` annotation is unverified metadata, Starmux's Global Read-Only mode (`--read`) excludes additional upstream MCP tools from execution and never auto-trusts `readOnlyHint` for permissions or caching. Switch to `starmux up --code` when you want connected upstream MCP tools enabled, and use each server's `allowTools` allowlist to control which upstream tools are exposed.
+Yes. In `--read`, list each permitted upstream tool by native name in both `allowTools` and `allowToolsInReadOnly` for its server. Omitting the second list leaves that server’s tools blocked. The host terminal stays blocked. In Coding mode, `allowTools` controls the upstream tool set.
 
 ---
 
